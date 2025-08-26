@@ -1,0 +1,18 @@
+Frame rates are total frame rate including morph render and data
+transfer. There may be wide variation in time for individual loops,
+with fewer samples. These numbers generated on a ROG Strix laptop with
+Core i9 CPU and a laptop 4080 GPU.
+
+Samples  FPS with CUDA avg   FPS pre-CUDA
+2048     40                  3.7-4.5
+1024     65                  7-10
+ 512    120                  20-21
+ 256    240                  36-37
+ 128    450                  76-83
+  64   ~700                  217-240
+  32   ~770                  169-388
+  16   ~900                  340-620
+   8  ~1200                  450-880
+   4  ~1200                  500-900
+   2  ~1300                  700-1100
+   1  ~1300                  700-1300
