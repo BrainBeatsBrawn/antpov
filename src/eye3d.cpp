@@ -113,11 +113,8 @@ int main (int argc, char* argv[])
     v.speed = 0.05f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
     v.scenetrans_stepsize = 0.1f;
-
-    v.showUserFrame (true);
-    v.options.set (mplot::visual_options::rotateAboutSceneOrigin, false);
-    v.options.set (mplot::visual_options::highlightCentralVM, true);
-    v.options.set (mplot::visual_options::boundingBoxesToJson, true);
+    // Rotate about the nearest VisualModel
+    v.rotateAboutNearest (true);
 
     // Use a FPS profiling with a text object on screen
     mplotext::fps::profiler fps_profiler;
