@@ -115,6 +115,7 @@ int main (int argc, char* argv[])
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.05f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
+
     // Use a non-default zFar as we use large environments
     v.zFar = 2400;
     // Rotate about the nearest VisualModel
