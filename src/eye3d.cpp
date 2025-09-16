@@ -21,6 +21,7 @@
 #include <mplotext/FourpiVisual.h>
 #include <mplot/VoronoiVisual.h>
 #include <mplot/CoordArrows.h>
+#include <mplot/GridVisual.h>
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -203,7 +204,10 @@ int main (int argc, char* argv[])
     cam_cs_ptr->name = "eye frame";
     cam_cs_ptr->setViewMatrix (initial_camera_space);
 
-    // Get access to the landscape VisualModel
+    /**
+     * Get access to the landscape VisualModel
+     */
+
     mplot::VisualModel<>* land = nullptr;
     {
         mplot::VisualModel<>* vmp = nullptr;
@@ -212,6 +216,13 @@ int main (int argc, char* argv[])
             if (vmp->name == "Landscape.003") { land = vmp; }
         }
     }
+    if (land) {
+        std::cout << "Landscape name: " << land->name << " was found\n";
+        std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
+        std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
+    }
+
+#if 0
     // Create a grid and associated data structures for landscape height along with landscape normal
     sm::grid<> g_land_xz;
     sm::vvec<float> g_land_y;
@@ -223,7 +234,8 @@ int main (int argc, char* argv[])
 
         // uy up, to x, z coords to grid
         unsigned int i_x = 0;
-        unsigned int i_y = opts.test(eye3d::options::blender_axes) ? 1 : 2;
+        unsigned int i_y = opts.test (eye3d::options::blender_axes) ? 1 : 2;
+        unsigned int i_z = opts.test (eye3d::options::blender_axes) ? 2 : 1;
         sm::vec<> pos = {};
         sm::vec<float, 2> xy_last = {};
         auto sp_x = sm::range<float>::search_initialized();
@@ -253,7 +265,63 @@ int main (int argc, char* argv[])
 
         // Can now build the heights for the grid and the normals.
         std::cout << "Landscape grid has size " << g_land_xz.n() << std::endl;
+        g_land_y.resize (g_land_xz.n(), -100.0f);
+        g_land_n.resize (g_land_xz.n(), {});
+
+        // Go through vpos. Fill grid in from those values. Then interpolate any missing elements
+        land->init_vpos_accessor();
+        while ((pos = land->get_next_vpos(), pos[0]) != std::numeric_limits<float>::max()) {
+            sm::vec<float, 2> xy = { pos[i_x], pos[i_y] };
+            try {
+                unsigned int i = g_land_xz.index_lookup (xy);
+                g_land_y[i] = pos[i_z];
+                // g_land_n[i] = land->get_normal(i);
+            } catch (...) {}
+        }
+        //unsigned int c = 0;
+        for (unsigned int i = 0; i < g_land_xz.n(); ++i) {
+            if (g_land_y[i] == -100.0f) {
+                //++c;
+                //std::cout << "  Grid element at " << g_land_xz[i] << " has not been set\n";
+                sm::vvec<unsigned int> neighbour_inds;
+                g_land_xz.find_nearest_neighbours ({i}, neighbour_inds);
+                //std::cout << "  Neighbours: " << neighbour_inds.size() << std::endl;
+                g_land_y[i] = 0.0f;
+                float nc = 1.0f;
+                for (auto ni : neighbour_inds) {
+                    if (g_land_y[ni] != -100.0f) {
+                        g_land_y[i] += g_land_y[ni];
+                        nc += 1.0f;
+                    }
+                }
+                g_land_y[i] /= nc;
+                //std::cout << "  Grid element height is now " << g_land_y[i] << std::endl;
+            }
+        }
     }
+
+    // Now check landscape grid with a GridVisual
+    auto gv = std::make_unique<mplot::GridVisual<float>>(&g_land_xz, sm::vec<>{0, 100, 0});
+    v.bindmodel (gv);
+    //sm::quaternion<float> vm;
+    //vm.set_rotation (sm::vec<>::ux(), -sm::mathconst<float>::pi_over_2);
+    //gv->setViewRotation (vm);
+    gv->gridVisMode = mplot::GridVisMode::RectInterp;
+    gv->setScalarData (&g_land_y);
+    gv->cm.setType (mplot::ColourMapType::Cork);
+    gv->zScale.do_autoscale = false;
+    gv->zScale.compute_scaling (0, 1);
+    gv->colourScale.do_autoscale = false;
+    gv->colourScale.compute_scaling (-1, 1);
+    gv->showborder (false);
+    gv->implygrid (true);
+    gv->addLabel ("Landscape grid", sm::vec<>{0,10,0}, mplot::TextFeatures(0.08f));
+    gv->finalize();
+    v.addVisualModel (gv);
+#endif
+    /**
+     * Done with landscape
+     */
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
