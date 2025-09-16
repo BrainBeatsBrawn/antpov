@@ -3,7 +3,10 @@
 #include <array>
 #include <deque>
 #include <chrono>
+
 #include <sm/flags>
+#include <sm/vvec>
+#include <sm/grid>
 
 #include <sampleConfig.h>
 
@@ -112,9 +115,15 @@ int main (int argc, char* argv[])
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.05f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
-    v.scenetrans_stepsize = 0.1f;
+    // Use a non-default zFar as we use large environments
+    v.zFar = 2400;
     // Rotate about the nearest VisualModel
     v.rotateAboutNearest (true);
+    // Rotate about a scene vertical axis
+    v.rotateAboutVertical (true);
+    if (opts.test(eye3d::options::blender_axes)) {
+        v.switch_scene_vertical_axis(); // to uz up
+    }
 
     // Use a FPS profiling with a text object on screen
     mplotext::fps::profiler fps_profiler;
@@ -172,6 +181,7 @@ int main (int argc, char* argv[])
         fpvm->cm.setType (mplot::ColourMapType::RGB);
         fpvm->setColourData (&ommatidiaData);
         fpvm->setViewMatrix (initial_camera_space);
+        fpvm->name = "fourpi";
         fpvm->finalize();
         fourpi_ptr = v.addVisualModel (fpvm);
     } else {
@@ -181,6 +191,7 @@ int main (int argc, char* argv[])
             auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (offset, &ommatidiaData, ommatidia);
             v.bindmodel (eyevm);
             eyevm->setViewMatrix (initial_camera_space);
+            eyevm->name = "EyeVisual";
             eyevm->finalize();
             eyevm_ptr = v.addVisualModel (eyevm);
         }
@@ -188,7 +199,60 @@ int main (int argc, char* argv[])
 
     // Make CoordArrows axes to show our camera's localspace
     mplot::CoordArrows<>* cam_cs_ptr = eye3d::plot_axes (&v);
+    cam_cs_ptr->name = "eye frame";
     cam_cs_ptr->setViewMatrix (initial_camera_space);
+
+    // Get access to the landscape VisualModel
+    mplot::VisualModel<>* land = nullptr;
+    {
+        mplot::VisualModel<>* vmp = nullptr;
+        v.init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
+        while ((vmp = v.get_next_vm_accessor()) != nullptr) {
+            if (vmp->name == "Landscape.003") { land = vmp; }
+        }
+    }
+    // Create a grid and associated data structures for landscape height along with landscape normal
+    sm::grid<> g_land_xz;
+    sm::vvec<float> g_land_y;
+    sm::vvec<sm::vec<float>> g_land_n;
+    if (land) {
+        std::cout << "Landscape name: " << land->name << " was found\n";
+        std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
+        std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
+
+        // uy up, to x, z coords to grid
+        unsigned int i_x = 0;
+        unsigned int i_y = opts.test(eye3d::options::blender_axes) ? 1 : 2;
+        sm::vec<> pos = {};
+        sm::vec<float, 2> xy_last = {};
+        auto sp_x = sm::range<float>::search_initialized();
+
+        land->init_vpos_accessor();
+        while ((pos = land->get_next_vpos(), pos[0]) != std::numeric_limits<float>::max()) {
+            // From this determine spacing
+            sm::vec<float, 2> xy = { pos[i_x], pos[i_y] };
+            auto xl = (xy - xy_last).length();
+            if (xl > 0.0001f) { sp_x.update (xl); }
+            xy_last = xy;
+        }
+        std::cout << "Spacing length range " << sp_x << std::endl;
+        // use sp_x.min as our gridspacing
+        sm::vec<float, 2> spacing = { sp_x.min, sp_x.min };
+        auto _bb = land->get_viewmatrix_modelbb();
+        auto x_d = _bb.max[i_x] - _bb.min[i_x]; // is the distance
+        auto y_d = _bb.max[i_y] - _bb.min[i_y];
+        sm::vec<unsigned int, 2> dims = { (x_d + spacing[0]) / spacing[0], (y_d + spacing[1]) / spacing[1] };
+        sm::vec<float, 2> grid_offset = { _bb.min[i_x], _bb.min[i_y] };
+
+        // Make a sm::grid that encompasses the land, then from x, z location, can find a grid
+        // element and do a fast search of the vertices that come within the element.
+        // What about neighbours? Grid makes finding these faster, too
+        g_land_xz.set_grid_params (dims, spacing, grid_offset);
+        g_land_xz.init();
+
+        // Can now build the heights for the grid and the normals.
+        std::cout << "Landscape grid has size " << g_land_xz.n() << std::endl;
+    }
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
@@ -257,6 +321,7 @@ int main (int argc, char* argv[])
                         vvm->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&ommatidiaData));
                         vvm->data_z_direction = voronoi_z_dirn;
                         vvm->setViewMatrix (mplot::compoundray::getCameraSpace (scene));
+                        vvm->name = "VoronoiVisual";
                         vvm->finalize();
                         vvm_ptr = v.addVisualModel (vvm);
                     }
@@ -313,6 +378,32 @@ int main (int argc, char* argv[])
         }
         cam_cs_ptr->setViewMatrix (camera_space);
     };
+
+#if 0 // From c_ray_mushscan:
+
+    // Sets the height above the landscape, but *needs to search full_landscape* to do this, so
+    // there's a comp. hit Uses a container of vertices and a container of normals. In mushscan,
+    // these were extracted from compound ray, but here, we have VisualModels (VerticesVisuals) that
+    // contain these data
+    auto subr_set_height = [land, cam_height, cam_rotnzero]
+    (sm::vec<float>& cam_posn, sm::vec<float>& last_posn)
+    {
+        if (cam_posn == last_posn) { return; }
+        // Figure out nearest landscape element and...
+        size_t closest_idx = std::numeric_limits<size_t>::max();
+        float min_lsq = std::numeric_limits<float>::max();
+        // Use land->vertexPositions
+        for (size_t i = 0; i < full_landscape.size(); ++i) {
+            float dx = full_landscape[i].x() - cam_posn[0];
+            float dz = full_landscape[i].z() - cam_posn[2];
+            float dl = dx * dx + dz * dz; // no need for sqrt, just want closest
+            min_lsq = dl < min_lsq ? closest_idx = i, dl : min_lsq;
+        }
+        cam_posn[1] = full_landscape[closest_idx].y() + cam_height;
+        mushscan::setCameraPose (cam_posn, cam_rotnzero);
+    };
+
+#endif
 
     /**
      * The main program loop
