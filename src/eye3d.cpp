@@ -213,112 +213,41 @@ int main (int argc, char* argv[])
         mplot::VisualModel<>* vmp = nullptr;
         v.init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
-            if (vmp->name == "Landscape.003") { land = vmp; }
+            // The 'land' is a cube for now
+            if (vmp->name == "Cube.002") { land = vmp; }
+            //if (vmp->name == "Landscape.003") { land = vmp; }
         }
     }
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
         std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
         std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
-    }
 
-#if 0
-    // Create a grid and associated data structures for landscape height along with landscape normal
-    sm::grid<> g_land_xz;
-    sm::vvec<float> g_land_y;
-    sm::vvec<sm::vec<float>> g_land_n;
-    if (land) {
-        std::cout << "Landscape name: " << land->name << " was found\n";
-        std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
-        std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
+        auto loc1 = sm::vec<>{8.9f, -1.0f, 0.0f};
+        uint32_t idx1 = land->find_vp1_nearest (loc1);
+        std::cout << "Index " << idx1 << " " << land->vp1[idx1] << " is nearest to loc1: " << loc1 << std::endl;
 
-        // uy up, to x, z coords to grid
-        unsigned int i_x = 0;
-        unsigned int i_y = opts.test (eye3d::options::blender_axes) ? 1 : 2;
-        unsigned int i_z = opts.test (eye3d::options::blender_axes) ? 2 : 1;
-        sm::vec<> pos = {};
-        sm::vec<float, 2> xy_last = {};
-        auto sp_x = sm::range<float>::search_initialized();
+        // Vector towards land?
+        std::cout << "bb centre is " << land->get_viewmatrix_bb_centre() << std::endl;
+        sm::vec<> to_land = land->get_viewmatrix_bb_centre() - loc1;
+        std::cout << "bb centre - loc1 = " << to_land << std::endl;
 
-        land->init_vpos_accessor();
-        while ((pos = land->get_next_vpos(), pos[0]) != std::numeric_limits<float>::max()) {
-            // From this determine spacing
-            sm::vec<float, 2> xy = { pos[i_x], pos[i_y] };
-            auto xl = (xy - xy_last).length();
-            if (xl > 0.0001f) { sp_x.update (xl); }
-            xy_last = xy;
+        // Neighbours of idx1?
+        sm::vvec<uint32_t> nb = land->neighbours (idx1);
+        std::cout << "neighbours of idx1=" << idx1 << ": " << nb << std::endl;
+        sm::vvec<std::array<uint32_t, 3>> nbt = land->neighbour_triangles (idx1);
+        std::cout << "neighbour tris:\n";
+        for (auto t : nbt) {
+            std::cout << "  " << t[0] << "," << t[1] << "," << t[2] << std::endl;
         }
-        std::cout << "Spacing length range " << sp_x << std::endl;
-        // use sp_x.min as our gridspacing
-        sm::vec<float, 2> spacing = { sp_x.min, sp_x.min };
-        auto _bb = land->get_viewmatrix_modelbb();
-        auto x_d = _bb.max[i_x] - _bb.min[i_x]; // is the distance
-        auto y_d = _bb.max[i_y] - _bb.min[i_y];
-        sm::vec<unsigned int, 2> dims = { (x_d + spacing[0]) / spacing[0], (y_d + spacing[1]) / spacing[1] };
-        sm::vec<float, 2> grid_offset = { _bb.min[i_x], _bb.min[i_y] };
 
-        // Make a sm::grid that encompasses the land, then from x, z location, can find a grid
-        // element and do a fast search of the vertices that come within the element.
-        // What about neighbours? Grid makes finding these faster, too
-        g_land_xz.set_grid_params (dims, spacing, grid_offset);
-        g_land_xz.init();
-
-        // Can now build the heights for the grid and the normals.
-        std::cout << "Landscape grid has size " << g_land_xz.n() << std::endl;
-        g_land_y.resize (g_land_xz.n(), -100.0f);
-        g_land_n.resize (g_land_xz.n(), {});
-
-        // Go through vpos. Fill grid in from those values. Then interpolate any missing elements
-        land->init_vpos_accessor();
-        while ((pos = land->get_next_vpos(), pos[0]) != std::numeric_limits<float>::max()) {
-            sm::vec<float, 2> xy = { pos[i_x], pos[i_y] };
-            try {
-                unsigned int i = g_land_xz.index_lookup (xy);
-                g_land_y[i] = pos[i_z];
-                // g_land_n[i] = land->get_normal(i);
-            } catch (...) {}
-        }
-        //unsigned int c = 0;
-        for (unsigned int i = 0; i < g_land_xz.n(); ++i) {
-            if (g_land_y[i] == -100.0f) {
-                //++c;
-                //std::cout << "  Grid element at " << g_land_xz[i] << " has not been set\n";
-                sm::vvec<unsigned int> neighbour_inds;
-                g_land_xz.find_nearest_neighbours ({i}, neighbour_inds);
-                //std::cout << "  Neighbours: " << neighbour_inds.size() << std::endl;
-                g_land_y[i] = 0.0f;
-                float nc = 1.0f;
-                for (auto ni : neighbour_inds) {
-                    if (g_land_y[ni] != -100.0f) {
-                        g_land_y[i] += g_land_y[ni];
-                        nc += 1.0f;
-                    }
-                }
-                g_land_y[i] /= nc;
-                //std::cout << "  Grid element height is now " << g_land_y[i] << std::endl;
-            }
+        // idx1 indices?
+        std::cout << "equivalent indices to idx1: " << land->vp1_to_indices[idx1] << std::endl;
+        for (auto i : land->vp1_to_indices[idx1]) {
+            std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
         }
     }
 
-    // Now check landscape grid with a GridVisual
-    auto gv = std::make_unique<mplot::GridVisual<float>>(&g_land_xz, sm::vec<>{0, 100, 0});
-    v.bindmodel (gv);
-    //sm::quaternion<float> vm;
-    //vm.set_rotation (sm::vec<>::ux(), -sm::mathconst<float>::pi_over_2);
-    //gv->setViewRotation (vm);
-    gv->gridVisMode = mplot::GridVisMode::RectInterp;
-    gv->setScalarData (&g_land_y);
-    gv->cm.setType (mplot::ColourMapType::Cork);
-    gv->zScale.do_autoscale = false;
-    gv->zScale.compute_scaling (0, 1);
-    gv->colourScale.do_autoscale = false;
-    gv->colourScale.compute_scaling (-1, 1);
-    gv->showborder (false);
-    gv->implygrid (true);
-    gv->addLabel ("Landscape grid", sm::vec<>{0,10,0}, mplot::TextFeatures(0.08f));
-    gv->finalize();
-    v.addVisualModel (gv);
-#endif
     /**
      * Done with landscape
      */
