@@ -22,6 +22,7 @@
 #include <mplot/VoronoiVisual.h>
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
+#include <mplot/SphereVisual.h> // debug really
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -218,6 +219,7 @@ int main (int argc, char* argv[])
             //if (vmp->name == "Landscape.003") { land = vmp; }
         }
     }
+    sm::vec<float, 3> hp = {};
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
         std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
@@ -246,11 +248,24 @@ int main (int argc, char* argv[])
         for (auto i : land->vp1_to_indices[idx1]) {
             std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
         }
+
+        auto tc = land->find_triangle_crossing (sm::vec<>{0,1,-1});
+        std::array<uint32_t, 3> ti = std::get<1>(tc); // triangle indices
+        std::cout << "Indices: " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
+        std::cout << "Contains hit " << std::get<0>(tc) << std::endl;
+        auto vm = land->get_viewmatrix();
+        hp = (vm * std::get<0>(tc)).less_one_dim();
+        std::cout << "or with viewmatrix of model: " << hp << std::endl;
     }
 
     /**
      * Done with landscape
      */
+
+    auto sv = std::make_unique<mplot::SphereVisual<>>(hp, 0.1, mplot::colour::goldenrod3);
+    v.bindmodel (sv);
+    sv->finalize();
+    v.addVisualModel (sv);
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
@@ -304,7 +319,7 @@ int main (int argc, char* argv[])
                     if (opts.test (eye3d::options::prefer_voronoi) == false) {
                         eyevm_ptr->reinit();
                     } else {
-                        constexpr sm::vec<float> voronoi_z_dirn = { 0, 0, 1 }; // Hack, your z dirn may need to be different
+                        constexpr auto voronoi_z_dirn = sm::vec<float>::uz(); // Hack, your z dirn may need to be different
                         sm::vec<float, 3> offset = { 0.0f };
                         auto vvm = std::make_unique<mplot::VoronoiVisual<float, 0>> (offset);
                         v.bindmodel (vvm);
