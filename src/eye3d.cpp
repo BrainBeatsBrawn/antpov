@@ -118,6 +118,8 @@ int main (int argc, char* argv[])
     v.speed = 0.05f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
 
+    v.lightingEffects (true);
+
     // Use a non-default zFar as we use large environments
     v.zFar = 2400;
     // Rotate about the nearest VisualModel
@@ -220,6 +222,9 @@ int main (int argc, char* argv[])
         }
     }
     sm::vec<float, 3> hp = {};
+
+    sm::mat44<float> vm;
+    sm::mat44<float> vmi;
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
         std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
@@ -249,11 +254,16 @@ int main (int argc, char* argv[])
             std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
         }
 
-        auto tc = land->find_triangle_crossing (sm::vec<>{0,1,-1});
+        vm = land->get_viewmatrix();
+        vmi = vm.inverse();
+        sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
+        auto camloc = camspace * sm::vec<>{0,0,0};
+        auto aa = (vmi * camloc).less_one_dim();
+        std::tuple<sm::vec<float, 3>,
+                   std::array<uint32_t, 3>> tc = land->find_triangle_crossing (aa);
         std::array<uint32_t, 3> ti = std::get<1>(tc); // triangle indices
         std::cout << "Indices: " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
         std::cout << "Contains hit " << std::get<0>(tc) << std::endl;
-        auto vm = land->get_viewmatrix();
         hp = (vm * std::get<0>(tc)).less_one_dim();
         std::cout << "or with viewmatrix of model: " << hp << std::endl;
     }
@@ -265,7 +275,7 @@ int main (int argc, char* argv[])
     auto sv = std::make_unique<mplot::SphereVisual<>>(hp, 0.1, mplot::colour::goldenrod3);
     v.bindmodel (sv);
     sv->finalize();
-    v.addVisualModel (sv);
+    mplot::SphereVisual<>* svp = v.addVisualModel (sv);
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
@@ -353,7 +363,7 @@ int main (int argc, char* argv[])
     /**
      * Subroutine: Move the camera according to key events in the mathplot window
      */
-    auto subr_key_move_camera = [&v, &eyevm_ptr, &vvm_ptr, &cam_cs_ptr, &fourpi_ptr, &initial_camera_space, opts]()
+    auto subr_key_move_camera = [&v, &eyevm_ptr, &vvm_ptr, &cam_cs_ptr, &fourpi_ptr, &initial_camera_space, opts, land, &svp, vm, vmi]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -390,6 +400,29 @@ int main (int argc, char* argv[])
             }
         }
         cam_cs_ptr->setViewMatrix (camera_space);
+
+        if (land) {
+            auto camloc = camera_space * sm::vec<>{0,0,0};
+            std::cout << "Cam locn = " << camloc << std::endl;
+            // Update vm/vmi?
+            auto aa = (vmi * camloc).less_one_dim();
+            std::tuple<sm::vec<float, 3>,
+                       std::array<uint32_t, 3>> tc = land->find_triangle_crossing (aa);
+            std::array<uint32_t, 3> ti = std::get<1>(tc); // triangle indices
+            if (ti[0] == std::numeric_limits<uint32_t>::max()) {
+                std::cout << "No hit\n";
+            } else {
+                std::cout << "Indices: " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
+                std::cout << "Contains hit at " << std::get<0>(tc) << std::endl;
+                sm::vec<float, 3> hp = (vm * std::get<0>(tc)).less_one_dim();
+                std::cout << "In scene coordinates, hit = " << hp << std::endl;
+
+                // Re-draw sphere
+                sm::mat44<float> newsphere;
+                newsphere.translate (hp);
+                svp->setViewMatrix (newsphere);
+            }
+        }
     };
 
 #if 0 // From c_ray_mushscan:
@@ -435,6 +468,7 @@ int main (int argc, char* argv[])
         if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.waitevents (0.018); }
         // Deal with any movements commanded by key press events (including reset)
         subr_key_move_camera();
+
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed
