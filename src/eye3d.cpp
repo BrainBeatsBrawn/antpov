@@ -279,10 +279,8 @@ int main (int argc, char* argv[])
             // Turn the hit point into a translation matrix
             sm::mat44<float> hitlocn;
             hitlocn.translate (hp);
-
             // Re-draw sphere
             svp->setViewMatrix (hitlocn);
-
             // The camera frame always has y up. Choose a random vector in the plane for 'x'
             // and then set z from this random x and the triangle norm (y).
             sm::vec<float> rand_vec;
@@ -416,7 +414,35 @@ int main (int argc, char* argv[])
 
                 if (ti[0] == std::numeric_limits<uint32_t>::max()) {
                     std::cout << "No hit - off the edge!\n";
+                    // In this case, we need to react to having fallen off, but re-orienting until
+                    // we find a new place on the model.
+                    if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
+                        std::cout << "No hit0 - off the edge TOTALLY!\n";
+                    } else {
+                        // Reorient to new triangle
+                        std::cout << "Reorient to triangle " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
+
+                        // Turn the hit point into a translation matrix
+                        sm::mat44<float> hitlocn;
+                        auto hp0 = (vm * hit0).less_one_dim();
+                        hitlocn.translate (hp0);
+                        svp->setViewMatrix (hitlocn);
+                        sm::mat44<float> coord_rotn;
+                        sm::vec<float> camera_frame_up = (camera_space * sm::vec<float>::uy()).less_one_dim();
+                        std::cout << "camera_frame_up is " << camera_frame_up << std::endl;
+                        std::cout << "tri normal      is " << tn0 << std::endl;
+                        auto _angle = tn0.angle (camera_frame_up);
+                        std::cout << "Angle between CFU and tn0 is " << _angle << std::endl;
+                        // Rotate about camera x axis
+                        coord_rotn.prerotate ((camera_space * sm::vec<float>::ux()).less_one_dim(), _angle);
+                        // Want to place camera just 'above'  hp.
+                        coord_rotn.translate (0.15f * tn0);
+
+                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
+                    }
+
                 } else {
+                    std::cout << "On triangle " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
                     std::cout << "Hit at " << hit << std::endl;
                     sm::vec<float, 3> hp = (vm * hit).less_one_dim();
                     std::cout << "In scene coordinates, hit = " << hp << std::endl;
