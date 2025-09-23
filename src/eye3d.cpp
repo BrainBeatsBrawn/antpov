@@ -222,6 +222,7 @@ int main (int argc, char* argv[])
         }
     }
     sm::vec<float, 3> hp = {};
+    mplot::SphereVisual<>* svp = nullptr;
 
     sm::mat44<float> vm;
     sm::mat44<float> vmi;
@@ -259,24 +260,48 @@ int main (int argc, char* argv[])
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
         auto camloc = camspace * sm::vec<>{0,0,0};
         auto aa = (vmi * camloc).less_one_dim();
-        std::tuple<sm::vec<float, 3>,
-                   std::array<uint32_t, 3>,
-                   sm::vec<float, 3>> tc = land->find_triangle_crossing (aa);
-        std::array<uint32_t, 3> ti = std::get<1>(tc); // triangle indices
-        std::cout << "Indices: " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
-        std::cout << "Contains hit " << std::get<0>(tc) << std::endl;
-        hp = (vm * std::get<0>(tc)).less_one_dim();
+        auto [hit, ti, tn] = land->find_triangle_crossing (aa);
+        hp = (vm * hit).less_one_dim();
         std::cout << "or with viewmatrix of model: " << hp << std::endl;
+
+        auto sv = std::make_unique<mplot::SphereVisual<>>(hp, 0.1, mplot::colour::goldenrod3);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp = v.addVisualModel (sv);
+
+        // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
+        if (ti[0] == std::numeric_limits<uint32_t>::max()) {
+            std::cout << "No hit\n";
+        } else {
+            std::cout << "Hit at " << hit << std::endl;
+            std::cout << "In scene coordinates, hit = " << hp << std::endl;
+
+            // Turn the hit point into a translation matrix
+            sm::mat44<float> hitlocn;
+            hitlocn.translate (hp);
+
+            // Re-draw sphere
+            svp->setViewMatrix (hitlocn);
+
+            // The camera frame always has y up. Choose a random vector in the plane for 'x'
+            // and then set z from this random x and the triangle norm (y).
+            sm::vec<float> rand_vec;
+            rand_vec.randomize();
+            sm::vec<float> _x = rand_vec.cross (tn);
+            _x.renormalize();
+            sm::vec<float> _z = _x.cross (tn);
+            auto coord_rotn = sm::mat44<float>::frombasis (_x, tn, _z);
+
+            // Want to place camera just 'above'  hp.
+            coord_rotn.translate (0.15f * tn);
+
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
+        }
     }
 
     /**
      * Done with landscape
      */
-
-    auto sv = std::make_unique<mplot::SphereVisual<>>(hp, 0.1, mplot::colour::goldenrod3);
-    v.bindmodel (sv);
-    sv->finalize();
-    mplot::SphereVisual<>* svp = v.addVisualModel (sv);
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
@@ -383,39 +408,44 @@ int main (int argc, char* argv[])
             if (land) {
                 // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
                 auto camloc = camera_space * sm::vec<>{0,0,0};
-                std::cout << "Cam locn = " << camloc << std::endl;
                 // Update vm/vmi?
                 auto aa = (vmi * camloc).less_one_dim();
-                std::tuple<sm::vec<float, 3>,
-                           std::array<uint32_t, 3>,
-                           sm::vec<float, 3>> tc = land->find_triangle_crossing (aa);
-                std::array<uint32_t, 3> ti = std::get<1>(tc); // triangle indices
+
+                auto [hit0, ti0, tn0] = land->find_triangle_crossing (aa);
+                auto [hit, ti, tn] = land->find_triangle_crossing (aa, -tn0);
+
                 if (ti[0] == std::numeric_limits<uint32_t>::max()) {
-                    std::cout << "No hit\n";
+                    std::cout << "No hit - off the edge!\n";
                 } else {
-                    //std::cout << "Indices: " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
-                    std::cout << "Hit at " << std::get<0>(tc) << std::endl;
-                    sm::vec<float, 3> hp = (vm * std::get<0>(tc)).less_one_dim();
+                    std::cout << "Hit at " << hit << std::endl;
+                    sm::vec<float, 3> hp = (vm * hit).less_one_dim();
                     std::cout << "In scene coordinates, hit = " << hp << std::endl;
 
                     // Turn the hit point into a translation matrix
                     sm::mat44<float> hitlocn;
                     hitlocn.translate (hp);
 
-                    // Add a rotation to hitlocn that arranges the up axis to be up.
-
                     // Re-draw sphere
                     svp->setViewMatrix (hitlocn);
 
-                    // Want to place camera just 'above' hp.
-                    setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn));
+#if 0
+                    // The camera frame always has y up. Choose a random vector in the plane for 'x'
+                    // and then set z from this random x and the triangle norm (y).
+                    sm::vec<float> rand_vec;
+                    rand_vec.randomize();
+                    sm::vec<float> _x = rand_vec.cross (tn);
+                    _x.renormalize();
+                    sm::vec<float> _z = _x.cross (tn);
+                    auto coord_rotn = sm::mat44<float>::frombasis (_x, tn, _z);
 
-                    // v.scene_up is the scene's up axis, but the camera frame always has y up.
-                    // Rotate about camera's x axis to get y in same direction as normal.
-                    // sm::vec<> lnorm = from_ti;
+                    // Want to place camera just 'above'  hp.
+                    coord_rotn.translate (0.1f * tn);
+
+                    setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
 
                     // Update camera_space
                     camera_space = hitlocn; // mplot::compoundray::getCameraSpace (scene);
+#endif
                 }
             }
 
