@@ -18,8 +18,6 @@
 #include <mplot/compoundray/interop.h> // mathplot <--> compoundray interoperability
 
 #include <mplot/compoundray/EyeVisual.h>
-#include <mplotext/FourpiVisual.h>
-#include <mplot/VoronoiVisual.h>
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
 #include <mplot/SphereVisual.h> // debug really
@@ -52,10 +50,7 @@ namespace eye3d
     // Flags class
     enum class options : uint32_t
     {
-        prefer_voronoi,   // Set true to prefer voronoi visualization over EyeVisual
         blender_axes,     // Set true to transform glTF into Blender's z-up axes
-        have_fourpi,      // If true, then a fourpi eye was found
-        disable_fourpi,   // If true then use EyeVisual even if a fourpi eye was found
         keep_moving,      // If true, movements keep moving
         max_fps,          // If true, poll, instead of fps
         can_exit          // Can exit the program
@@ -72,8 +67,6 @@ namespace eye3d
             } else if (arg == "-f") {
                 i++;
                 path = std::string(argv[i]);
-            } else if (arg == "-v") {
-                opts |= eye3d::options::prefer_voronoi;
             } else if (arg == "-b") {
                 opts |= eye3d::options::blender_axes;
             } else if (arg == "-x") {
@@ -146,13 +139,6 @@ int main (int argc, char* argv[])
         if (!efpath.empty()) {
             ++num_compound_cameras;
             my_compound_camera = ci;
-            if (efpath.find ("fourpi") != std::string::npos) {
-                // Check number of pixels and what the 'nside' is for this fourpi
-                ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
-                int npix = static_cast<int>(ommatidia->size());
-                int _nside = static_cast<int>(std::sqrt((static_cast<double>(npix) - 2.0) / 24.0));
-                if (hp::am::is_power_of_two (_nside)) { opts |= eye3d::options::have_fourpi; } // nside must be power of 2
-            }
         }
     }
     if (num_compound_cameras > 1) {
@@ -172,35 +158,15 @@ int main (int argc, char* argv[])
     // Plot the visual models
     mplot::compoundray::scene_to_visualmodels (scene, &v);
 
-    // Create a FourpiVisual, EyeVisual or VoronoiVisual 'eye' in our mathplot scene, v.
+    // Create an EyeVisual 'eye' in our mathplot scene, v.
     sm::vec<float, 3> offset = { 0.0f };
     mplot::compoundray::EyeVisual<>* eyevm_ptr = nullptr;
-    mplotext::FourpiVisual<float>* fourpi_ptr = nullptr;
-    mplot::VoronoiVisual<float, 0>* vvm_ptr = nullptr;
-    if (opts.test (eye3d::options::have_fourpi) == true && opts.test (eye3d::options::disable_fourpi) == false) {
-        auto fpvm = std::make_unique<mplotext::FourpiVisual<float>> (offset);
-        v.bindmodel (fpvm);
-        int npix = static_cast<int>(ommatidia->size());
-        int _nside = static_cast<int>(std::sqrt((static_cast<double>(npix) - 2.0) / 24.0));
-        fpvm->set_nside (_nside);
-        fpvm->cm.setType (mplot::ColourMapType::RGB);
-        fpvm->setColourData (&ommatidiaData);
-        fpvm->setViewMatrix (initial_camera_space);
-        fpvm->name = "fourpi";
-        fpvm->finalize();
-        fourpi_ptr = v.addVisualModel (fpvm);
-    } else {
-        if (opts.test(eye3d::options::prefer_voronoi) == true) {
-            // The VoronoiVisual is set up later
-        } else {
-            auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (offset, &ommatidiaData, ommatidia);
-            v.bindmodel (eyevm);
-            eyevm->setViewMatrix (initial_camera_space);
-            eyevm->name = "EyeVisual";
-            eyevm->finalize();
-            eyevm_ptr = v.addVisualModel (eyevm);
-        }
-    }
+    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (offset, &ommatidiaData, ommatidia);
+    v.bindmodel (eyevm);
+    eyevm->setViewMatrix (initial_camera_space);
+    eyevm->name = "EyeVisual";
+    eyevm->finalize();
+    eyevm_ptr = v.addVisualModel (eyevm);
 
     // Make CoordArrows axes to show our camera's localspace
     mplot::CoordArrows<>* cam_cs_ptr = eye3d::plot_axes (&v);
@@ -209,6 +175,8 @@ int main (int argc, char* argv[])
 
     /**
      * Get access to the landscape VisualModel
+     *
+     * May want to make a class to manage the agent/camera's position wrt a VisualModel.
      */
 
     mplot::VisualModel<>* land = nullptr;
@@ -226,6 +194,11 @@ int main (int argc, char* argv[])
 
     sm::mat44<float> vm;
     sm::mat44<float> vmi;
+
+    std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
+    sm::vvec<std::array<uint32_t, 3>> ti0_neighbours;
+    sm::vec<float, 3> tn0 = {}; // Current triangle normal that our agent/camera is 'next to'
+
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
         std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
@@ -235,14 +208,8 @@ int main (int argc, char* argv[])
         uint32_t idx1 = land->find_vp1_nearest (loc1);
         std::cout << "Index " << idx1 << " " << land->vp1[idx1] << " is nearest to loc1: " << loc1 << std::endl;
 
-        // Vector towards land?
-        std::cout << "bb centre is " << land->get_viewmatrix_bb_centre() << std::endl;
-        sm::vec<> to_land = land->get_viewmatrix_bb_centre() - loc1;
-        std::cout << "bb centre - loc1 = " << to_land << std::endl;
-
         // Neighbours of idx1?
-        sm::vvec<uint32_t> nb = land->neighbours (idx1);
-        std::cout << "neighbours of idx1=" << idx1 << ": " << nb << std::endl;
+        std::cout << "neighbours of idx1=" << idx1 << ": " << land->neighbours (idx1) << std::endl;
         sm::vvec<std::array<uint32_t, 3>> nbt = land->neighbour_triangles (idx1);
         std::cout << "neighbour tris:\n";
         for (auto t : nbt) {
@@ -259,10 +226,13 @@ int main (int argc, char* argv[])
         vmi = vm.inverse();
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
         auto camloc = camspace * sm::vec<>{0,0,0};
-        auto aa = (vmi * camloc).less_one_dim();
-        auto [hit, ti, tn] = land->find_triangle_crossing (aa);
+        auto camloc_modelframe = (vmi * camloc).less_one_dim();
+        auto [hit, ti, tn] = land->find_triangle_crossing (camloc_modelframe);
+        ti0 = ti;
+        // Populate neighbours of ti0 with something like:
+        // ti0_neighbours = land->neighbour_triangles (ti0); // ??
+        tn0 = tn;
         hp = (vm * hit).less_one_dim();
-        std::cout << "or with viewmatrix of model: " << hp << std::endl;
 
         auto sv = std::make_unique<mplot::SphereVisual<>>(hp, 0.1, mplot::colour::goldenrod3);
         v.bindmodel (sv);
@@ -273,14 +243,13 @@ int main (int argc, char* argv[])
         if (ti[0] == std::numeric_limits<uint32_t>::max()) {
             std::cout << "No hit\n";
         } else {
+            // In this case, place the camera on the land, and orient it randomly in the 'land plane'
             std::cout << "Hit at " << hit << std::endl;
             std::cout << "In scene coordinates, hit = " << hp << std::endl;
-
             // Turn the hit point into a translation matrix
             sm::mat44<float> hitlocn;
             hitlocn.translate (hp);
-            // Re-draw sphere
-            svp->setViewMatrix (hitlocn);
+            svp->setViewMatrix (hitlocn); // reposition sphere
             // The camera frame always has y up. Choose a random vector in the plane for 'x'
             // and then set z from this random x and the triangle norm (y).
             sm::vec<float> rand_vec;
@@ -308,78 +277,35 @@ int main (int argc, char* argv[])
      * Subroutine lambda: Detect changes in the camera (there can be multiple cameras, some
      * compound ray, some non-compound ray). The complexity here results from this complexity in
      * compound-ray and the fact that we have multiple ways to visualize the eye's ommatidia
-     * (fourpivisual, voronoivisual and compoundrayvisual)
      */
     auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData, &ommatidiaPositions,
-                                       &last_eye_size, &eyevm_ptr, &vvm_ptr, &fourpi_ptr, opts] ()
+                                       &last_eye_size, &eyevm_ptr, opts] ()
     {
         size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
-        if (opts.test (eye3d::options::have_fourpi) == true && opts.test (eye3d::options::disable_fourpi) == false) {
-            if (ommatidia != nullptr) {
-                curr_eye_size = ommatidia->size();
-                if (curr_eye_size == static_cast<size_t>(fourpi_ptr->n_pixels())) {
-                    if (ommatidiaData.size() == 0) {
-                        if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
-                    } // else no need to re-get data
+        if (ommatidiaData.size() == 0) {
+            if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
+        } // else no need to re-get data
 
-                    if (ommatidiaData.size() > 0) {
-                        fourpi_ptr->setColourData (&ommatidiaData);
-                        fourpi_ptr->reinit();
-                    }
-                }
-            }
-        } else { // Generic compound eye
-            if (ommatidiaData.size() == 0) {
-                if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
-            } // else no need to re-get data
+        // Change showing the 'cones' of the compound eye visual model?
+        if (eyevm_ptr->show_cones != v.vstate.test(eye3dvisual::state::show_cones)) {
+            eyevm_ptr->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
+            eyevm_ptr->reinit();
+        }
+        // Change the length of the cones?
+        if (eyevm_ptr->get_cone_length() != v.manual_cone_length) {
+            eyevm_ptr->set_cone_length (v.manual_cone_length);
+        }
+        // Update eyevm model (or just update colours)
+        eyevm_ptr->ommatidia = ommatidia;
 
-            if (opts.test (eye3d::options::prefer_voronoi) == false) {
-                // Change showing the 'cones' of the compound eye visual model?
-                if (eyevm_ptr->show_cones != v.vstate.test(eye3dvisual::state::show_cones)) {
-                    eyevm_ptr->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
-                    eyevm_ptr->reinit();
-                }
-                // Change the length of the cones?
-                if (eyevm_ptr->get_cone_length() != v.manual_cone_length) {
-                    eyevm_ptr->set_cone_length (v.manual_cone_length);
-                }
-                // Update eyevm model (or just update colours)
-                eyevm_ptr->ommatidia = ommatidia;
-            }
-            if (ommatidia != nullptr) {
-                curr_eye_size = ommatidia->size();
-                if (curr_eye_size != last_eye_size) {
-                    if (opts.test (eye3d::options::prefer_voronoi) == false) {
-                        eyevm_ptr->reinit();
-                    } else {
-                        constexpr auto voronoi_z_dirn = sm::vec<float>::uz(); // Hack, your z dirn may need to be different
-                        sm::vec<float, 3> offset = { 0.0f };
-                        auto vvm = std::make_unique<mplot::VoronoiVisual<float, 0>> (offset);
-                        v.bindmodel (vvm);
-                        for (size_t i = 0u; i < ommatidia->size(); ++i) {
-                            float3 rpos = (*ommatidia)[i].relativePosition;
-                            sm::vec<float> rposv = {rpos.x, rpos.y, rpos.z};
-                            ommatidiaPositions.push_back (rposv);
-                        }
-                        vvm->cm.setType (mplot::ColourMapType::RGB);
-                        vvm->zoom = 1.0f;
-                        vvm->setDataCoords (&ommatidiaPositions);
-                        vvm->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&ommatidiaData));
-                        vvm->data_z_direction = voronoi_z_dirn;
-                        vvm->setViewMatrix (mplot::compoundray::getCameraSpace (scene));
-                        vvm->name = "VoronoiVisual";
-                        vvm->finalize();
-                        vvm_ptr = v.addVisualModel (vvm);
-                    }
-                    last_eye_size = curr_eye_size;
-                } else {
-                    if (opts.test (eye3d::options::prefer_voronoi) == false) {
-                        eyevm_ptr->reinitColours(); // 4x faster to just reinitColours
-                    } else {
-                        vvm_ptr->reinitColours();
-                    }
-                }
+        if (ommatidia != nullptr) {
+            curr_eye_size = ommatidia->size();
+            if (curr_eye_size != last_eye_size) {
+                eyevm_ptr->reinit();
+                last_eye_size = curr_eye_size;
+            } else {
+                eyevm_ptr->reinitColours(); // 4x faster to just reinitColours
             }
         }
     };
@@ -387,13 +313,73 @@ int main (int argc, char* argv[])
     /**
      * Subroutine: Move the camera according to key events in the mathplot window
      */
-    auto subr_key_move_camera = [&v, &eyevm_ptr, &vvm_ptr, &cam_cs_ptr, &fourpi_ptr, &initial_camera_space, opts, land, &svp, vm, vmi]()
+    auto subr_key_move_camera = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
+                                 opts, land, &svp, vm, vmi, &tn0, &ti0]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> camera_space;
         if (v.isActivelyMoving()) {
             sm::vec<float, 3> t = v.getMovementVector (opts.test(eye3d::options::keep_moving));
+
+            // If constrained by land, determine here if t will move it into a new triangle on the land
+            if (land) {
+
+                // 0. Find vertices of triangle, given its indices. These are in the model frame
+                sm::vec<sm::vec<float, 3>, 3> tv_modelframe = land->triangle_vertices (ti0);
+                std::cout << "ti0 Triangle vertices are " << tv_modelframe << " and upcoming movement is " << t << std::endl;
+
+
+                // 1. Find component of t that is in the current triangle plane. t is in camera frame.
+                camera_space = mplot::compoundray::getCameraSpace (scene);
+                // camera_space transforms camera frame to scene frame
+                // vmi * camera_space transforms camera frame to model frame
+                sm::mat44<float> cam_to_model = vmi * camera_space;
+                std::cout << "Camera location from camera_space is camloc = " << (cam_to_model * sm::vec<float>{}) << std::endl;
+                sm::vec<float> camloc_modelframe = (cam_to_model * sm::vec<float>{}).less_one_dim();
+                std::cout << "camloc_modelframe = " << camloc_modelframe << std::endl;
+                sm::vec<float> t_modelframe = (cam_to_model * t).less_one_dim() - camloc_modelframe;
+                std::cout << "t_modelframe = " << t_modelframe << std::endl;
+                std::cout << "tn0 = " << tn0 << std::endl;
+                float udn = t_modelframe.dot (tn0); // ah - is tn0 in model frame?
+                sm::vec<float> t_orthog = tn0 * (udn / (tn0.dot(tn0)));
+                sm::vec<float> t_inplane = t_modelframe - t_orthog;
+                std::cout << "t_orthog: " << t_orthog << std::endl;
+                std::cout << "t_inplane: " << t_inplane << std::endl;
+
+                // 2. Determine if that component will cross any edge of the triangle
+                // First need h, the location on the triangle that the camera is above.
+                //auto [h, ti, tn] = land->find_triangle_crossing (camloc_modelframe, -tn0); // Too heavy - know our triangle already
+                sm::vec<> h = {};
+                const sm::vec<>& t0 = tv_modelframe[0];
+                const sm::vec<>& t1 = tv_modelframe[1];
+                const sm::vec<>& t2 = tv_modelframe[2];
+                bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_modelframe, -tn0, h);
+                std::cout << "t starts at " << h << std::endl;
+                std::cout << "t end is " << (h + t_inplane) << std::endl;
+                if (isect) {
+                    // For each edge in triangle, compute distance to edge for h and (h + t_inplane)
+                    sm::vec<> p = h + t_inplane;
+                    bool inside = ((tn0.dot ((t1 - t0).cross (p - t0)) >= 0) // >= to include triangle boundary
+                                   && (tn0.dot ((t2 - t1).cross (p - t1)) >= 0)
+                                   && (tn0.dot ((t0 - t2).cross (p - t2)) >= 0));
+                    std::cout << "inside = " << (inside ? "T" : "F") << std::endl;
+                    bool inside01 = (tn0.dot ((t1 - t0).cross (p - t0)) >= 0);
+                    bool inside21 = (tn0.dot ((t2 - t1).cross (p - t1)) >= 0);
+                    bool inside02 = (tn0.dot ((t0 - t2).cross (p - t2)) >= 0);
+                    if (!inside) {
+                        std::cout << "Crossed over " << (inside01 ? " " : "0-1") <<  (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
+                    } else {
+                        std::cout << "No crossings " << (inside01 ? " " : "0-1") <<  (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
+                    }
+                } else {
+                    std::cout << "No intersection?\n";
+                }
+
+                // 3. Work out what the new edge is and find a location on that triangle
+                // 4. Find the 'hover location' over that new location
+            }
+
             translateCamerasLocally (t.x(), t.y(), t.z());
             // Up-down (pitch) is rotation about local camera frame axis x
             rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
@@ -404,74 +390,29 @@ int main (int argc, char* argv[])
 
             camera_space = mplot::compoundray::getCameraSpace (scene);
             if (land) {
-                // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
-                auto camloc = camera_space * sm::vec<>{0,0,0};
-                // Update vm/vmi?
-                auto aa = (vmi * camloc).less_one_dim();
+                // We have the landscape object, so move with this as a constraint
 
-                auto [hit0, ti0, tn0] = land->find_triangle_crossing (aa);
-                auto [hit, ti, tn] = land->find_triangle_crossing (aa, -tn0);
+                // This is the *new* camera location after the translation/rotation above
+                auto camloc = camera_space * sm::vec<>{0,0,0};
+                auto camloc_modelframe = (vmi * camloc).less_one_dim();
+
+                auto [hit, ti, tn] = land->find_triangle_crossing (camloc_modelframe, -tn0);
 
                 if (ti[0] == std::numeric_limits<uint32_t>::max()) {
+
                     std::cout << "No hit - off the edge!\n";
-                    // In this case, we need to react to having fallen off, but re-orienting until
-                    // we find a new place on the model.
-                    if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
-                        std::cout << "No hit0 - off the edge TOTALLY!\n";
-                    } else {
-                        // Reorient to new triangle
-                        std::cout << "Reorient to triangle " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
-
-                        // Turn the hit point into a translation matrix
-                        sm::mat44<float> hitlocn;
-                        auto hp0 = (vm * hit0).less_one_dim();
-                        hitlocn.translate (hp0);
-                        svp->setViewMatrix (hitlocn);
-                        sm::mat44<float> coord_rotn;
-                        sm::vec<float> camera_frame_up = (camera_space * sm::vec<float>::uy()).less_one_dim();
-                        std::cout << "camera_frame_up is " << camera_frame_up << std::endl;
-                        std::cout << "tri normal      is " << tn0 << std::endl;
-                        auto _angle = tn0.angle (camera_frame_up);
-                        std::cout << "Angle between CFU and tn0 is " << _angle << std::endl;
-                        // Rotate about camera x axis
-                        coord_rotn.prerotate ((camera_space * sm::vec<float>::ux()).less_one_dim(), _angle);
-                        // Want to place camera just 'above'  hp.
-                        coord_rotn.translate (0.15f * tn0);
-
-                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
-                    }
 
                 } else {
                     std::cout << "On triangle " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
+                    std::cout << "Cf ti0      " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
+
                     std::cout << "Hit at " << hit << std::endl;
                     sm::vec<float, 3> hp = (vm * hit).less_one_dim();
                     std::cout << "In scene coordinates, hit = " << hp << std::endl;
-
                     // Turn the hit point into a translation matrix
                     sm::mat44<float> hitlocn;
                     hitlocn.translate (hp);
-
-                    // Re-draw sphere
-                    svp->setViewMatrix (hitlocn);
-
-#if 0
-                    // The camera frame always has y up. Choose a random vector in the plane for 'x'
-                    // and then set z from this random x and the triangle norm (y).
-                    sm::vec<float> rand_vec;
-                    rand_vec.randomize();
-                    sm::vec<float> _x = rand_vec.cross (tn);
-                    _x.renormalize();
-                    sm::vec<float> _z = _x.cross (tn);
-                    auto coord_rotn = sm::mat44<float>::frombasis (_x, tn, _z);
-
-                    // Want to place camera just 'above'  hp.
-                    coord_rotn.translate (0.1f * tn);
-
-                    setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
-
-                    // Update camera_space
-                    camera_space = hitlocn; // mplot::compoundray::getCameraSpace (scene);
-#endif
+                    svp->setViewMatrix (hitlocn); // Re-position sphere
                 }
             }
 
@@ -489,43 +430,9 @@ int main (int argc, char* argv[])
         }
 
         // Update the view matrix of eye and eye localspace axes
-        if (opts.test (eye3d::options::have_fourpi) == true && opts.test (eye3d::options::disable_fourpi) == false) {
-            fourpi_ptr->setViewMatrix (camera_space);
-        } else {
-            if (opts.test (eye3d::options::prefer_voronoi) == false) {
-                eyevm_ptr->setViewMatrix (camera_space);
-            } else {
-                if (vvm_ptr != nullptr) { vvm_ptr->setViewMatrix (camera_space); }
-            }
-        }
+        eyevm_ptr->setViewMatrix (camera_space);
         cam_cs_ptr->setViewMatrix (camera_space);
     };
-
-#if 0 // From c_ray_mushscan:
-
-    // Sets the height above the landscape, but *needs to search full_landscape* to do this, so
-    // there's a comp. hit Uses a container of vertices and a container of normals. In mushscan,
-    // these were extracted from compound ray, but here, we have VisualModels (VerticesVisuals) that
-    // contain these data
-    auto subr_set_height = [land, cam_height, cam_rotnzero]
-    (sm::vec<float>& cam_posn, sm::vec<float>& last_posn)
-    {
-        if (cam_posn == last_posn) { return; }
-        // Figure out nearest landscape element and...
-        size_t closest_idx = std::numeric_limits<size_t>::max();
-        float min_lsq = std::numeric_limits<float>::max();
-        // Use land->vertexPositions
-        for (size_t i = 0; i < full_landscape.size(); ++i) {
-            float dx = full_landscape[i].x() - cam_posn[0];
-            float dz = full_landscape[i].z() - cam_posn[2];
-            float dl = dx * dx + dz * dz; // no need for sqrt, just want closest
-            min_lsq = dl < min_lsq ? closest_idx = i, dl : min_lsq;
-        }
-        cam_posn[1] = full_landscape[closest_idx].y() + cam_height;
-        mushscan::setCameraPose (cam_posn, cam_rotnzero);
-    };
-
-#endif
 
     /**
      * The main program loop
