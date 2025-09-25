@@ -117,12 +117,13 @@ int main (int argc, char* argv[])
     v.zFar = 2400;
     // Rotate about the nearest VisualModel
     v.rotateAboutNearest (true);
+#if 0 // turned off during cube debug
     // Rotate about a scene vertical axis
     v.rotateAboutVertical (true);
     if (opts.test(eye3d::options::blender_axes)) {
         v.switch_scene_vertical_axis(); // to uz up
     }
-
+#endif
     // Use a FPS profiling with a text object on screen
     mplotext::fps::profiler fps_profiler;
     mplot::VisualTextModel<>* fps_label;
@@ -328,7 +329,8 @@ int main (int argc, char* argv[])
 
                 // 0. Find vertices of triangle, given its indices. These are in the model frame
                 sm::vec<sm::vec<float, 3>, 3> tv_modelframe = land->triangle_vertices (ti0);
-                std::cout << "ti0 Triangle vertices are " << tv_modelframe << " and upcoming movement is " << t << std::endl;
+                std::cout << "ti0 " << ti0[0] << "," << ti0[1] << "," << ti0[2]
+                          << ". Triangle vertices are " << tv_modelframe << " and upcoming movement is " << t << std::endl;
 
                 // 1. Find component of t that is in the current triangle plane. t is in camera frame.
                 camera_space = mplot::compoundray::getCameraSpace (scene);
@@ -408,10 +410,24 @@ int main (int argc, char* argv[])
                             float d_rest = t_inplane.length() - t_part.length();
                             std::cout << "additional distance = " << d_rest << std::endl;
 
-                            // sm::vec<> raxis = tn0.cross (_tn);
-                            // float rangle = tn0.angle (_tn);
-                            //
-                            // sm::mat44<float> coord_rotn = ??
+                            sm::mat44<float> coord_reorient; // in which frame to move the camera?
+                                                             // This is used to postmuiltiply the
+                                                             // viewmatrix, so should be in the scene frame.
+                            //coord_reorient.translate (t_part); // now we're ON the triangle boundary
+                            // Rotate by the angle between the normals. I think this is constrained to be <= pi
+                            float rotn_angle = tn0.angle (_tn);
+                            std::cout << "Angle between tn0:" << tn0 << " and _tn:" << _tn << " is " << rotn_angle << std::endl;
+                            // Use the *edge* as the rotation axis
+                            std::cout << "Rotate " << rotn_angle << " about edge: " << edge << std::endl;
+                            coord_reorient.rotate (edge, rotn_angle);
+                            sm::vec<> t_rest = t_part; // FIXME: What if t_rest sails past the next triangle and on to ANOTHER one?
+                            t_rest.renormalize();
+                            t_rest *= d_rest; // NOW rotate t_rest
+                            coord_reorient.translate (t_rest);
+
+                            // For now, just re-place the sphere.
+                            svp->postmultViewMatrix (coord_reorient);
+
                             //
                             // translateCamerasLocally (t_part);
                             // rotateCameras()
@@ -422,7 +438,6 @@ int main (int argc, char* argv[])
                             // height':
                             //
                             // setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
-
                             ti0 = _ti;
                             tn0 = _tn;
 
