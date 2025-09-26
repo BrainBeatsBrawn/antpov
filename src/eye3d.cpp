@@ -41,7 +41,7 @@ namespace eye3d
     // Helper to plot coords
     mplot::CoordArrows<>* plot_axes (mplot::Visual<>* thevisual)
     {
-        auto cavm = std::make_unique<mplot::CoordArrows<>> (sm::vec<float>{0.0f});
+        auto cavm = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
         thevisual->bindmodel (cavm);
         cavm->em = 0.0f; // labels don't work so well
         cavm->finalize();
@@ -93,7 +93,7 @@ int main (int argc, char* argv[])
     // Boilerplate memory alloc for compound-ray
     multicamAlloc();
 
-    std::vector<sm::vec<float, 3>> ommatidiaPositions;
+    std::vector<sm::vec<>> ommatidiaPositions;
     std::vector<std::array<float, 3>> ommatidiaData;
     std::vector<Ommatidium>* ommatidia = nullptr;
 
@@ -160,7 +160,7 @@ int main (int argc, char* argv[])
     mplot::compoundray::scene_to_visualmodels (scene, &v);
 
     // Create an EyeVisual 'eye' in our mathplot scene, v.
-    sm::vec<float, 3> offset = { 0.0f };
+    sm::vec<> offset = {};
     mplot::compoundray::EyeVisual<>* eyevm_ptr = nullptr;
     auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (offset, &ommatidiaData, ommatidia);
     v.bindmodel (eyevm);
@@ -190,15 +190,17 @@ int main (int argc, char* argv[])
             //if (vmp->name == "Landscape.003") { land = vmp; }
         }
     }
-    sm::vec<float, 3> hp = {};
+    sm::vec<> hp_scene = {};
     mplot::SphereVisual<>* svp = nullptr;
 
-    sm::mat44<float> vm;
-    sm::mat44<float> vmi;
+    sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
+    sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
 
     std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
     sm::vvec<std::array<uint32_t, 3>> ti0_neighbours;
-    sm::vec<float, 3> tn0 = {}; // Current triangle normal that our agent/camera is 'next to'
+    sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
+
+    constexpr float hoverheight = 0.15f;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
@@ -223,19 +225,19 @@ int main (int argc, char* argv[])
             std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
         }
 
-        vm = land->get_viewmatrix();
-        vmi = vm.inverse();
+        land_to_scene = land->get_viewmatrix();
+        scene_to_land = land_to_scene.inverse();
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
         auto camloc = camspace * sm::vec<>{0,0,0};
-        auto camloc_modelframe = (vmi * camloc).less_one_dim();
-        auto [hit, ti, tn] = land->find_triangle_crossing (camloc_modelframe);
+        auto camloc_landframe = (scene_to_land * camloc).less_one_dim();
+        auto [hit, ti, tn] = land->find_triangle_crossing (camloc_landframe);
         ti0 = ti;
         // Populate neighbours of ti0 with something like:
         // ti0_neighbours = land->neighbour_triangles (ti0); // ??
-        tn0 = tn;
-        hp = (vm * hit).less_one_dim();
+        tn0_land = tn; // landframe
+        hp_scene = (land_to_scene * hit).less_one_dim();
 
-        auto sv = std::make_unique<mplot::SphereVisual<>>(hp, 0.1, mplot::colour::goldenrod3);
+        auto sv = std::make_unique<mplot::SphereVisual<>>(hp_scene, 0.1, mplot::colour::goldenrod3);
         v.bindmodel (sv);
         sv->finalize();
         svp = v.addVisualModel (sv);
@@ -246,24 +248,24 @@ int main (int argc, char* argv[])
         } else {
             // In this case, place the camera on the land, and orient it randomly in the 'land plane'
             std::cout << "Hit at " << hit << std::endl;
-            std::cout << "In scene coordinates, hit = " << hp << std::endl;
+            std::cout << "In scene coordinates, hit = " << hp_scene << std::endl;
             // Turn the hit point into a translation matrix
-            sm::mat44<float> hitlocn;
-            hitlocn.translate (hp);
-            svp->setViewMatrix (hitlocn); // reposition sphere
+            sm::mat44<float> hitlocn_mat;
+            hitlocn_mat.translate (hp_scene);
+            svp->setViewMatrix (hitlocn_mat); // reposition sphere
             // The camera frame always has y up. Choose a random vector in the plane for 'x'
             // and then set z from this random x and the triangle norm (y).
-            sm::vec<float> rand_vec;
+            sm::vec<> rand_vec;
             rand_vec.randomize();
-            sm::vec<float> _x = rand_vec.cross (tn);
+            sm::vec<> _x = rand_vec.cross (tn);
             _x.renormalize();
-            sm::vec<float> _z = _x.cross (tn);
+            sm::vec<> _z = _x.cross (tn);
             auto coord_rotn = sm::mat44<float>::frombasis (_x, tn, _z);
 
             // Want to place camera just 'above'  hp.
-            coord_rotn.translate (0.15f * tn);
+            coord_rotn.translate (hoverheight * tn);
 
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * coord_rotn));
         }
     }
 
@@ -315,87 +317,82 @@ int main (int argc, char* argv[])
      * Subroutine: Move the camera according to key events in the mathplot window
      */
     auto subr_key_move_camera = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                 opts, land, &svp, vm, vmi, &tn0, &ti0]()
+                                 opts, land, &svp, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
-        sm::mat44<float> camera_space;
+        sm::mat44<float> cam_to_scene;
         if (v.isActivelyMoving()) {
 
-            sm::vec<float, 3> t = v.getMovementVector (opts.test(eye3d::options::keep_moving));
-
+            sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
+            std::cout << "Movement vector is " << mv_camframe << " in the camspace model frame\n";
+            sm::mat44<float> mv_camframe_mat;
+            mv_camframe_mat.translate (mv_camframe);
             // If constrained by land, determine here if t will move it into a new triangle on the land
             if (land) {
 
-                // 0. Find vertices of triangle, given its indices. These are in the model frame
-                sm::vec<sm::vec<float, 3>, 3> tv_modelframe = land->triangle_vertices (ti0);
+                // 0. Find vertices of triangle, given its indices. These are in the land model frame
+                sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
                 std::cout << "ti0 " << ti0[0] << "," << ti0[1] << "," << ti0[2]
-                          << ". Triangle vertices are " << tv_modelframe << " and upcoming movement is " << t << std::endl;
+                          << " has vertices (landframe) at " << tv_landframe
+                          << " and upcoming movement (camframe) of " << mv_camframe << std::endl;
 
                 // 1. Find component of t that is in the current triangle plane. t is in camera frame.
-                camera_space = mplot::compoundray::getCameraSpace (scene);
-                // camera_space transforms camera frame to scene frame
-                // vmi * camera_space transforms camera frame to model frame
-                sm::mat44<float> cam_to_model = vmi * camera_space;
-                //std::cout << "Camera location from camera_space is camloc = " << (cam_to_model * sm::vec<float>{}) << std::endl;
-                sm::vec<float> camloc_modelframe = (cam_to_model * sm::vec<float>{}).less_one_dim();
-                //std::cout << "camloc_modelframe = " << camloc_modelframe << std::endl;
-                sm::vec<float> t_modelframe = (cam_to_model * t).less_one_dim() - camloc_modelframe;
-                //std::cout << "t_modelframe = " << t_modelframe << std::endl;
-                //std::cout << "tn0 = " << tn0 << std::endl;
-                float udn = t_modelframe.dot (tn0); // ah - is tn0 in model frame?
-                sm::vec<float> t_orthog = tn0 * (udn / (tn0.dot(tn0)));
-                sm::vec<float> t_inplane = t_modelframe - t_orthog;
-                //std::cout << "t_orthog: " << t_orthog << std::endl;
-                //std::cout << "t_inplane: " << t_inplane << std::endl;
+                cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+                // cam_to_scene transforms camera frame to scene frame
+                // scene_to_land * cam_to_scene transforms camera frame to model frame
+                sm::mat44<float> cam_to_land = scene_to_land * cam_to_scene;
+                // To use later:
+                sm::mat44<float> mv_landframe_mat = cam_to_land * mv_camframe_mat;
+                //std::cout << "Camera location from cam_to_scene is camloc = " << (cam_to_land * sm::vec<>{}) << std::endl;
+                sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
+                //std::cout << "camloc_landframe = " << camloc_landframe << std::endl;
+                sm::vec<> mv_landframe = (cam_to_land * mv_camframe).less_one_dim() - camloc_landframe;
+                std::cout << "mv_landframe = " << mv_landframe << std::endl;
+                float udn = mv_landframe.dot (tn0_land); // tn0_land is in landframe
+                sm::vec<> mv_orthog = tn0_land * (udn / (tn0_land.dot(tn0_land))); // landframe
+                sm::vec<> mv_inplane = mv_landframe - mv_orthog;      // landframe
+                std::cout << "mv_inplane (landframe): " << mv_inplane << std::endl;
 
                 // 2. Determine if that component will cross any edge of the triangle
                 // 3. Work out what the new edge is and find a location on that triangle
                 // 4. Find the 'hover location' over that new location
                 //
                 sm::vec<> h = {};
-                const sm::vec<>& t0 = tv_modelframe[0];
-                const sm::vec<>& t1 = tv_modelframe[1];
-                const sm::vec<>& t2 = tv_modelframe[2];
-                bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_modelframe, -tn0, h);
-                //std::cout << "t starts at " << h << std::endl;
-                //std::cout << "t end is " << (h + t_inplane) << std::endl;
-                sm::vec<> t_part = {}; // The part-way movement to the edge
+                const sm::vec<>& t0 = tv_landframe[0];
+                const sm::vec<>& t1 = tv_landframe[1];
+                const sm::vec<>& t2 = tv_landframe[2];
+                std::cout << "Triangle is " << t0 << ", " << t1 << ", " << t2 << std::endl;
+                bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_landframe, -tn0_land, h);
+                //std::cout << "t starts at " << h << std::endl; // h is in landframe
+                //std::cout << "t end is " << (h + mv_inplane) << std::endl;
+                sm::vec<> mv_part = {}; // The part-way movement to the edge (landframe)
                 if (isect) {
-                    // For each edge in triangle, compute distance to edge for h and (h + t_inplane)
-                    sm::vec<> p = h + t_inplane;
+                    // For each edge in triangle, compute distance to edge for h and (h + mv_inplane)
+                    sm::vec<> p = h + mv_inplane;
                     uint32_t common_a = 0;
                     uint32_t common_b = 0;
 
                     sm::vec<> edge = t1 - t0;
                     sm::vec<> ptoe = p - t0;
-                    bool inside01 = (tn0.dot (edge.cross (ptoe)) >= 0);
+                    bool inside01 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside01) {
-                        common_a = ti0[0];
-                        common_b = ti0[1];
-                        float amt = edge.dot (ptoe) / edge.dot (edge);
-                        sm::vec<> xp = amt * edge + t0;
-                        t_part = xp - h;
+                        common_a = ti0[0]; common_b = ti0[1];
+                        // distance to cross point : edge.dot (ptoe) / edge.dot (edge)
+                        //        (                  cross point                  )
+                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t0) - h;
                     }
-                    edge = t2 - t1;
-                    ptoe = p - t1;
-                    bool inside21 = (tn0.dot (edge.cross (ptoe)) >= 0);
+                    edge = t2 - t1; ptoe = p - t1;
+                    bool inside21 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside21) {
-                        common_a = ti0[2];
-                        common_b = ti0[1];
-                        float amt = edge.dot (ptoe) / edge.dot (edge);
-                        sm::vec<> xp = amt * edge + t1;
-                        t_part = xp - h;
+                        common_a = ti0[2]; common_b = ti0[1];
+                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t1) - h;
                     }
-                    edge = t0 - t2;
-                    ptoe = p - t2;
-                    bool inside02 = (tn0.dot (edge.cross (ptoe)) >= 0);
+                    edge = t0 - t2; ptoe = p - t2;
+                    bool inside02 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside02) {
-                        common_a = ti0[0];
-                        common_b = ti0[2];
-                        float amt = edge.dot (ptoe) / edge.dot (edge);
-                        sm::vec<> xp = amt * edge + t2;
-                        t_part = xp - h;
+                        common_a = ti0[0]; common_b = ti0[2];
+                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t2) - h;
                     }
 
                     if (!inside01 || !inside21 || !inside02) {
@@ -406,76 +403,74 @@ int main (int argc, char* argv[])
                             // Re-orient onto the new triangle
                             std::cout << "FIXME: Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
 
-                            std::cout << "t_part = " << t_part << " length " << t_part.length() << " cf t_inplane len " << t_inplane.length() << std::endl;
-                            float d_rest = t_inplane.length() - t_part.length();
+                            std::cout << "mv_part = " << mv_part << " length " << mv_part.length() << " cf mv_inplane len " << mv_inplane.length() << std::endl;
+                            float d_rest = mv_inplane.length() - mv_part.length();
                             std::cout << "additional distance = " << d_rest << std::endl;
 
-                            sm::mat44<float> coord_reorient; // in which frame to move the camera?
-                                                             // This is used to postmuiltiply the
-                                                             // viewmatrix, so should be in the scene frame.
-                            //coord_reorient.translate (t_part); // now we're ON the triangle boundary
+                            sm::mat44<float> reorient_land; // reorientation transformation in landframe
+                            std::cout << "mv_part in land frame = " << mv_part << std::endl;
+                            reorient_land.translate (mv_part); // now we're ON the triangle boundary
+
                             // Rotate by the angle between the normals. I think this is constrained to be <= pi
-                            float rotn_angle = tn0.angle (_tn);
-                            std::cout << "Angle between tn0:" << tn0 << " and _tn:" << _tn << " is " << rotn_angle << std::endl;
+                            float rotn_angle = tn0_land.angle (_tn); // Hmm, these are NOT right at the mo is _tn is camframe??
+                            std::cout << "Angle between tn0_land:" << tn0_land << " and _tn:" << _tn << " is " << rotn_angle << std::endl;
                             // Use the *edge* as the rotation axis
                             std::cout << "Rotate " << rotn_angle << " about edge: " << edge << std::endl;
-                            coord_reorient.rotate (edge, rotn_angle);
-                            sm::vec<> t_rest = t_part; // FIXME: What if t_rest sails past the next triangle and on to ANOTHER one?
-                            t_rest.renormalize();
-                            t_rest *= d_rest; // NOW rotate t_rest
-                            coord_reorient.translate (t_rest);
+                            reorient_land.rotate (edge, rotn_angle);
+                            sm::vec<> mv_rest = mv_part; // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
+                            mv_rest.renormalize();
+                            mv_rest *= d_rest; // NOW rotate mv_rest
 
-                            // For now, just re-place the sphere.
-                            svp->postmultViewMatrix (coord_reorient);
+                            reorient_land.translate (mv_rest); // reorients points in the land model frame to change the coordinate axes
 
-                            //
-                            // translateCamerasLocally (t_part);
-                            // rotateCameras()
-                            // translateCamerasLocally (t_rest);
-                            //
-                            // ... or something that completely sets a new viewmatrix for the camera
-                            // (which finds new location, then rises above the surface to our 'hover
-                            // height':
-                            //
-                            // setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn * coord_rotn));
+                            // reorient_land should now move the projection of the coordinate frame
+                            // onto the land into the right location
+                            sm::vec<> new_h = (reorient_land * h).less_one_dim();
+                            std::cout << "Old h = " << h << " and new_h = " << new_h << std::endl;
+
+                            // a) Get sphere locn into land model frame
+                            // b) apply reorient_land
+                            // c) Return sphere lcon into scene coordinates (or bunch it all together):
+                            // d) Update svp->viewmatrix
+                            // All in one line:
+                            svp->setViewTranslation (land_to_scene * reorient_land * scene_to_land * svp->get_viewmatrix_origin());
+
+                            // we have cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+                            // Take cam_to_scene.
+                            // Apply scene_to_land
+                            // sink to the surface
+                            // Apply reorient_land
+                            // Raise from surface
+                            // Apply land_to_scene
+                            sm::mat44<float> sink;
+                            sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
+                            sm::mat44<float> unsink;
+                            sink.translate (_tn * hoverheight); // assumes we normalized _tn
+                            sm::mat44<float> cam_transform = land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene;
+                            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_transform));
+
                             ti0 = _ti;
-                            tn0 = _tn;
-
-                            // THEN (for debug) find the new hit location to draw the sphere:
-#if 0
-                            // This is the *new* camera location after the translation/rotation above
-                            auto camloc = camera_space * sm::vec<>{0,0,0};
-                            auto camloc_modelframe = (vmi * camloc).less_one_dim();
-                            auto [hit, ti, tn] = land->find_triangle_crossing (camloc_modelframe, -tn0);
-                            if (ti[0] == std::numeric_limits<uint32_t>::max()) {
-                                std::cout << "No hit - off the edge!\n";
-                            } else {
-                                std::cout << "On triangle " << ti[0] << "," << ti[1] << "," << ti[2] << std::endl;
-                                std::cout << "Cf ti0      " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
-
-                                std::cout << "Hit at " << hit << std::endl;
-                                sm::vec<float, 3> hp = (vm * hit).less_one_dim();
-                                std::cout << "In scene coordinates, hit = " << hp << std::endl;
-                                // Turn the hit point into a translation matrix
-                                sm::mat44<float> hitlocn;
-                                hitlocn.translate (hp);
-                                svp->setViewMatrix (hitlocn); // Re-position sphere
-                            }
-#endif
+                            tn0_land = _tn;
                         }
                     } else {
                         std::cout << "No crossings " << (inside01 ? " " : "!!0-1") <<  (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
-                        translateCamerasLocally (t.x(), t.y(), t.z());
+                        translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
+                        //sm::vec<> mv_scene = (cam_to_scene * mv_camframe).less_one_dim();
+                        //svp->addViewTranslation (mv_scene);
+                        svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
                     }
                 } else {
                     std::cout << "No intersection?\n";
-                    translateCamerasLocally (t.x(), t.y(), t.z());
+                    translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
+                    //svp->addViewTranslation (cam_to_scene * mv_camframe);
+                    svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
                 }
             } else {
-                translateCamerasLocally (t.x(), t.y(), t.z());
+                translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
+                //svp->addViewTranslation (cam_to_scene * mv_camframe);
+                svp->setViewTranslation (land_to_scene * mv_camframe_mat * scene_to_land * svp->get_viewmatrix_origin());
             }
 
-            //translateCamerasLocally (t.x(), t.y(), t.z());
             // Up-down (pitch) is rotation about local camera frame axis x
             rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
             // Left-and-right (yaw) is rotation about local camera frame axis y
@@ -483,24 +478,26 @@ int main (int argc, char* argv[])
             // Roll
             rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f);
 
-            camera_space = mplot::compoundray::getCameraSpace (scene);
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+
+            std::cout << std::endl; // debug
 
         } else {
             // Get the camera space and update our eye and camera-frame models
-            camera_space = mplot::compoundray::getCameraSpace (scene);
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         }
 
         // reset to initial camera space if requested
         if (v.vstate.test (eye3dvisual::state::campose_reset_request) == true) {
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
             v.stop(); // cancel any active movements
-            camera_space = initial_camera_space;
+            cam_to_scene = initial_camera_space;
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
         }
 
         // Update the view matrix of eye and eye localspace axes
-        eyevm_ptr->setViewMatrix (camera_space);
-        cam_cs_ptr->setViewMatrix (camera_space);
+        eyevm_ptr->setViewMatrix (cam_to_scene);
+        cam_cs_ptr->setViewMatrix (cam_to_scene);
     };
 
     /**
