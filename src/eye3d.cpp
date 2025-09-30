@@ -235,6 +235,12 @@ int main (int argc, char* argv[])
         // Populate neighbours of ti0 with something like:
         // ti0_neighbours = land->neighbour_triangles (ti0); // ??
         tn0_land = tn; // landframe
+        // Can I make hit the centre of the triangle?
+        constexpr bool hit_tri_centre = true;
+        if constexpr (hit_tri_centre) {
+            sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
+            hit = tv_landframe.mean();
+        }
         hp_scene = (land_to_scene * hit).less_one_dim();
 
         auto sv = std::make_unique<mplot::SphereVisual<>>(hp_scene, 0.1, mplot::colour::goldenrod3);
@@ -446,7 +452,9 @@ int main (int argc, char* argv[])
                             sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
                             sm::mat44<float> unsink;
                             sink.translate (_tn * hoverheight); // assumes we normalized _tn
-                            sm::mat44<float> cam_transform = land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene;
+                            //sm::mat44<float> cam_transform = land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene;
+                            sm::mat44<float> cam_transform = land_to_scene  * reorient_land * scene_to_land * cam_to_scene;
+                            // wrong at the moment
                             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_transform));
 
                             ti0 = _ti;
@@ -454,21 +462,25 @@ int main (int argc, char* argv[])
                         }
                     } else {
                         std::cout << "No crossings " << (inside01 ? " " : "!!0-1") <<  (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
+
                         translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
-                        //sm::vec<> mv_scene = (cam_to_scene * mv_camframe).less_one_dim();
-                        //svp->addViewTranslation (mv_scene);
-                        svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
+
+                        // Whats the movement of the camera in the scene frame?
+                        sm::vec<float, 4> mv_sceneframe = cam_to_scene * mv_camframe;
+                        sm::vec<float, 4> orig_sceneframe = cam_to_scene * sm::vec<>{};
+                        std::cout << "cam movement is " << mv_camframe << " in its own frame or from "
+                                  << orig_sceneframe << " to " << mv_sceneframe << " = " << (mv_sceneframe - orig_sceneframe) << " in the scene frame\n";
+                        svp->addViewTranslation ((mv_sceneframe - orig_sceneframe));
                     }
                 } else {
-                    std::cout << "No intersection?\n";
+                    std::cout << "No intersection with triangle t1t2t3\n";
                     translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
                     //svp->addViewTranslation (cam_to_scene * mv_camframe);
                     svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
                 }
             } else {
+                std::cout << "No land, translate cameras only.\n";
                 translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
-                //svp->addViewTranslation (cam_to_scene * mv_camframe);
-                svp->setViewTranslation (land_to_scene * mv_camframe_mat * scene_to_land * svp->get_viewmatrix_origin());
             }
 
             // Up-down (pitch) is rotation about local camera frame axis x
@@ -482,7 +494,7 @@ int main (int argc, char* argv[])
 
             std::cout << std::endl; // debug
 
-        } else {
+        } else { // not actively moving
             // Get the camera space and update our eye and camera-frame models
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         }
