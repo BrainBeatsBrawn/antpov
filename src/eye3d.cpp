@@ -192,6 +192,14 @@ int main (int argc, char* argv[])
     }
     sm::vec<> hp_scene = {};
     mplot::SphereVisual<>* svp = nullptr;
+    mplot::SphereVisual<>* svp1 = nullptr;
+    mplot::SphereVisual<>* svp2 = nullptr;
+    mplot::SphereVisual<>* svp3 = nullptr;
+    mplot::SphereVisual<>* svp4 = nullptr;
+
+    mplot::SphereVisual<>* svp_t0 = nullptr;
+    mplot::SphereVisual<>* svp_t1 = nullptr;
+    mplot::SphereVisual<>* svp_t2 = nullptr;
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
     sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
@@ -243,10 +251,45 @@ int main (int argc, char* argv[])
         }
         hp_scene = (land_to_scene * hit).less_one_dim();
 
-        auto sv = std::make_unique<mplot::SphereVisual<>>(hp_scene, 0.1, mplot::colour::goldenrod3);
+        auto sv = std::make_unique<mplot::SphereVisual<>>(hp_scene, 0.005, mplot::colour::goldenrod3);
         v.bindmodel (sv);
         sv->finalize();
         svp = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::deepskyblue3);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp1 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::magenta3);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp2 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::springgreen2);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp3 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::black);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp4 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.012, mplot::colour::orangered1);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp_t0 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.012, mplot::colour::darkgreen);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp_t1 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.012, mplot::colour::blue2);
+        v.bindmodel (sv);
+        sv->finalize();
+        svp_t2 = v.addVisualModel (sv);
 
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti[0] == std::numeric_limits<uint32_t>::max()) {
@@ -323,7 +366,7 @@ int main (int argc, char* argv[])
      * Subroutine: Move the camera according to key events in the mathplot window
      */
     auto subr_key_move_camera = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                 opts, land, &svp, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
+                                 opts, land, &svp, &svp1, &svp2, &svp3, &svp4, &svp_t0, &svp_t1, &svp_t2, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -357,25 +400,28 @@ int main (int argc, char* argv[])
                 std::cout << "mv_landframe = " << mv_landframe << std::endl;
                 float udn = mv_landframe.dot (tn0_land); // tn0_land is in landframe
                 sm::vec<> mv_orthog = tn0_land * (udn / (tn0_land.dot(tn0_land))); // landframe
-                sm::vec<> mv_inplane = mv_landframe - mv_orthog;      // landframe
-                std::cout << "mv_inplane (landframe): " << mv_inplane << std::endl;
+                sm::vec<> mv_inplane = mv_landframe - mv_orthog;                   // landframe
+                std::cout << "mv_inplane = " << mv_inplane << std::endl;
 
                 // 2. Determine if that component will cross any edge of the triangle
                 // 3. Work out what the new edge is and find a location on that triangle
                 // 4. Find the 'hover location' over that new location
                 //
-                sm::vec<> h = {};
+                sm::vec<> hovlocn = {};
                 const sm::vec<>& t0 = tv_landframe[0];
                 const sm::vec<>& t1 = tv_landframe[1];
                 const sm::vec<>& t2 = tv_landframe[2];
-                std::cout << "Triangle is " << t0 << ", " << t1 << ", " << t2 << std::endl;
-                bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_landframe, -tn0_land, h);
-                //std::cout << "t starts at " << h << std::endl; // h is in landframe
-                //std::cout << "t end is " << (h + mv_inplane) << std::endl;
+                svp_t0->setViewTranslation (land_to_scene * t0);
+                svp_t1->setViewTranslation (land_to_scene * t1);
+                svp_t2->setViewTranslation (land_to_scene * t2);
+                std::cout << "Current hover triangle is " << t0 << ", " << t1 << ", " << t2 << std::endl;
+                bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_landframe, -tn0_land, hovlocn);
+                std::cout << "hovlocn: " << hovlocn << std::endl; // h is in landframe
+                //std::cout << "t end is " << (hovlocn + mv_inplane) << std::endl;
                 sm::vec<> mv_part = {}; // The part-way movement to the edge (landframe)
                 if (isect) {
                     // For each edge in triangle, compute distance to edge for h and (h + mv_inplane)
-                    sm::vec<> p = h + mv_inplane;
+                    sm::vec<> p = hovlocn + mv_inplane;
                     uint32_t common_a = 0;
                     uint32_t common_b = 0;
 
@@ -383,22 +429,74 @@ int main (int argc, char* argv[])
                     sm::vec<> ptoe = p - t0;
                     bool inside01 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside01) {
+                        std::cout << "not inside 0-1\n";
                         common_a = ti0[0]; common_b = ti0[1];
-                        // distance to cross point : edge.dot (ptoe) / edge.dot (edge)
-                        //        (                  cross point                  )
-                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t0) - h;
+
+                        std::cout << "edge is " << edge << std::endl;
+                        std::cout << "edge.dot (p-t0) = " << edge.dot (ptoe) << std::endl;
+                        std::cout << "edge.dot (edge) = " << edge.dot (edge) << std::endl;
+
+                        auto d_to_cross = (edge.dot (ptoe) / edge.dot (edge));
+                        std::cout << "d_to_cross is " << d_to_cross << std::endl;
+
+                        auto proj_vec = d_to_cross * edge;
+                        std::cout << "proj_vec " << proj_vec << std::endl;
+                        auto proj_point = (proj_vec + t0);
+
+                        svp1->setViewTranslation (land_to_scene * proj_point); // blue
+                        svp2->setViewTranslation (land_to_scene * hovlocn);
+                        svp3->setViewTranslation (land_to_scene * p);
+
+                        std::cout << "proj_point is " << proj_point << " and hovlocn is " << hovlocn << std::endl;
+                        mv_part = proj_point - hovlocn;
                     }
                     edge = t2 - t1; ptoe = p - t1;
                     bool inside21 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside21) {
+                        std::cout << "not inside 2-1\n";
                         common_a = ti0[2]; common_b = ti0[1];
-                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t1) - h;
+
+                        std::cout << "edge is " << edge << std::endl;
+                        std::cout << "edge.dot (p-t1) = " << edge.dot (ptoe) << std::endl;
+                        std::cout << "p-t1 length: " << ptoe.length() << std::endl;
+                        std::cout << "edge.dot (edge) = " << edge.dot (edge) << std::endl;
+
+                        auto d_to_cross = (edge.dot (ptoe) / edge.dot (edge));
+                        std::cout << "d_to_cross is " << d_to_cross << std::endl; // a proportion
+
+                        auto proj_vec = d_to_cross * edge;
+
+                        std::cout << "proj_vec " << proj_vec << std::endl;
+                        auto proj_point = (proj_vec + t1);
+
+                        auto dp = std::sqrt (ptoe.dot(ptoe) - proj_vec.dot(proj_vec));
+                        std::cout << "dp = " << dp << std::endl;
+
+                        auto th = edge.angle (mv_inplane);
+                        auto th2 = mv_inplane.angle (edge);
+                        std::cout << "th = " << (th * sm::mathconst<float>::rad2deg) << std::endl;
+                        std::cout << "th2 = " << (th2 * sm::mathconst<float>::rad2deg) << std::endl;
+
+                        auto ad = dp / std::atan (th);
+                        std::cout << "ad = " << ad << std::endl; // an absolute
+
+                        auto cross_vec = (d_to_cross + (ad / edge.length())) * edge;
+                        auto cross_point = cross_vec + t1;
+
+                        svp1->setViewTranslation (land_to_scene * proj_point);  // proj point is blue
+                        svp2->setViewTranslation (land_to_scene * hovlocn);     // last hover locn is magenta
+                        svp3->setViewTranslation (land_to_scene * p);           // p is light green
+                        svp4->setViewTranslation (land_to_scene * cross_point); // cross point is black (not yet in right location)
+
+                        std::cout << "proj_point is " << proj_point << " and hovlocn is " << hovlocn << std::endl;
+                        mv_part = proj_point - hovlocn;
                     }
                     edge = t0 - t2; ptoe = p - t2;
                     bool inside02 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside02) {
+                        std::cout << "not inside 0-2\n";
                         common_a = ti0[0]; common_b = ti0[2];
-                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t2) - h;
+                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t2) - hovlocn;
                     }
 
                     if (!inside01 || !inside21 || !inside02) {
@@ -407,32 +505,38 @@ int main (int argc, char* argv[])
                         auto [_ti, _tn] = land->find_other_triangle_containing (common_a, common_b, ti0);
                         if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
                             // Re-orient onto the new triangle
-                            std::cout << "FIXME: Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
+                            std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
 
-                            std::cout << "mv_part = " << mv_part << " length " << mv_part.length() << " cf mv_inplane len " << mv_inplane.length() << std::endl;
+                            std::cout << "mv_inplane (landframe): " << mv_inplane  << " length " << mv_inplane.length() << " angle wrt z " << mv_inplane.angle (sm::vec<>::uz())<< std::endl;
+
+                            std::cout << "mv_part =               " << mv_part << " length " << mv_part.length() << " angle wrt z " << mv_part.angle (sm::vec<>::uz())<< std::endl;
                             float d_rest = mv_inplane.length() - mv_part.length();
-                            std::cout << "additional distance = " << d_rest << std::endl;
+                            std::cout << "  additional distance = " << d_rest << std::endl;
 
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
-                            std::cout << "mv_part in land frame = " << mv_part << std::endl;
                             reorient_land.translate (mv_part); // now we're ON the triangle boundary
 
                             // Rotate by the angle between the normals. I think this is constrained to be <= pi
-                            float rotn_angle = tn0_land.angle (_tn); // Hmm, these are NOT right at the mo is _tn is camframe??
-                            std::cout << "Angle between tn0_land:" << tn0_land << " and _tn:" << _tn << " is " << rotn_angle << std::endl;
+                            float rotn_angle = tn0_land.angle (_tn);
+                            ///std::cout << "Angle between tn0_land:" << tn0_land << " and _tn:" << _tn << " is " << rotn_angle << std::endl;
                             // Use the *edge* as the rotation axis
-                            std::cout << "Rotate " << rotn_angle << " about edge: " << edge << std::endl;
+                            ///std::cout << "Rotate " << rotn_angle << " about edge: " << edge << std::endl;
                             reorient_land.rotate (edge, rotn_angle);
-                            sm::vec<> mv_rest = mv_part; // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
+
+                            sm::vec<> mv_rest = mv_inplane; // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
                             mv_rest.renormalize();
                             mv_rest *= d_rest; // NOW rotate mv_rest
+                            std::cout << "mv_rest (unrotated) in land frame = " << mv_rest << std::endl;
 
                             reorient_land.translate (mv_rest); // reorients points in the land model frame to change the coordinate axes
 
+                            std::cout << "reorient_land applied to (0,0,0): " << (reorient_land * sm::vec<>{}) << std::endl;
+                            std::cout << "mv_part + mv_rest = " << (mv_part + mv_rest) << std::endl;
+
                             // reorient_land should now move the projection of the coordinate frame
                             // onto the land into the right location
-                            sm::vec<> new_h = (reorient_land * h).less_one_dim();
-                            std::cout << "Old h = " << h << " and new_h = " << new_h << std::endl;
+                            sm::vec<> new_hovlocn = (reorient_land * hovlocn).less_one_dim();
+                            std::cout << "Old hovlocn = " << hovlocn << " and new_hovlocn = " << new_hovlocn << std::endl;
 
                             // a) Get sphere locn into land model frame
                             // b) apply reorient_land
