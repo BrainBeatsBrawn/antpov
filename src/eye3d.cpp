@@ -370,6 +370,49 @@ int main (int argc, char* argv[])
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
+        auto subr_compute_mv_part = [land_to_scene, &svp1, &svp2, &svp3, &svp4]
+        (const sm::vec<>& edge, const sm::vec<>& ptoe,
+         const sm::vec<>& mv_inplane, const sm::vec<>& t_other,
+         const sm::vec<>& p, const sm::vec<>& hovlocn)
+        {
+            std::cout << "edge is " << edge << std::endl;
+            std::cout << "edge.dot (p-t1) = " << edge.dot (ptoe) << std::endl;
+            std::cout << "p-t1 length: " << ptoe.length() << std::endl;
+            std::cout << "edge.dot (edge) = " << edge.dot (edge) << std::endl;
+
+            auto d_to_cross = (edge.dot (ptoe) / edge.dot (edge));
+            std::cout << "d_to_cross is " << d_to_cross << std::endl; // a proportion
+
+            auto proj_vec = d_to_cross * edge;
+
+            std::cout << "proj_vec " << proj_vec << std::endl;
+            auto proj_point = (proj_vec + t_other);
+
+            auto dp = std::sqrt (ptoe.dot(ptoe) - proj_vec.dot(proj_vec));
+            std::cout << "dp = " << dp << std::endl;
+
+            auto th = edge.angle (mv_inplane);
+            auto th2 = mv_inplane.angle (edge);
+            std::cout << "th = " << (th * sm::mathconst<float>::rad2deg) << std::endl;
+            std::cout << "th2 = " << (th2 * sm::mathconst<float>::rad2deg) << std::endl;
+
+            auto ad = dp / std::atan (th);
+            std::cout << "ad = " << ad << std::endl; // an absolute
+
+            auto cross_vec = (d_to_cross + (ad / edge.length())) * edge;
+            auto cross_point = cross_vec + t_other;
+
+            svp1->setViewTranslation (land_to_scene * proj_point);  // proj point is blue
+            svp2->setViewTranslation (land_to_scene * hovlocn);     // last hover locn is magenta
+            svp3->setViewTranslation (land_to_scene * p);           // p is light green
+            svp4->setViewTranslation (land_to_scene * cross_point); // cross point is black (not yet in right location)
+
+            std::cout << "proj_point is " << proj_point << " and hovlocn is " << hovlocn << std::endl;
+            auto mv_part = proj_point - hovlocn;
+
+            return mv_part;
+        };
+
         sm::mat44<float> cam_to_scene;
         if (v.isActivelyMoving()) {
 
@@ -431,72 +474,23 @@ int main (int argc, char* argv[])
                     if (!inside01) {
                         std::cout << "not inside 0-1\n";
                         common_a = ti0[0]; common_b = ti0[1];
-
-                        std::cout << "edge is " << edge << std::endl;
-                        std::cout << "edge.dot (p-t0) = " << edge.dot (ptoe) << std::endl;
-                        std::cout << "edge.dot (edge) = " << edge.dot (edge) << std::endl;
-
-                        auto d_to_cross = (edge.dot (ptoe) / edge.dot (edge));
-                        std::cout << "d_to_cross is " << d_to_cross << std::endl;
-
-                        auto proj_vec = d_to_cross * edge;
-                        std::cout << "proj_vec " << proj_vec << std::endl;
-                        auto proj_point = (proj_vec + t0);
-
-                        svp1->setViewTranslation (land_to_scene * proj_point); // blue
-                        svp2->setViewTranslation (land_to_scene * hovlocn);
-                        svp3->setViewTranslation (land_to_scene * p);
-
-                        std::cout << "proj_point is " << proj_point << " and hovlocn is " << hovlocn << std::endl;
-                        mv_part = proj_point - hovlocn;
+                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t0, p, hovlocn);
                     }
+
                     edge = t2 - t1; ptoe = p - t1;
                     bool inside21 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside21) {
                         std::cout << "not inside 2-1\n";
                         common_a = ti0[2]; common_b = ti0[1];
-
-                        std::cout << "edge is " << edge << std::endl;
-                        std::cout << "edge.dot (p-t1) = " << edge.dot (ptoe) << std::endl;
-                        std::cout << "p-t1 length: " << ptoe.length() << std::endl;
-                        std::cout << "edge.dot (edge) = " << edge.dot (edge) << std::endl;
-
-                        auto d_to_cross = (edge.dot (ptoe) / edge.dot (edge));
-                        std::cout << "d_to_cross is " << d_to_cross << std::endl; // a proportion
-
-                        auto proj_vec = d_to_cross * edge;
-
-                        std::cout << "proj_vec " << proj_vec << std::endl;
-                        auto proj_point = (proj_vec + t1);
-
-                        auto dp = std::sqrt (ptoe.dot(ptoe) - proj_vec.dot(proj_vec));
-                        std::cout << "dp = " << dp << std::endl;
-
-                        auto th = edge.angle (mv_inplane);
-                        auto th2 = mv_inplane.angle (edge);
-                        std::cout << "th = " << (th * sm::mathconst<float>::rad2deg) << std::endl;
-                        std::cout << "th2 = " << (th2 * sm::mathconst<float>::rad2deg) << std::endl;
-
-                        auto ad = dp / std::atan (th);
-                        std::cout << "ad = " << ad << std::endl; // an absolute
-
-                        auto cross_vec = (d_to_cross + (ad / edge.length())) * edge;
-                        auto cross_point = cross_vec + t1;
-
-                        svp1->setViewTranslation (land_to_scene * proj_point);  // proj point is blue
-                        svp2->setViewTranslation (land_to_scene * hovlocn);     // last hover locn is magenta
-                        svp3->setViewTranslation (land_to_scene * p);           // p is light green
-                        svp4->setViewTranslation (land_to_scene * cross_point); // cross point is black (not yet in right location)
-
-                        std::cout << "proj_point is " << proj_point << " and hovlocn is " << hovlocn << std::endl;
-                        mv_part = proj_point - hovlocn;
+                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t1, p, hovlocn);
                     }
+
                     edge = t0 - t2; ptoe = p - t2;
                     bool inside02 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
                     if (!inside02) {
                         std::cout << "not inside 0-2\n";
                         common_a = ti0[0]; common_b = ti0[2];
-                        mv_part = ((edge.dot (ptoe) / edge.dot (edge)) * edge + t2) - hovlocn;
+                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t2, p, hovlocn);
                     }
 
                     if (!inside01 || !inside21 || !inside02) {
