@@ -372,45 +372,55 @@ int main (int argc, char* argv[])
 
         auto subr_compute_mv_part = [land_to_scene, &svp1, &svp2, &svp3, &svp4]
         (const sm::vec<>& edge, const sm::vec<>& ptoe,
-         const sm::vec<>& mv_inplane, const sm::vec<>& t_other,
+         const sm::vec<>& mv_inplane, const sm::vec<>& t_other, const sm::vec<>& t_norm,
          const sm::vec<>& p, const sm::vec<>& hovlocn)
         {
-            std::cout << "edge is " << edge << std::endl;
-            std::cout << "edge.dot (p-t1) = " << edge.dot (ptoe) << std::endl;
-            std::cout << "p-t1 length: " << ptoe.length() << std::endl;
-            std::cout << "edge.dot (edge) = " << edge.dot (edge) << std::endl;
+            sm::vec<> u_y = edge;
+            u_y.renormalize();
+            sm::vec<> u_z = t_norm;
+            u_z.renormalize();
+            sm::vec<> u_x = u_y.cross(u_z);
 
-            auto d_to_cross = (edge.dot (ptoe) / edge.dot (edge));
-            std::cout << "d_to_cross is " << d_to_cross << std::endl; // a proportion
+            // Create a matrix to convert from land frame movements to the triangle frame of ref.
+            sm::mat44<float> from_triangle_frame = sm::mat44<float>::frombasis (u_x, u_y, u_z);
+            sm::mat44<float> to_triangle_frame = from_triangle_frame.inverse();
 
-            auto proj_vec = d_to_cross * edge;
+            // Use Edge as our 'y' and the orthogonal as our 'x', then express mv_inplane in terms
+            // of these two unit vectors. We also have our 'z' which is the triangle normal.
+            sm::vec<float, 4> mv_inplane4d = to_triangle_frame * mv_inplane;
+            sm::vec<float, 2> mv_inplane2d = { mv_inplane4d[0], mv_inplane4d[1] };
 
-            std::cout << "proj_vec " << proj_vec << std::endl;
-            auto proj_point = (proj_vec + t_other);
+            sm::vec<float, 4> h_4d = to_triangle_frame * hovlocn;
+            sm::vec<float, 2> h_2d =  { h_4d[0], h_4d[1] };
 
-            auto dp = std::sqrt (ptoe.dot(ptoe) - proj_vec.dot(proj_vec));
-            std::cout << "dp = " << dp << std::endl;
+            sm::vec<float, 4> edge_4d = to_triangle_frame * edge;
+            sm::vec<float, 2> edge_2d =  { edge_4d[0], edge_4d[1] };
 
-            auto th = edge.angle (mv_inplane);
-            auto th2 = mv_inplane.angle (edge);
-            std::cout << "th = " << (th * sm::mathconst<float>::rad2deg) << std::endl;
-            std::cout << "th2 = " << (th2 * sm::mathconst<float>::rad2deg) << std::endl;
+            // A 2d null vector for the origin in 2D
+            constexpr sm::vec<float, 2> orig_2d = {};
 
-            auto ad = dp / std::atan (th);
-            std::cout << "ad = " << ad << std::endl; // an absolute
-
-            auto cross_vec = (d_to_cross + (ad / edge.length())) * edge;
-            auto cross_point = cross_vec + t_other;
-
-            svp1->setViewTranslation (land_to_scene * proj_point);  // proj point is blue
-            svp2->setViewTranslation (land_to_scene * hovlocn);     // last hover locn is magenta
-            svp3->setViewTranslation (land_to_scene * p);           // p is light green
-            svp4->setViewTranslation (land_to_scene * cross_point); // cross point is black (not yet in right location)
-
-            std::cout << "proj_point is " << proj_point << " and hovlocn is " << hovlocn << std::endl;
-            auto mv_part = proj_point - hovlocn;
-
-            return mv_part;
+            // Can now apply algo to find crossing point
+            std::bitset<2> si = sm::algo::segments_intersect<float> (orig_2d, edge_2d, h_2d, h_2d + mv_inplane2d);
+            if (si.test(1)) {
+                throw std::runtime_error ("Deal with colinear movement and triangle edge!\n");
+            } else {
+                if (si.test(0)) {
+                    // Intersects as expected
+                    sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (orig_2d, edge_2d, h_2d, h_2d + mv_inplane2d);
+                    std::cout << "Cross point (2d) is " << cross_point_2d << std::endl;
+                    // Now go from cross point 2d to a point in landscape coordinates?
+                    sm::vec<> cross_point = (from_triangle_frame * cross_point_2d.plus_one_dim(0)).less_one_dim();
+                    std::cout << "Cross point in land frame: " << cross_point << std::endl;
+                    svp2->setViewTranslation (land_to_scene * hovlocn);     // last hover locn is magenta
+                    svp4->setViewTranslation (land_to_scene * cross_point); // cross point is black (not yet in right location)
+                    sm::vec<> mv_part = {};
+                    return mv_part;
+                } else {
+                    // Hmm, don't expect a lack of intersection
+                    // set mv_part to be mv_inplane?
+                    return mv_inplane;
+                }
+            }
         };
 
         sm::mat44<float> cam_to_scene;
@@ -474,7 +484,7 @@ int main (int argc, char* argv[])
                     if (!inside01) {
                         std::cout << "not inside 0-1\n";
                         common_a = ti0[0]; common_b = ti0[1];
-                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t0, p, hovlocn);
+                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t0, tn0_land, p, hovlocn);
                     }
 
                     edge = t2 - t1; ptoe = p - t1;
@@ -482,7 +492,7 @@ int main (int argc, char* argv[])
                     if (!inside21) {
                         std::cout << "not inside 2-1\n";
                         common_a = ti0[2]; common_b = ti0[1];
-                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t1, p, hovlocn);
+                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t1, tn0_land, p, hovlocn);
                     }
 
                     edge = t0 - t2; ptoe = p - t2;
@@ -490,7 +500,7 @@ int main (int argc, char* argv[])
                     if (!inside02) {
                         std::cout << "not inside 0-2\n";
                         common_a = ti0[0]; common_b = ti0[2];
-                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t2, p, hovlocn);
+                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t2, tn0_land, p, hovlocn);
                     }
 
                     if (!inside01 || !inside21 || !inside02) {
