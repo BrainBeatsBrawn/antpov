@@ -295,12 +295,12 @@ int main (int argc, char* argv[])
         sv->finalize();
         svp_t2 = v.addVisualModel (sv);
 
-        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{2,2,2}, 0.005f, mplot::colour::blue2);
+        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{2,2,2}, 0.001f, mplot::colour::blue2);
         v.bindmodel (rv);
         rv->finalize();
         rvp1 = v.addVisualModel (rv);
 
-        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.005f, mplot::colour::crimson);
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.001f, mplot::colour::crimson);
         v.bindmodel (rv);
         rv->finalize();
         rvp2 = v.addVisualModel (rv);
@@ -408,8 +408,8 @@ int main (int argc, char* argv[])
             // Create a matrix to convert from land frame movements to the triangle frame of ref.
             sm::mat44<float> from_triangle_frame = sm::mat44<float>::frombasis (u_x, u_y, u_z);
 
-            // Idea:
-            // from_triangle_frame.translate (+/- edge_s);
+            // Idea (no good)
+            // from_triangle_frame.pretranslate (edge_s);
 
             sm::mat44<float> to_triangle_frame = from_triangle_frame.inverse();
 
@@ -427,6 +427,14 @@ int main (int argc, char* argv[])
             sm::vec<float, 2> edge_2d =  { edge_4d[0], edge_4d[1] };
             std::cout << "edge_2d: " << edge_2d  << std::endl;
 
+            sm::vec<float, 4> edge_s_4d = to_triangle_frame * edge_s;
+            sm::vec<float, 2> edge_s_2d =  { edge_s_4d[0], edge_s_4d[1] };
+            std::cout << "edge_s_2d: " << edge_s_2d  << std::endl;
+
+            sm::vec<float, 4> edge_e_4d = to_triangle_frame * edge_e;
+            sm::vec<float, 2> edge_e_2d =  { edge_e_4d[0], edge_e_4d[1] };
+            std::cout << "edge_e_2d: " << edge_e_2d  << std::endl;
+
             // A 2d null vector for the origin in 2D
             constexpr sm::vec<float, 2> orig_2d = {};
 
@@ -436,19 +444,19 @@ int main (int argc, char* argv[])
                       << " and " << h_2d << " --> " << (h_2d + mv_inplane2d) << "\n";
 
             // Let's transform these back for vis
-            rvp1->update ((from_triangle_frame * sm::vec<>{}).less_one_dim(),
-                          (from_triangle_frame * edge_4d).less_one_dim());
+            rvp1->update ((from_triangle_frame * (sm::vec<float, 4>{} + edge_s_4d)).less_one_dim(),
+                          (from_triangle_frame * (edge_4d + edge_s_4d)).less_one_dim());
             rvp2->update ((from_triangle_frame * h_4d).less_one_dim(),
                           (from_triangle_frame * (h_4d + mv_inplane4d)).less_one_dim());
 
 
-            std::bitset<2> si = sm::algo::segments_intersect<float> (orig_2d, edge_2d, h_2d, h_2d + mv_inplane2d);
+            std::bitset<2> si = sm::algo::segments_intersect<float> (orig_2d + edge_s_2d, edge_2d + edge_s_2d, h_2d, h_2d + mv_inplane2d);
             if (si.test(1)) {
                 throw std::runtime_error ("Deal with colinear movement and triangle edge!\n");
             } else {
                 if (si.test(0)) {
                     // Intersects as expected
-                    sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (orig_2d, edge_2d, h_2d, h_2d + mv_inplane2d);
+                    sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (orig_2d + edge_s_2d, edge_2d + edge_s_2d, h_2d, h_2d + mv_inplane2d);
                     std::cout << "Cross point (2d) is " << cross_point_2d << std::endl;
                     // Now go from cross point 2d to a point in landscape coordinates?
                     sm::vec<> cross_point = (from_triangle_frame * cross_point_2d.plus_one_dim()).less_one_dim();
