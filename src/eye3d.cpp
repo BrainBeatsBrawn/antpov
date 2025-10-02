@@ -21,6 +21,7 @@
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
 #include <mplot/SphereVisual.h> // debug really
+#include <mplot/RodVisual.h>    // also debug
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -201,6 +202,9 @@ int main (int argc, char* argv[])
     mplot::SphereVisual<>* svp_t1 = nullptr;
     mplot::SphereVisual<>* svp_t2 = nullptr;
 
+    mplot::RodVisual<>* rvp1 = nullptr;
+    mplot::RodVisual<>* rvp2 = nullptr;
+
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
     sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
 
@@ -291,6 +295,16 @@ int main (int argc, char* argv[])
         sv->finalize();
         svp_t2 = v.addVisualModel (sv);
 
+        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{2,2,2}, 0.005f, mplot::colour::blue2);
+        v.bindmodel (rv);
+        rv->finalize();
+        rvp1 = v.addVisualModel (rv);
+
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.005f, mplot::colour::crimson);
+        v.bindmodel (rv);
+        rv->finalize();
+        rvp2 = v.addVisualModel (rv);
+
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti[0] == std::numeric_limits<uint32_t>::max()) {
             std::cout << "No hit\n";
@@ -366,40 +380,68 @@ int main (int argc, char* argv[])
      * Subroutine: Move the camera according to key events in the mathplot window
      */
     auto subr_key_move_camera = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                 opts, land, &svp, &svp1, &svp2, &svp3, &svp4, &svp_t0, &svp_t1, &svp_t2, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
+                                 opts, land, &svp, &svp1, &svp2, &svp3, &svp4, &svp_t0, &svp_t1, &svp_t2, &rvp1, &rvp2, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
-        auto subr_compute_mv_part = [land_to_scene, &svp1, &svp2, &svp3, &svp4]
-        (const sm::vec<>& edge, const sm::vec<>& ptoe,
-         const sm::vec<>& mv_inplane, const sm::vec<>& t_other, const sm::vec<>& t_norm,
-         const sm::vec<>& p, const sm::vec<>& hovlocn)
+        /**
+         * A subroutine to find the part of mv_inplane that gets us to the triangle boundary
+         */
+        auto subr_compute_mv_part = [land_to_scene, &svp1, &svp2, &svp3, &svp4, &rvp1, &rvp2]
+        (const sm::vec<>& edge_s, const sm::vec<>& edge_e, const sm::vec<>& mv_inplane, const sm::vec<>& t_norm, const sm::vec<>& hovlocn)
         {
+            sm::vec<> edge = edge_e - edge_s;
+
+            // This is ok - shows the right lines
+            // rvp1->update (edge_s, edge_e);
+            // rvp2->update (hovlocn, hovlocn + mv_inplane);
+
             sm::vec<> u_y = edge;
             u_y.renormalize();
             sm::vec<> u_z = t_norm;
             u_z.renormalize();
-            sm::vec<> u_x = u_y.cross(u_z);
+            sm::vec<> u_x = u_y.cross (u_z);
+
+            std::cout << "edge = " << edge << std::endl;
+            std::cout << "Basis: " << u_x << " " << u_y << " " << u_z << std::endl;
 
             // Create a matrix to convert from land frame movements to the triangle frame of ref.
             sm::mat44<float> from_triangle_frame = sm::mat44<float>::frombasis (u_x, u_y, u_z);
+
+            // Idea:
+            // from_triangle_frame.translate (+/- edge_s);
+
             sm::mat44<float> to_triangle_frame = from_triangle_frame.inverse();
 
             // Use Edge as our 'y' and the orthogonal as our 'x', then express mv_inplane in terms
             // of these two unit vectors. We also have our 'z' which is the triangle normal.
             sm::vec<float, 4> mv_inplane4d = to_triangle_frame * mv_inplane;
             sm::vec<float, 2> mv_inplane2d = { mv_inplane4d[0], mv_inplane4d[1] };
+            std::cout << "mv_inplane2d: " << mv_inplane2d  << std::endl;
 
             sm::vec<float, 4> h_4d = to_triangle_frame * hovlocn;
             sm::vec<float, 2> h_2d =  { h_4d[0], h_4d[1] };
+            std::cout << "h_2d: " << h_2d  << std::endl;
 
             sm::vec<float, 4> edge_4d = to_triangle_frame * edge;
             sm::vec<float, 2> edge_2d =  { edge_4d[0], edge_4d[1] };
+            std::cout << "edge_2d: " << edge_2d  << std::endl;
 
             // A 2d null vector for the origin in 2D
             constexpr sm::vec<float, 2> orig_2d = {};
 
+            sm::vec<> mv_part = {};
             // Can now apply algo to find crossing point
+            std::cout << "intersection test for lines: " << orig_2d << " --> " << edge_2d
+                      << " and " << h_2d << " --> " << (h_2d + mv_inplane2d) << "\n";
+
+            // Let's transform these back for vis
+            rvp1->update ((from_triangle_frame * sm::vec<>{}).less_one_dim(),
+                          (from_triangle_frame * edge_4d).less_one_dim());
+            rvp2->update ((from_triangle_frame * h_4d).less_one_dim(),
+                          (from_triangle_frame * (h_4d + mv_inplane4d)).less_one_dim());
+
+
             std::bitset<2> si = sm::algo::segments_intersect<float> (orig_2d, edge_2d, h_2d, h_2d + mv_inplane2d);
             if (si.test(1)) {
                 throw std::runtime_error ("Deal with colinear movement and triangle edge!\n");
@@ -409,18 +451,20 @@ int main (int argc, char* argv[])
                     sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (orig_2d, edge_2d, h_2d, h_2d + mv_inplane2d);
                     std::cout << "Cross point (2d) is " << cross_point_2d << std::endl;
                     // Now go from cross point 2d to a point in landscape coordinates?
-                    sm::vec<> cross_point = (from_triangle_frame * cross_point_2d.plus_one_dim(0)).less_one_dim();
+                    sm::vec<> cross_point = (from_triangle_frame * cross_point_2d.plus_one_dim()).less_one_dim();
                     std::cout << "Cross point in land frame: " << cross_point << std::endl;
                     svp2->setViewTranslation (land_to_scene * hovlocn);     // last hover locn is magenta
                     svp4->setViewTranslation (land_to_scene * cross_point); // cross point is black (not yet in right location)
-                    sm::vec<> mv_part = {};
-                    return mv_part;
+                    mv_part = cross_point - hovlocn;
                 } else {
+                    std::cout << "Huh?!? Got no intersection across edge?\n";
                     // Hmm, don't expect a lack of intersection
                     // set mv_part to be mv_inplane?
-                    return mv_inplane;
+                    mv_part = mv_inplane;
                 }
             }
+
+            return mv_part;
         };
 
         sm::mat44<float> cam_to_scene;
@@ -450,7 +494,6 @@ int main (int argc, char* argv[])
                 sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
                 //std::cout << "camloc_landframe = " << camloc_landframe << std::endl;
                 sm::vec<> mv_landframe = (cam_to_land * mv_camframe).less_one_dim() - camloc_landframe;
-                std::cout << "mv_landframe = " << mv_landframe << std::endl;
                 float udn = mv_landframe.dot (tn0_land); // tn0_land is in landframe
                 sm::vec<> mv_orthog = tn0_land * (udn / (tn0_land.dot(tn0_land))); // landframe
                 sm::vec<> mv_inplane = mv_landframe - mv_orthog;                   // landframe
@@ -470,7 +513,7 @@ int main (int argc, char* argv[])
                 std::cout << "Current hover triangle is " << t0 << ", " << t1 << ", " << t2 << std::endl;
                 bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_landframe, -tn0_land, hovlocn);
                 std::cout << "hovlocn: " << hovlocn << std::endl; // h is in landframe
-                //std::cout << "t end is " << (hovlocn + mv_inplane) << std::endl;
+
                 sm::vec<> mv_part = {}; // The part-way movement to the edge (landframe)
                 if (isect) {
                     // For each edge in triangle, compute distance to edge for h and (h + mv_inplane)
@@ -484,7 +527,7 @@ int main (int argc, char* argv[])
                     if (!inside01) {
                         std::cout << "not inside 0-1\n";
                         common_a = ti0[0]; common_b = ti0[1];
-                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t0, tn0_land, p, hovlocn);
+                        mv_part = subr_compute_mv_part (t0, t1, mv_inplane, tn0_land, hovlocn);
                     }
 
                     edge = t2 - t1; ptoe = p - t1;
@@ -492,7 +535,7 @@ int main (int argc, char* argv[])
                     if (!inside21) {
                         std::cout << "not inside 2-1\n";
                         common_a = ti0[2]; common_b = ti0[1];
-                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t1, tn0_land, p, hovlocn);
+                        mv_part = subr_compute_mv_part (t1, t2, mv_inplane, tn0_land, hovlocn);
                     }
 
                     edge = t0 - t2; ptoe = p - t2;
@@ -500,7 +543,7 @@ int main (int argc, char* argv[])
                     if (!inside02) {
                         std::cout << "not inside 0-2\n";
                         common_a = ti0[0]; common_b = ti0[2];
-                        mv_part = subr_compute_mv_part (edge, ptoe, mv_inplane, t2, tn0_land, p, hovlocn);
+                        mv_part = subr_compute_mv_part (t2, t0, mv_inplane, tn0_land, hovlocn);
                     }
 
                     if (!inside01 || !inside21 || !inside02) {
@@ -511,9 +554,14 @@ int main (int argc, char* argv[])
                             // Re-orient onto the new triangle
                             std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
 
-                            std::cout << "mv_inplane (landframe): " << mv_inplane  << " length " << mv_inplane.length() << " angle wrt z " << mv_inplane.angle (sm::vec<>::uz())<< std::endl;
+                            std::cout << " mv_inplane (landframe): " << mv_inplane
+                                      << " length " << mv_inplane.length() << " angle wrt z "
+                                      << mv_inplane.angle (sm::vec<>::uz())<< std::endl;
 
-                            std::cout << "mv_part =               " << mv_part << " length " << mv_part.length() << " angle wrt z " << mv_part.angle (sm::vec<>::uz())<< std::endl;
+                            std::cout << " mv_part =               " << mv_part
+                                      << " length " << mv_part.length()
+                                      << " angle wrt z " << mv_part.angle (sm::vec<>::uz())<< std::endl;
+
                             float d_rest = mv_inplane.length() - mv_part.length();
                             std::cout << "  additional distance = " << d_rest << std::endl;
 
@@ -559,10 +607,8 @@ int main (int argc, char* argv[])
                             sm::mat44<float> sink;
                             sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
                             sm::mat44<float> unsink;
-                            sink.translate (_tn * hoverheight); // assumes we normalized _tn
-                            //sm::mat44<float> cam_transform = land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene;
-                            sm::mat44<float> cam_transform = land_to_scene  * reorient_land * scene_to_land * cam_to_scene;
-                            // wrong at the moment
+                            unsink.translate (_tn * hoverheight); // assumes we normalized _tn
+                            sm::mat44<float> cam_transform = land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene;
                             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_transform));
 
                             ti0 = _ti;

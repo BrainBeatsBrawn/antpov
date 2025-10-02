@@ -17,7 +17,7 @@ struct eye3dvisual final : public mplot::Visual<>
         : mplot::Visual<> (width, height, title)
     {
         // State defaults
-        this->vstate |= state::show_cones;
+        //this->vstate |= state::show_cones;
         this->vstate |= state::show_camframe;
         if (blender_axes) {
             this->updateCoordLabels ("X", "Y", "Z(up)");
