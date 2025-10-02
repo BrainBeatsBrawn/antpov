@@ -297,11 +297,13 @@ int main (int argc, char* argv[])
 
         auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{2,2,2}, 0.001f, mplot::colour::blue2);
         v.bindmodel (rv);
+        rv->use_oriented_tube = false;
         rv->finalize();
         rvp1 = v.addVisualModel (rv);
 
         rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.001f, mplot::colour::crimson);
         v.bindmodel (rv);
+        rv->use_oriented_tube = false;
         rv->finalize();
         rvp2 = v.addVisualModel (rv);
 
