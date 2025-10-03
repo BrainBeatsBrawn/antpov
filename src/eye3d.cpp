@@ -108,6 +108,7 @@ int main (int argc, char* argv[])
     // Create a mathplot window to render the eye/sensor
     eye3dvisual v (2000, 1200, "Eye 3D (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     v.showCoordArrows (true);
+    v.coordArrowsInScene (true);
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.05f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
@@ -584,37 +585,47 @@ int main (int argc, char* argv[])
                             // The reorientation transform is to take us from the previous
                             // hover-surface location to the new hover-surface location.
 
-                            sm::mat44<float> reorient_rotn;
+                            //sm::mat44<float> reorient_rotn;
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
-
-                            reorient_land.pretranslate (mv_part); // now we're ON the triangle boundary
-
-                            //reorient_land.pretranslate (-hovlocn); // not quite. Want the matrix that defines hovlocn+orientation. is that cam_to_scene?
 
                             // Rotate by the angle between the normals. I think this is constrained to be <= pi
                             float rotn_angle = tn0_land.angle (_tn);
 
                             // Use the *edge* as the rotation axis. Need to translate for the rotate though.
-                            std::cout << "Rotate about edge " << tri_edge << " by angle " << rotn_angle << std::endl;
+                            std::cout << "Pretranslate mat44 by " << -(hovlocn + mv_part) << " to get\n";
+                            reorient_land.pretranslate (-(hovlocn + mv_part));
+                            std::cout << reorient_land << std::endl;
+                            std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
+                            std::cout << "Rotate mat44 about edge " << tri_edge << " by angle " << rotn_angle << " to get\n";
                             reorient_land.rotate (tri_edge, rotn_angle);
-                            reorient_rotn.rotate (tri_edge, rotn_angle); // Just the rotn
+                            std::cout << reorient_land << std::endl;
+                            std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
+                            std::cout << "Translate mat44 by " << (hovlocn + mv_part) << " to get\n";
+                            reorient_land.translate ((hovlocn + mv_part));
+                            std::cout << reorient_land << std::endl;
+                            std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
 
-                            // Untranslate for edge?
-                            //reorient_land.translate (hovlocn); // not quite
+                            sm::mat44<float> reorient_rot; // JUST the rotn
+                            reorient_rot.rotate (tri_edge, rotn_angle);
+#if 0
+                            // Comparison (is good)
+                            sm::mat44<float> reorient_tr1;
+                            reorient_tr1.pretranslate (-(hovlocn + mv_part));
+                            sm::mat44<float> reorient_rot;
+                            reorient_rot.rotate (tri_edge, rotn_angle);
+                            sm::mat44<float> reorient_tr2;
+                            reorient_tr2.translate (hovlocn + mv_part);
+                            std::cout << "===\ncf:\n" << reorient_tr1 << "\n--\n" << reorient_rot * reorient_tr1
+                                      << "\n--\n" << reorient_tr2 * reorient_rot * reorient_tr1 << std::endl;
+#endif
+                            // Apply the rotation to mv_rest (didn't think it would work this way)
+                            sm::vec<float, 4> mv_rest = reorient_rot * (mv_inplane - mv_part); // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
 
-                            sm::vec<> mv_rest = (mv_inplane - mv_part); // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
-                            std::cout << "mv_rest (unrotated) in land frame = " << mv_rest << std::endl;
+                            std::cout << "mv_rest (rotated) in land frame = " << mv_rest << std::endl;
 
-                            // This is translating in unrotated direction
-                            reorient_land.translate (reorient_rotn * mv_rest); // reorients points in the land model frame to change the coordinate axes
-
-                            std::cout << "reorient_land:\n" << reorient_land << std::endl;
-                            //std::cout << "mv_part + mv_rest = " << (mv_part + mv_rest) << std::endl;
-
-                            // reorient_land should now move the projection of the coordinate frame
-                            // onto the land into the right location
-                            sm::vec<> new_hovlocn = (reorient_land * hovlocn).less_one_dim();
-                            std::cout << "Old hovlocn = " << hovlocn << " and new_hovlocn = reorient_land * hovlocn = " << new_hovlocn << std::endl;
+                            // Apply pre- and post-translations. *These* completely wreck the rotation!
+                            // reorient_land.pretranslate (mv_part);
+                            reorient_land.translate (mv_rest); // reorients points in the land model frame to change the coordinate axes
 
                             // a) Get sphere locn into land model frame. Note: *starts* with sphere location
                             // b) apply reorient_land
