@@ -593,7 +593,7 @@ int main (int argc, char* argv[])
 
                             // Use the *edge* as the rotation axis. Need to translate for the rotate though.
                             std::cout << "Pretranslate mat44 by " << -(hovlocn + mv_part) << " to get\n";
-                            reorient_land.pretranslate (-(hovlocn + mv_part));
+                            reorient_land.pretranslate (-hovlocn);
                             std::cout << reorient_land << std::endl;
                             std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
                             std::cout << "Rotate mat44 about edge " << tri_edge << " by angle " << rotn_angle << " to get\n";
@@ -601,30 +601,20 @@ int main (int argc, char* argv[])
                             std::cout << reorient_land << std::endl;
                             std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
                             std::cout << "Translate mat44 by " << (hovlocn + mv_part) << " to get\n";
-                            reorient_land.translate ((hovlocn + mv_part));
+                            reorient_land.translate (hovlocn);
                             std::cout << reorient_land << std::endl;
                             std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
 
                             sm::mat44<float> reorient_rot; // JUST the rotn
                             reorient_rot.rotate (tri_edge, rotn_angle);
-#if 0
-                            // Comparison (is good)
-                            sm::mat44<float> reorient_tr1;
-                            reorient_tr1.pretranslate (-(hovlocn + mv_part));
-                            sm::mat44<float> reorient_rot;
-                            reorient_rot.rotate (tri_edge, rotn_angle);
-                            sm::mat44<float> reorient_tr2;
-                            reorient_tr2.translate (hovlocn + mv_part);
-                            std::cout << "===\ncf:\n" << reorient_tr1 << "\n--\n" << reorient_rot * reorient_tr1
-                                      << "\n--\n" << reorient_tr2 * reorient_rot * reorient_tr1 << std::endl;
-#endif
+
                             // Apply the rotation to mv_rest (didn't think it would work this way)
                             sm::vec<float, 4> mv_rest = reorient_rot * (mv_inplane - mv_part); // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
 
                             std::cout << "mv_rest (rotated) in land frame = " << mv_rest << std::endl;
 
-                            // Apply pre- and post-translations. *These* completely wreck the rotation!
-                            // reorient_land.pretranslate (mv_part);
+                            // Apply pre- and post-translations.
+                            reorient_land.pretranslate (mv_part);
                             reorient_land.translate (mv_rest); // reorients points in the land model frame to change the coordinate axes
 
                             // a) Get sphere locn into land model frame. Note: *starts* with sphere location
