@@ -212,7 +212,7 @@ int main (int argc, char* argv[])
     sm::vvec<std::array<uint32_t, 3>> ti0_neighbours;
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
-    constexpr float hoverheight = 0.15f;
+    constexpr float hoverheight = 0.08f;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
@@ -525,7 +525,7 @@ int main (int argc, char* argv[])
                 svp_t2->setViewTranslation (land_to_scene * t2);
                 std::cout << "Current hover triangle is " << t0 << ", " << t1 << ", " << t2 << std::endl;
                 bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_landframe, -tn0_land, hovlocn);
-                std::cout << "hovlocn: " << hovlocn << std::endl; // h is in landframe
+                std::cout << "hovlocn: " << hovlocn << std::endl; // hovlocn is in landframe
 
                 sm::vec<> mv_part = {}; // The part-way movement to the edge (landframe)
                 sm::vec<> tri_edge = {};
@@ -569,7 +569,9 @@ int main (int argc, char* argv[])
                         auto [_ti, _tn] = land->find_other_triangle_containing (common_a, common_b, ti0);
                         if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
                             // Re-orient onto the new triangle
-                            std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
+                            sm::vec<sm::vec<>, 3> newtv_landframe = land->triangle_vertices (_ti); // debug only
+                            std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2]
+                                      << "[ " << newtv_landframe << " ] with normal " << _tn << "\n";
 
                             std::cout << " mv_inplane (landframe): " << mv_inplane
                                       << " length " << mv_inplane.length() << " angle wrt z "
@@ -582,15 +584,24 @@ int main (int argc, char* argv[])
                             float d_rest = mv_inplane.length() - mv_part.length();
                             std::cout << "  additional distance = " << d_rest << std::endl;
 
+                            // The reorientation transform is to take us from the previous
+                            // hover-surface location to the new hover-surface location.
+
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
-                            reorient_land.translate (mv_part); // now we're ON the triangle boundary
+
+                            reorient_land.pretranslate (mv_part); // now we're ON the triangle boundary
+
+                            //reorient_land.pretranslate (-hovlocn); // not quite
 
                             // Rotate by the angle between the normals. I think this is constrained to be <= pi
                             float rotn_angle = tn0_land.angle (_tn);
-                            // Use the *edge* as the rotation axis
-                            // But use the *right* edge!
+
+                            // Use the *edge* as the rotation axis. Need to translate for the rotate though.
                             std::cout << "Rotate about edge " << tri_edge << " by angle " << rotn_angle << std::endl;
                             reorient_land.rotate (tri_edge, rotn_angle);
+
+                            // Untranslate for edge?
+                            //reorient_land.translate (hovlocn); // not quite
 
                             sm::vec<> mv_rest = (mv_inplane - mv_part); // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
                             std::cout << "mv_rest (unrotated) in land frame = " << mv_rest << std::endl;
@@ -598,18 +609,21 @@ int main (int argc, char* argv[])
                             reorient_land.translate (mv_rest); // reorients points in the land model frame to change the coordinate axes
 
                             std::cout << "reorient_land applied to (0,0,0): " << (reorient_land * sm::vec<>{}) << std::endl;
-                            std::cout << "mv_part + mv_rest = " << (mv_part + mv_rest) << std::endl;
+                            //std::cout << "mv_part + mv_rest = " << (mv_part + mv_rest) << std::endl;
 
                             // reorient_land should now move the projection of the coordinate frame
                             // onto the land into the right location
                             sm::vec<> new_hovlocn = (reorient_land * hovlocn).less_one_dim();
                             std::cout << "Old hovlocn = " << hovlocn << " and new_hovlocn = reorient_land * hovlocn = " << new_hovlocn << std::endl;
 
-                            // a) Get sphere locn into land model frame
+                            // a) Get sphere locn into land model frame. Note: *starts* with sphere location
                             // b) apply reorient_land
                             // c) Return sphere lcon into scene coordinates (or bunch it all together):
                             // d) Update svp->viewmatrix
                             // All in one line:
+                            std::cout << "starting from the sphere's current origin in scene frame: " <<  svp->get_viewmatrix_origin() << std::endl;
+                            std::cout << "which is " << scene_to_land * svp->get_viewmatrix_origin() << " in land model frame\n";
+                            std::cout << "which re-orients to " << reorient_land * scene_to_land * svp->get_viewmatrix_origin() << std::endl;
                             svp->setViewTranslation (land_to_scene * reorient_land * scene_to_land * svp->get_viewmatrix_origin());
 
                             // we have cam_to_scene = mplot::compoundray::getCameraSpace (scene);
