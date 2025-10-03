@@ -575,9 +575,9 @@ int main (int argc, char* argv[])
                                       << " length " << mv_inplane.length() << " angle wrt z "
                                       << mv_inplane.angle (sm::vec<>::uz())<< std::endl;
 
-                            std::cout << " mv_part =               " << mv_part
-                                      << " length " << mv_part.length()
-                                      << " angle wrt z " << mv_part.angle (sm::vec<>::uz())<< std::endl;
+                            //std::cout << " mv_part =               " << mv_part
+                            //          << " length " << mv_part.length()
+                            //          << " angle wrt z " << mv_part.angle (sm::vec<>::uz())<< std::endl;
 
                             float d_rest = mv_inplane.length() - mv_part.length();
                             std::cout << "  additional distance = " << d_rest << std::endl;
@@ -610,8 +610,8 @@ int main (int argc, char* argv[])
 
                             // Apply the rotation to mv_rest (didn't think it would work this way)
                             sm::vec<float, 4> mv_rest = reorient_rot * (mv_inplane - mv_part); // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
-
-                            std::cout << "mv_rest (rotated) in land frame = " << mv_rest << std::endl;
+                            std::cout << "mv_part           = " << mv_part << std::endl;
+                            std::cout << "mv_rest (rotated) = " << mv_rest << std::endl;
 
                             // Apply pre- and post-translations.
                             reorient_land.pretranslate (mv_part);
