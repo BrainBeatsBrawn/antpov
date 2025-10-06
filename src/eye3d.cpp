@@ -568,91 +568,39 @@ int main (int argc, char* argv[])
                             std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2]
                                       << "[ " << newtv_landframe << " ] with normal " << _tn << "\n";
 
-                            std::cout << " mv_inplane (landframe): " << mv_inplane
-                                      << " length " << mv_inplane.length() << " angle wrt z "
-                                      << mv_inplane.angle (sm::vec<>::uz())<< std::endl;
-
-                            //std::cout << " mv_part =               " << mv_part
-                            //          << " length " << mv_part.length()
-                            //          << " angle wrt z " << mv_part.angle (sm::vec<>::uz())<< std::endl;
-
-                            float d_rest = mv_inplane.length() - mv_part.length();
-                            std::cout << "  additional distance = " << d_rest << std::endl;
-
-                            // The reorientation transform is to take us from the previous
-                            // hover-surface location to the new hover-surface location.
-
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
 
                             // Rotate by the angle between the normals. I think this is constrained to be <= pi
                             float rotn_angle = tn0_land.angle (_tn);
 
-                            // Use the *edge* as the rotation axis. Need to translate for the rotate though.
-                            //std::cout << "Pretranslate mat44 by " << -(hovlocn) << " to get\n";
-                            reorient_land.pretranslate (-hovlocn);
-                            std::cout << reorient_land << std::endl;
-                            //std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
-
-                            //std::cout << "Rotate mat44 about edge " << tri_edge << " by angle " << rotn_angle << " to get\n";
+                            // Use the *edge* as the rotation axis.
                             reorient_land.rotate (tri_edge, rotn_angle);
-                            std::cout << reorient_land << std::endl;
-                            //std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
 
-                            //std::cout << "Translate mat44 by " << hovlocn << " to get\n";
+                            // Before doing any additional work, apply this rotation to mv_rest
+                            sm::vec<float, 4> mv_rest = reorient_land * (mv_inplane - mv_part);
+
+                            // The edge may not already be a coordinate axis, so pre- and post-translate by hovlocn
+                            reorient_land.pretranslate (-hovlocn);
                             reorient_land.translate (hovlocn);
-                            std::cout << reorient_land << std::endl;
-                            //std::cout << "> transforms 001.1 to " << reorient_land * sm::vec<>{0,0,1.1} << std::endl;
 
-                            sm::mat44<float> reorient_rot; // JUST the rotn
-                            reorient_rot.rotate (tri_edge, rotn_angle);
-
-                            // Apply the rotation to mv_rest (didn't think it would work this way)
-                            sm::vec<float, 4> mv_rest = reorient_rot * (mv_inplane - mv_part); // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
-                            std::cout << "mv_part           = " << mv_part << std::endl;
-                            std::cout << "mv_rest (rotated) = " << mv_rest << std::endl;
+                            // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one?
 
                             // Apply pre- and post-translations.
-                            // reorient_land.pretranslate (mv_part);
-                            // reorient_land already had a rotation in it
-                            reorient_land.translate (mv_part.plus_one_dim() + mv_rest); // reorients points in the land model frame to change the coordinate axes
+                            reorient_land.translate (mv_part.plus_one_dim() + mv_rest);
 
                             // a) Get sphere locn into land model frame. Note: *starts* with sphere location
                             // b) apply reorient_land
                             // c) Return sphere lcon into scene coordinates (or bunch it all together):
                             // d) Update svp->viewmatrix
-                            // All in one line:
-                            std::cout << "! starting from the sphere's current origin in scene frame: " <<  svp->get_viewmatrix_origin() << std::endl;
-                            std::cout << "! to land " << scene_to_land * svp->get_viewmatrix_origin() << "\n";
-                            std::cout << "! re-orients " << reorient_land * scene_to_land * svp->get_viewmatrix_origin() << "\n";
-                            std::cout << "! to scene " << land_to_scene * reorient_land * scene_to_land * svp->get_viewmatrix_origin() << std::endl;
-
+                            // All in one line to update the sphere indicator's location
                             svp->setViewTranslation (land_to_scene * reorient_land * scene_to_land * svp->get_viewmatrix_origin());
 
-                            // we have cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-                            // Take cam_to_scene.
-                            // Apply scene_to_land
-                            // sink to the surface
-                            // Apply reorient_land
-                            // Raise from surface
-                            // Apply land_to_scene
+                            // Now similar for the camera frame:
                             sm::mat44<float> sink;
-                            //std::cout << "Will sink in dirn " << -tn0_land << " len " << tn0_land.length() << std::endl;
                             sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
                             sm::mat44<float> unsink;
-                            //std::cout << "Will unsink in dirn " << _tn << " len " << _tn.length() << std::endl;
                             unsink.translate (_tn * hoverheight); // assumes we normalized _tn
-
-#if 0
-                            std::cout << "===================\n";
-                            std::cout << "!! starting camera in scene: " << cam_to_scene * sm::vec<>{} << std::endl;
-                            std::cout << "!! to land: " << scene_to_land * cam_to_scene * sm::vec<>{} << std::endl;
-                            std::cout << "!! sinks: " << sink * scene_to_land * cam_to_scene * sm::vec<>{} << std::endl;
-                            std::cout << "!! re-orients " << reorient_land * sink * scene_to_land * cam_to_scene * sm::vec<>{} << std::endl;
-                            std::cout << "!! unsink " << unsink * reorient_land * sink * scene_to_land * cam_to_scene * sm::vec<>{} << std::endl;
-                            std::cout << "!! to scene " << land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene * sm::vec<>{} << std::endl;
-#endif
-                            sm::mat44<float> cam_transform = land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene;
-                            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_transform));
+                            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * unsink * reorient_land * sink * scene_to_land * cam_to_scene));
 
                             ti0 = _ti;
                             tn0_land = _tn;
