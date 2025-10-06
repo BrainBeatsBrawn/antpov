@@ -393,7 +393,7 @@ int main (int argc, char* argv[])
         auto subr_compute_mv_part = [land_to_scene, &svp1, &svp2, &svp3, &svp4, &rvp1, &rvp2]
         (const sm::vec<>& edge_s, const sm::vec<>& edge_e, const sm::vec<>& mv_inplane, const sm::vec<>& t_norm, const sm::vec<>& hovlocn)
         {
-            constexpr bool debug = true;
+            constexpr bool debug = false;
 
             sm::vec<> edge = edge_e - edge_s;
 
