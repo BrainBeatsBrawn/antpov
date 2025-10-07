@@ -81,41 +81,61 @@ namespace eye3d
         return path;
     }
 
-    struct mv_part_outputs
+    /*
+     * The partial movement that takes us to the crossing point, specified as movement + endpoint
+     * (rather than startpoint + movement)
+     */
+    struct partial_movement
     {
-        // The partial movement that takes us from hovlocn to the crossing point
-        sm::vec<> mv_part = {};
-        // The location of the crossing point
-        sm::vec<> cross_point = {};
+        // The movement vector
+        sm::vec<float> mv = {};
+        // The end coordinate of the movement
+        sm::vec<float> end = {};
     };
 
     /*
-     * Find the part of mv_inplane that gets us to the triangle boundary
+     * Find the part of mv_inplane that gets us to the triangle boundary defined by edge_s and
+     * edge_e
+     *
+     * IS IS ASSUMED that mv_s is in the triangle plane and that a movement of mv_inplane would cross
+     * the edge if it were long enough.
+     *
+     * The triangle is part of a model, which has its own coordinate frame. All vectors and
+     * coordinates here are in the model coordinate frame.
+     *
+     * \param edge_s Starting coordinate of the edge
+     * \param edge_e End coordinate of the edge
+     * \param t_norm The triangle normal vector
+     * \param mv_s The movement starting point
+     * \param mv_inplane The planned movement, starting from hovlocn
+     *
+     * \return a struct containing the partial movement vector and the end of the movement as a
+     * coordinate. If mv_inplane does not cross the edge, then the return object contains the vector
+     * mv_inplane itself, and the coordinate that this movement ends at.
      */
-    eye3d::mv_part_outputs subr_compute_mv_part (const sm::mat44<float>& land_to_scene,
-                                                 const sm::vec<>& edge_s,
-                                                 const sm::vec<>& edge_e,
-                                                 const sm::vec<>& mv_inplane,
-                                                 const sm::vec<>& t_norm,
-                                                 const sm::vec<>& hovlocn)
+    eye3d::partial_movement find_edge_crossing (const sm::vec<float>& edge_s,
+                                                const sm::vec<float>& edge_e,
+                                                const sm::vec<float>& t_norm,
+                                                const sm::vec<float>& mv_s,
+                                                const sm::vec<float>& mv_inplane)
     {
         constexpr bool debug = false;
 
-        mv_part_outputs out;
+        partial_movement pm;
 
-        sm::vec<> edge = edge_e - edge_s;
+        sm::vec<float> edge = edge_e - edge_s;
 
-        sm::vec<> u_y = edge;
+        sm::vec<float> u_y = edge;
         u_y.renormalize();
-        sm::vec<> u_z = t_norm;
+        sm::vec<float> u_z = t_norm;
         u_z.renormalize();
-        sm::vec<> u_x = u_y.cross (u_z);
+        sm::vec<float> u_x = u_y.cross (u_z);
         if constexpr (debug) {
             std::cout << "edge = " << edge << std::endl;
             std::cout << "Basis: " << u_x << " " << u_y << " " << u_z << std::endl;
         }
 
-        // Create a matrix to convert from land frame movements to the triangle frame of ref.
+        // Create a matrix to convert from mdl frame movements to the triangle frame of ref.
         sm::mat44<float> from_triangle_frame = sm::mat44<float>::frombasis (u_x, u_y, u_z);
 
         sm::mat44<float> to_triangle_frame = from_triangle_frame.inverse();
@@ -125,7 +145,7 @@ namespace eye3d
         sm::vec<float, 4> mv_inplane4d = to_triangle_frame * mv_inplane;
         sm::vec<float, 2> mv_inplane2d = { mv_inplane4d[0], mv_inplane4d[1] };
 
-        sm::vec<float, 4> h_4d = to_triangle_frame * hovlocn;
+        sm::vec<float, 4> h_4d = to_triangle_frame * mv_s;
         sm::vec<float, 2> h_2d =  { h_4d[0], h_4d[1] };
 
         sm::vec<float, 4> edge_4d = to_triangle_frame * edge;
@@ -153,15 +173,6 @@ namespace eye3d
                       << " and " << h_2d << " --> " << (h_2d + mv_inplane2d) << "\n";
         }
 
-        // Let's transform these back for vis
-        //rvp1->update ((from_triangle_frame * (sm::vec<float, 4>{} + edge_s_4d)).less_one_dim(),
-        //              (from_triangle_frame * (edge_4d + edge_s_4d)).less_one_dim()); // the edge
-
-        // Just from hov locn, in dirn of inplane
-        //rvp2->update ((from_triangle_frame * h_4d).less_one_dim(),
-        //              (from_triangle_frame * (h_4d + mv_inplane4d)).less_one_dim());
-
-
         std::bitset<2> si = sm::algo::segments_intersect<float> (orig_2d + edge_s_2d, edge_2d + edge_s_2d, h_2d, h_2d + mv_inplane2d);
         if (si.test(1)) {
             throw std::runtime_error ("Deal with colinear movement and triangle edge!\n");
@@ -170,83 +181,102 @@ namespace eye3d
                 // Intersects as expected
                 sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (orig_2d + edge_s_2d, edge_2d + edge_s_2d, h_2d, h_2d + mv_inplane2d);
                 if constexpr (debug) { std::cout << "Cross point (2d) is " << cross_point_2d << std::endl; }
-                // Now go from cross point 2d to a point in landscape coordinates?
-                out.cross_point = (from_triangle_frame * cross_point_2d.plus_one_dim(edge_s_4d[2])).less_one_dim();
-                if constexpr (debug) { std::cout << "Cross point in land frame: " << out.cross_point << std::endl; }
-                out.mv_part = out.cross_point - hovlocn;
+                // Now go from cross point 2d to a point in model coordinates?
+                pm.end = (from_triangle_frame * cross_point_2d.plus_one_dim(edge_s_4d[2])).less_one_dim();
+                if constexpr (debug) { std::cout << "Cross point in mdl frame: " << pm.end << std::endl; }
+                pm.mv = pm.end - mv_s;
             } else {
                 std::cout << "Huh?!? Got no intersection across edge?\n";
                 // Hmm, don't expect a lack of intersection
-                // set mv_part to be mv_inplane?
-                out.mv_part = mv_inplane;
+                pm.mv = mv_inplane;
+                pm.end = mv_s + mv_inplane;
             }
         }
 
-        return out;
+        return pm;
     }
 
-    struct crossing_outputs
+    /*
+     * After testing up to all three edges of a triangle, we return information about the crossing
+     * location and the indices of the triangle that form the crossed edge in this structure.
+     */
+    struct crossing_data
     {
         // Did we get an intersection of the movement mv_inplane through a triangle edge?
         bool crossed = false;
-        // common_a/b are the indices of the triangle vertices on the crossed edge
-        uint32_t common_a = 0;
-        uint32_t common_b = 0;
+        // edge_idx_a/b are the indices of the triangle vertices on the crossed edge
+        uint32_t edge_idx_a = 0;
+        uint32_t edge_idx_b = 0;
         // The crossed edge as a vector
-        sm::vec<> tri_edge = {};
-        // Contains the partial movement, mv_part and the cross_point for the crossed edge
-        eye3d::mv_part_outputs mpo = {};
+        sm::vec<float> tri_edge = {};
+        // The partial movement. pm.mv is the movement, pm.end is the crossing point
+        eye3d::partial_movement pm = {};
     };
 
-    // Find the location at which a movement from hovlocn in the direction mv_inplane crosses one of
-    // the edges of the triangle specified by the three vertices in tv_landframe (and also by the
-    // three indices in ti0)
-    eye3d::crossing_outputs compute_crossing_location (const sm::vec<sm::vec<>, 3>& tv_landframe,
-                                                       const std::array<uint32_t, 3>& ti0,
-                                                       const sm::mat44<float>& land_to_scene,
-                                                       const sm::vec<>& hovlocn,
-                                                       const sm::vec<>& mv_inplane,
-                                                       const sm::vec<>& tn0_land)
+    /*
+     * Find the location at which a movement from mv_s in the direction mv_inplane crosses one of
+     * the edges of the triangle specified by the three vertices in t_verts/t_indices.
+     *
+     * IT IS ASSUMED that the triangle normal passing through mv_s WILL intersect the
+     * triangle. (Test beforehand with sm::algo::ray_tri_intersection)
+     *
+     * All coordinates are in the frame of the model that contains this triangle.
+     *
+     * \param t_verts *Ordered* vertices of the triangle. Vertices should be in anti-clockwise order
+     * when viewed with the triangle normal vector coming 'out of the page'
+     *
+     * \param t_indices The indices of the vertices in t_verts. Used to return the crossed edge
+     * specified as two common indices
+     *
+     * \param mv_s The start of the planned movement
+     *
+     * \param mv_inplane The planned movement
+     *
+     * \param t_norm The triangle normal. While this could be computed from t_verts, it has already
+     * been computed by the program and so I'm passing it in here.
+     */
+    eye3d::crossing_data compute_crossing_location (const sm::vec<sm::vec<float>, 3>& t_verts,
+                                                    const std::array<uint32_t, 3>& t_indices,
+                                                    const sm::vec<float>& mv_s,
+                                                    const sm::vec<float>& mv_inplane,
+                                                    const sm::vec<float>& t_norm)
     {
-        eye3d::crossing_outputs rtn;
+        eye3d::crossing_data rtn;
 
-        const sm::vec<>& t0 = tv_landframe[0];
-        const sm::vec<>& t1 = tv_landframe[1];
-        const sm::vec<>& t2 = tv_landframe[2];
+        const sm::vec<float>& t0 = t_verts[0];
+        const sm::vec<float>& t1 = t_verts[1];
+        const sm::vec<float>& t2 = t_verts[2];
 
-        sm::vec<> p = hovlocn + mv_inplane;
-        sm::vec<> edge = t1 - t0;
-        sm::vec<> ptoe = p - t0;
-        bool inside01 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
+        sm::vec<float> p = mv_s + mv_inplane;
+        sm::vec<float> edge = t1 - t0;
+        sm::vec<float> ptoe = p - t0;
+        bool inside01 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside01) {
-            rtn.common_a = ti0[0]; rtn.common_b = ti0[1];
-            eye3d::mv_part_outputs mpo = eye3d::subr_compute_mv_part (land_to_scene, t0, t1, mv_inplane, tn0_land, hovlocn);
+            rtn.edge_idx_a = t_indices[0]; rtn.edge_idx_b = t_indices[1];
+            rtn.pm = eye3d::find_edge_crossing (t0, t1, t_norm, mv_s, mv_inplane);
             rtn.tri_edge = edge;
-            rtn.mpo = mpo;
         }
 
         edge = t2 - t1; ptoe = p - t1;
-        bool inside21 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
+        bool inside21 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside21) {
-            rtn.common_a = ti0[2]; rtn.common_b = ti0[1];
-            eye3d::mv_part_outputs mpo = eye3d::subr_compute_mv_part (land_to_scene, t1, t2, mv_inplane, tn0_land, hovlocn);
+            rtn.edge_idx_a = t_indices[2]; rtn.edge_idx_b = t_indices[1];
+            rtn.pm = eye3d::find_edge_crossing (t1, t2, t_norm, mv_s, mv_inplane);
             rtn.tri_edge = edge;
-            rtn.mpo = mpo;
         }
 
         edge = t0 - t2; ptoe = p - t2;
-        bool inside02 = (tn0_land.dot (edge.cross (ptoe)) >= 0);
+        bool inside02 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside02) {
-            rtn.common_a = ti0[0]; rtn.common_b = ti0[2];
-            eye3d::mv_part_outputs mpo = eye3d::subr_compute_mv_part (land_to_scene, t2, t0, mv_inplane, tn0_land, hovlocn);
+            rtn.edge_idx_a = t_indices[0]; rtn.edge_idx_b = t_indices[2];
+            rtn.pm = eye3d::find_edge_crossing (t2, t0, t_norm, mv_s, mv_inplane);
             rtn.tri_edge = edge;
-            rtn.mpo = mpo;
         }
         if (!inside01 || !inside21 || !inside02) {
-            std::cout << "Crossed over " << (inside01 ? " " : "0-1") <<  (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
+            std::cout << "Crossed over " << (inside01 ? " " : "0-1") << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
             rtn.crossed = true;
         } else {
-            std::cout << "No crossings " << (inside01 ? " " : "!!0-1") <<  (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
+            std::cout << "No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
         }
 
         return rtn;
@@ -577,14 +607,11 @@ int main (int argc, char* argv[])
                     // 4. Find the 'hover location' over that new location
                     //
                     sm::vec<> hovlocn = {};
-                    const sm::vec<>& t0 = tv_landframe[0];
-                    const sm::vec<>& t1 = tv_landframe[1];
-                    const sm::vec<>& t2 = tv_landframe[2];
-                    svp_t0->setViewTranslation (land_to_scene * t0);
-                    svp_t1->setViewTranslation (land_to_scene * t1);
-                    svp_t2->setViewTranslation (land_to_scene * t2);
-                    std::cout << "Current hover triangle is " << t0 << ", " << t1 << ", " << t2 << std::endl;
-                    bool isect = sm::algo::ray_tri_intersection<float> (t0, t1, t2, camloc_landframe, -tn0_land, hovlocn);
+                    svp_t0->setViewTranslation (land_to_scene * tv_landframe[0]);
+                    svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
+                    svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
+                    std::cout << "Current hover triangle is " << tv_landframe << std::endl;
+                    bool isect = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land, hovlocn);
                     std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
                     svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
 
@@ -592,14 +619,14 @@ int main (int argc, char* argv[])
                                   (land_to_scene * (hovlocn + mv_inplane)).less_one_dim()); // FIXME: mv_inplane needs to be in landframe
 
                     if (isect) {
-                        // For each edge in triangle, compute distance to edge for h and (h + mv_inplane)
-                        eye3d::crossing_outputs co = eye3d::compute_crossing_location (tv_landframe, ti0, land_to_scene, hovlocn, mv_inplane, tn0_land);
+                        // For each edge in triangle, compute distance to edge for hovlocn and (hovlocn + mv_inplane)
+                        eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
 
-                        svp4->setViewTranslation (land_to_scene * co.mpo.cross_point); // cross point is black (not yet in right location)
+                        svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black (not yet in right location)
 
-                        if (co.crossed) {
+                        if (cd.crossed) {
                             // Can work out new triangle here
-                            auto [_ti, _tn] = land->find_other_triangle_containing (co.common_a, co.common_b, ti0);
+                            auto [_ti, _tn] = land->find_other_triangle_containing (cd.edge_idx_a, cd.edge_idx_b, ti0);
                             if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
                                 // Re-orient onto the new triangle
                                 sm::vec<sm::vec<>, 3> newtv_landframe = land->triangle_vertices (_ti); // debug only
@@ -611,14 +638,14 @@ int main (int argc, char* argv[])
                                     // Rotate by the angle between the normals. I think this is constrained to be <= pi
                                     float rotn_angle = tn0_land.angle (_tn);
                                     // Use the *edge* as the rotation axis.
-                                    reorient_land.rotate (co.tri_edge, rotn_angle);
+                                    reorient_land.rotate (cd.tri_edge, rotn_angle);
                                     // Before doing any additional work, apply this rotation to mv_rest
-                                    sm::vec<float, 4> mv_rest = reorient_land * (mv_inplane - co.mpo.mv_part);
+                                    sm::vec<float, 4> mv_rest = reorient_land * (mv_inplane - cd.pm.mv);
                                     // The edge may not already be a coordinate axis, so pre- and post-translate by hovlocn
                                     reorient_land.pretranslate (-hovlocn);
                                     reorient_land.translate (hovlocn);
                                     // Apply pre- and post-translations.
-                                    reorient_land.translate (co.mpo.mv_part.plus_one_dim() + mv_rest);
+                                    reorient_land.translate (cd.pm.mv.plus_one_dim() + mv_rest);
                                     // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one? Test here to see if final location is inside triangle.
                                 }
 
