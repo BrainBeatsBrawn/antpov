@@ -600,87 +600,154 @@ int main (int argc, char* argv[])
                 sm::vec<> mv_orthog = tn0_land * (mv_landframe.dot (tn0_land) / (tn0_land.dot(tn0_land)));
                 sm::vec<> mv_inplane = mv_landframe - mv_orthog; // landframe
 
-                { // start of loop until we've crossed all possible triangle boundaries?
+                // 2. Determine if that component will cross any edge of the triangle
+                // 3. Work out what the new edge is and find a location on that triangle
+                // 4. Find the 'hover location' over that new location
+                //
 
-                    // 2. Determine if that component will cross any edge of the triangle
-                    // 3. Work out what the new edge is and find a location on that triangle
-                    // 4. Find the 'hover location' over that new location
-                    //
-                    sm::vec<> hovlocn = {};
-                    svp_t0->setViewTranslation (land_to_scene * tv_landframe[0]);
-                    svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
-                    svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
-                    std::cout << "Current hover triangle is " << tv_landframe << std::endl;
-                    bool isect = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land, hovlocn);
-                    std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
-                    svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
+                // Debug/vis
+                std::cout << "Current hover triangle is " << tv_landframe << std::endl;
+                svp_t0->setViewTranslation (land_to_scene * tv_landframe[0]);
+                svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
+                svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
 
-                    rvp2->update ((land_to_scene * hovlocn).less_one_dim(),
-                                  (land_to_scene * (hovlocn + mv_inplane)).less_one_dim()); // FIXME: mv_inplane needs to be in landframe
+                // Does camloc_landframe in dirn tn0_land intersect the tv_landframe triangle?
+                auto [ isect, hovlocn ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land);
 
-                    if (isect) {
-                        // For each edge in triangle, compute distance to edge for hovlocn and (hovlocn + mv_inplane)
-                        eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
+                // Debug/vis
+                std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
+                svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
+                rvp2->update ((land_to_scene * hovlocn).less_one_dim(),
+                              (land_to_scene * (hovlocn + mv_inplane)).less_one_dim()); // FIXME: mv_inplane needs to be in landframe
 
-                        svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black (not yet in right location)
+                if (isect) {
 
-                        if (cd.crossed) {
+                    // For each edge in triangle, compute distance to edge for hovlocn and (hovlocn + mv_inplane)
+                    eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
+
+                    // Debug/vis
+                    svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black (not yet in right location)
+
+                    if (cd.crossed) {
+                        bool done = false;
+                        bool done2 = false;
+                        sm::mat44<float> sphereTransform;
+                        sm::mat44<float> sink;
+                        sm::mat44<float> unsink;
+                        sm::mat44<float> camposeTransform;
+                        sm::mat44<float> reorient_final;
+                        while (!done) {
+
                             // Can work out new triangle here
                             auto [_ti, _tn] = land->find_other_triangle_containing (cd.edge_idx_a, cd.edge_idx_b, ti0);
+
                             if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
+
                                 // Re-orient onto the new triangle
-                                sm::vec<sm::vec<>, 3> newtv_landframe = land->triangle_vertices (_ti); // debug only
+
+                                sm::vec<sm::vec<>, 3> newtv_landframe = land->triangle_vertices (_ti);
                                 std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2]
                                           << "[ " << newtv_landframe << " ] with normal " << _tn << "\n";
 
                                 sm::mat44<float> reorient_land; // reorientation transformation in landframe
+                                sm::vec<float, 4> mv_rest;
                                 {
                                     // Rotate by the angle between the normals. I think this is constrained to be <= pi
                                     float rotn_angle = tn0_land.angle (_tn);
                                     // Use the *edge* as the rotation axis.
                                     reorient_land.rotate (cd.tri_edge, rotn_angle);
                                     // Before doing any additional work, apply this rotation to mv_rest
-                                    sm::vec<float, 4> mv_rest = reorient_land * (mv_inplane - cd.pm.mv);
+                                    mv_rest = reorient_land * (mv_inplane - cd.pm.mv);
                                     // The edge may not already be a coordinate axis, so pre- and post-translate by hovlocn
                                     reorient_land.pretranslate (-hovlocn);
                                     reorient_land.translate (hovlocn);
                                     // Apply pre- and post-translations.
                                     reorient_land.translate (cd.pm.mv.plus_one_dim() + mv_rest);
-                                    // FIXME: What if mv_rest sails past the next triangle and on to ANOTHER one? Test here to see if final location is inside triangle.
                                 }
+                                reorient_final = reorient_land * reorient_final;
 
-                                // a) Get sphere locn into land model frame. Note: *starts* with sphere location
-                                // b) apply reorient_land
-                                // c) Return sphere lcon into scene coordinates (or bunch it all together):
-                                // d) Update svp->viewmatrix
-                                // All in one line to update the sphere indicator's location
-                                svp->setViewTranslation (land_to_scene * reorient_land * scene_to_land * svp->get_viewmatrix_origin());
+                                // At this point, can test to see if the end point of the movement
+                                // lands in the adjacent triangle. If so, we're done, if not, time
+                                // for another loop.
+                                sm::vec<float> endmv = (reorient_land * hovlocn).less_one_dim();
+                                // Is endmv in newtv_landframe/_ti?
+                                auto [ isect2, isectpoint ] = sm::algo::ray_tri_intersection<float> (newtv_landframe[0], newtv_landframe[1], newtv_landframe[2],
+                                                                                                     endmv + (_tn / 2.0f), -_tn);
 
-                                // Now similar for the camera frame (the thing we really want to move):
-                                sm::mat44<float> sink;
-                                sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
-                                sm::mat44<float> unsink;
-                                unsink.translate (_tn * hoverheight); // assumes we normalized _tn
-                                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene
-                                                                                             * unsink * reorient_land * sink
-                                                                                             * scene_to_land * cam_to_scene));
+                                std::cout << "endmv = " << endmv << (isect2 ? " DOES " : " DOES NOT ")
+                                          << "land in the next triangle" << std::endl;
 
-                                ti0 = _ti;
-                                tn0_land = _tn;
+                                if (isect2 || done2) {
+                                    // Complete, set matrices and exit loop
+                                    done = true;
+
+                                    // sink/unsink for last triangle
+                                    sink.setToIdentity();
+                                    sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
+                                    unsink.setToIdentity();
+                                    unsink.translate (_tn * hoverheight); // assumes we normalized _tn
+
+                                    ti0 = _ti;
+                                    tn0_land = _tn;
+
+                                } else {
+                                    // Incomplete, set matrices and go to next loop
+                                    std::cout << "Frigging it with done2=true\n";
+                                    done2 = true;
+
+                                    // OR: Perhaps in this case, set hovlocn to be the actual
+                                    // crossing point and then go from there? Then no need to reduce
+                                    // mv_rest.
+
+                                    // halve mv_rest until we get inside, then that's the new hovlocn for the next main loop.
+                                    // I can probably just create a 'step back' matrix and multiply by reorient_final
+                                    sm::mat44<float> reorient_land2; // a step back
+                                    bool isect3 = false;
+                                    sm::vec<> isectpoint3 = {};
+                                    while (not_restdone && mv_rest.length() > 0.0f) {
+                                        mv_rest /= 2.0f;
+                                        reorient_land2.translate (-mv_rest);
+                                        // Compute endmv based on reduced size reorient_land2
+                                        endmv = (reorient_land2 * reorient_final * hovlocn).less_one_dim();
+
+                                        std::tie (isect3, isectpoint3) = sm::algo::ray_tri_intersection<float> (newtv_landframe[0], newtv_landframe[1], newtv_landframe[2],
+                                                                                                              endmv + (_tn / 2.0f), -_tn);
+                                    }
+
+                                    ti0 = _ti;
+                                    tn0_land = _tn;
+
+                                    // Need to update cd.edge_idx_a/b, too
+                                    mv_inplane = mv_rest.less_one_dim();
+                                    cd = eye3d::compute_crossing_location (newtv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
+                                }
                             }
-                        } else {
-                            translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
-                            // Whats the movement of the camera in the scene frame?
-                            sm::vec<float, 4> mv_sceneframe = cam_to_scene * mv_camframe;
-                            sm::vec<float, 4> orig_sceneframe = cam_to_scene * sm::vec<>{};
-                            svp->addViewTranslation ((mv_sceneframe - orig_sceneframe));
-                        }
+
+                        } // end while
+
+                        // a) Get sphere locn into land model frame. Note: *starts* with sphere location
+                        // b) apply reorient_land
+                        // c) Return sphere lcon into scene coordinates (or bunch it all together):
+                        // d) Update svp->viewmatrix
+                        // All in one line to update the sphere indicator's location
+                        sphereTransform = land_to_scene * reorient_final * scene_to_land;
+                        svp->setViewTranslation (sphereTransform * svp->get_viewmatrix_origin());
+
+                        camposeTransform = land_to_scene * unsink * reorient_final * sink * scene_to_land * cam_to_scene;
+                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (camposeTransform));
+
                     } else {
-                        std::cout << "No intersection with triangle t1t2t3\n";
                         translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
+                        // Whats the movement of the camera in the scene frame?
+                        sm::vec<float, 4> mv_sceneframe = cam_to_scene * mv_camframe;
+                        sm::vec<float, 4> orig_sceneframe = cam_to_scene * sm::vec<>{};
+                        svp->addViewTranslation ((mv_sceneframe - orig_sceneframe));
+                    }
+                } else {
+                    std::cout << "No intersection with triangle t1t2t3\n";
+                    translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
                         svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
                     }
-                } // end loop?
 
             } else {
                 std::cout << "No land, translate cameras only.\n";
