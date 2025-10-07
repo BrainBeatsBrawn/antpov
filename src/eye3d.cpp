@@ -121,7 +121,7 @@ namespace eye3d
     {
         constexpr bool debug = false;
 
-        partial_movement pm;
+        eye3d::partial_movement pm;
 
         sm::vec<float> edge = edge_e - edge_s;
 
@@ -225,8 +225,8 @@ namespace eye3d
      * \param t_verts *Ordered* vertices of the triangle. Vertices should be in anti-clockwise order
      * when viewed with the triangle normal vector coming 'out of the page'
      *
-     * \param t_indices The indices of the vertices in t_verts. Used to return the crossed edge
-     * specified as two common indices
+     * \param t_indices The *Ordered* indices of the vertices in t_verts. Used to return the crossed
+     * edge specified as two common indices. See t_verts for correct order of triangle vertices.
      *
      * \param mv_s The start of the planned movement
      *
@@ -241,7 +241,7 @@ namespace eye3d
                                                     const sm::vec<float>& mv_inplane,
                                                     const sm::vec<float>& t_norm)
     {
-        eye3d::crossing_data rtn;
+        eye3d::crossing_data cd;
 
         const sm::vec<float>& t0 = t_verts[0];
         const sm::vec<float>& t1 = t_verts[1];
@@ -252,34 +252,34 @@ namespace eye3d
         sm::vec<float> ptoe = p - t0;
         bool inside01 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside01) {
-            rtn.edge_idx_a = t_indices[0]; rtn.edge_idx_b = t_indices[1];
-            rtn.pm = eye3d::find_edge_crossing (t0, t1, t_norm, mv_s, mv_inplane);
-            rtn.tri_edge = edge;
+            cd.edge_idx_a = t_indices[0]; cd.edge_idx_b = t_indices[1];
+            cd.pm = eye3d::find_edge_crossing (t0, t1, t_norm, mv_s, mv_inplane);
+            cd.tri_edge = edge;
         }
 
         edge = t2 - t1; ptoe = p - t1;
         bool inside21 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside21) {
-            rtn.edge_idx_a = t_indices[2]; rtn.edge_idx_b = t_indices[1];
-            rtn.pm = eye3d::find_edge_crossing (t1, t2, t_norm, mv_s, mv_inplane);
-            rtn.tri_edge = edge;
+            cd.edge_idx_a = t_indices[2]; cd.edge_idx_b = t_indices[1];
+            cd.pm = eye3d::find_edge_crossing (t1, t2, t_norm, mv_s, mv_inplane);
+            cd.tri_edge = edge;
         }
 
         edge = t0 - t2; ptoe = p - t2;
         bool inside02 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside02) {
-            rtn.edge_idx_a = t_indices[0]; rtn.edge_idx_b = t_indices[2];
-            rtn.pm = eye3d::find_edge_crossing (t2, t0, t_norm, mv_s, mv_inplane);
-            rtn.tri_edge = edge;
+            cd.edge_idx_a = t_indices[0]; cd.edge_idx_b = t_indices[2];
+            cd.pm = eye3d::find_edge_crossing (t2, t0, t_norm, mv_s, mv_inplane);
+            cd.tri_edge = edge;
         }
         if (!inside01 || !inside21 || !inside02) {
             std::cout << "Crossed over " << (inside01 ? " " : "0-1") << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
-            rtn.crossed = true;
+            cd.crossed = true;
         } else {
             std::cout << "No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
         }
 
-        return rtn;
+        return cd;
     }
 
 } // namespace eye3d
