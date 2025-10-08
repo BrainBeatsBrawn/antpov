@@ -715,11 +715,11 @@ int main (int argc, char* argv[])
 
                                 if (isect2 /* || done2*/) {
                                     // Complete, exit loop
-
-                                    // FIXME next: Get this debugging
-                                    rvp1->update (cd.pm.mv, isectpoint2);
-
                                     reorient_final = reorient_land * reorient_final;
+
+                                    // Show remaining movement in blue
+                                    rvp1->update (hovlocn + cd.pm.mv, isectpoint2);
+
                                     done = true;
                                 } else {
                                     // Incomplete.
