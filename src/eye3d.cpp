@@ -186,13 +186,16 @@ namespace eye3d
                 if constexpr (debug) { std::cout << "Cross point in mdl frame: " << pm.end << std::endl; }
                 pm.mv = pm.end - mv_s;
             } else {
-                std::cout << "Huh?!? Got no intersection across edge for:\n";
-                std::cout << (orig_2d + edge_s_2d) << " -- " << (edge_2d + edge_s_2d) << " AND "
-                          << h_2d << " -- " << (h_2d + mv_inplane2d) << std::endl;
-                //throw std::runtime_error ("Huh?!? Got no intersection across edge?"); // or return some kind of error signal
-                // Hmm, don't expect a lack of intersection
-                pm.mv = mv_inplane;
-                pm.end = mv_s + mv_inplane;
+                if constexpr (debug) {
+                    std::cout << "Huh?!? Got no intersection across edge for:\n";
+                    std::cout << (orig_2d + edge_s_2d) << " -- " << (edge_2d + edge_s_2d) << " AND "
+                              << h_2d << " -- " << (h_2d + mv_inplane2d) << std::endl;
+                    // Don't expect a lack of intersection, but for debug mode:
+                    pm.mv = mv_inplane;
+                    pm.end = mv_s + mv_inplane;
+                } else {
+                    throw std::runtime_error ("Huh?!? Got no intersection across edge?");
+                }
             }
         }
 
@@ -405,8 +408,10 @@ int main (int argc, char* argv[])
         v.init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
             // The 'land' is a cube for now
-            if (vmp->name == "Cube.002") { land = vmp; }
-            //if (vmp->name == "Landscape.003") { land = vmp; }
+            if (vmp->name == "Cube.002" && land == nullptr) { land = vmp; }
+            else if (vmp->name == "Landscape.003" && land == nullptr) { land = vmp; }
+            else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; }
+            else { std::cout << "Model name " << vmp->name << std::endl; }
         }
     }
     sm::vec<> hp_scene = {};
@@ -418,6 +423,7 @@ int main (int argc, char* argv[])
     mplot::SphereVisual<>* svp_t1 = nullptr;
     mplot::SphereVisual<>* svp_t2 = nullptr;
 
+    mplot::RodVisual<>* rvp1 = nullptr;
     mplot::RodVisual<>* rvp2 = nullptr;
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
@@ -455,9 +461,10 @@ int main (int argc, char* argv[])
         land_to_scene = land->get_viewmatrix();
         scene_to_land = land_to_scene.inverse();
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
-        auto camloc = camspace * sm::vec<>{0,0,0};
+        auto camloc = camspace * sm::vec<>{0,10,0};
         auto camloc_landframe = (scene_to_land * camloc).less_one_dim();
         auto [hit, ti, tn] = land->find_triangle_crossing (camloc_landframe);
+        std::cout << "find_triangle_crossing hit: " << hit << ", ti[0] = " << ti[0] << "\n";
         ti0 = ti;
         // Populate neighbours of ti0 with something like:
         // ti0_neighbours = land->neighbour_triangles (ti0); // ??
@@ -505,6 +512,11 @@ int main (int argc, char* argv[])
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp2 = v.addVisualModel (rv);
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.001f, mplot::colour::blue);
+        v.bindmodel (rv);
+        rv->use_oriented_tube = false;
+        rv->finalize();
+        rvp1 = v.addVisualModel (rv);
 
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti[0] == std::numeric_limits<uint32_t>::max()) {
@@ -581,7 +593,7 @@ int main (int argc, char* argv[])
      * Subroutine: Move the camera according to key events in the mathplot window
      */
     auto subr_key_move_camera = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                 opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2, &rvp2, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
+                                 opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2, &rvp1, &rvp2, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -620,20 +632,19 @@ int main (int argc, char* argv[])
                 // 4. Find the 'hover location' over that new location
 
                 // Debug/vis
-                std::cout << "Current hover triangle is " << tv_landframe;
+                //std::cout << "Current hover triangle is " << tv_landframe;
                 svp_t0->setViewTranslation (land_to_scene * tv_landframe[0]);
                 svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
                 svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
-                std::cout << " with normal " << tn0_land << std::endl;
+                //std::cout << " with normal " << tn0_land << std::endl;
 
                 // Does camloc_landframe in dirn tn0_land intersect the tv_landframe triangle?
                 auto [ isect, hovlocn ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land);
 
                 // Debug/vis
-                std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
+                //std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
                 svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
-                rvp2->update ((land_to_scene * hovlocn).less_one_dim(),
-                              (land_to_scene * (hovlocn + mv_inplane)).less_one_dim()); // FIXME: mv_inplane needs to be in landframe
+                rvp2->update (hovlocn, hovlocn + mv_inplane);
 
                 if (isect) {
 
@@ -674,7 +685,9 @@ int main (int argc, char* argv[])
                                 sm::vec<float, 4> mv_rest;
                                 {
                                     // Rotate by the angle between the normals. I think this is constrained to be <= pi
-                                    float rotn_angle = tn0_land.angle (_tn);
+                                    float rotn_angle = tn0_land.angle (_tn, cd.tri_edge);
+                                    std::cout << "rotn_angle is " << rotn_angle << std::endl;
+                                    std::cout << "alt angle is " <<  tn0_land.angle (_tn) << std::endl;
                                     // Use the *edge* as the rotation axis.
                                     reorient_land.rotate (cd.tri_edge, rotn_angle);
                                     // Before doing any additional work, apply this rotation to mv_rest
@@ -702,9 +715,12 @@ int main (int argc, char* argv[])
 
                                 if (isect2 /* || done2*/) {
                                     // Complete, exit loop
+
+                                    // FIXME next: Get this debugging
+                                    rvp1->update (cd.pm.mv, isectpoint2);
+
                                     reorient_final = reorient_land * reorient_final;
                                     done = true;
-
                                 } else {
                                     // Incomplete.
                                     // We've sailed past newtv_landframe
