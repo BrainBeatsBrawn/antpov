@@ -186,7 +186,10 @@ namespace eye3d
                 if constexpr (debug) { std::cout << "Cross point in mdl frame: " << pm.end << std::endl; }
                 pm.mv = pm.end - mv_s;
             } else {
-                std::cout << "Huh?!? Got no intersection across edge?\n";
+                std::cout << "Huh?!? Got no intersection across edge for:\n";
+                std::cout << (orig_2d + edge_s_2d) << " -- " << (edge_2d + edge_s_2d) << " AND "
+                          << h_2d << " -- " << (h_2d + mv_inplane2d) << std::endl;
+                //throw std::runtime_error ("Huh?!? Got no intersection across edge?"); // or return some kind of error signal
                 // Hmm, don't expect a lack of intersection
                 pm.mv = mv_inplane;
                 pm.end = mv_s + mv_inplane;
@@ -204,6 +207,8 @@ namespace eye3d
     {
         // Did we get an intersection of the movement mv_inplane through a triangle edge?
         bool crossed = false;
+        // If we crossed a specific vertex, say which one here
+        uint32_t crossed_vertex = std::numeric_limits<uint32_t>::max();
         // edge_idx_a/b are the indices of the triangle vertices on the crossed edge
         uint32_t edge_idx_a = 0;
         uint32_t edge_idx_b = 0;
@@ -275,6 +280,16 @@ namespace eye3d
         if (!inside01 || !inside21 || !inside02) {
             std::cout << "Crossed over " << (inside01 ? " " : "0-1") << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
             cd.crossed = true;
+            if (!inside01 && !inside21) {
+                // crossed vertex 1
+                cd.crossed_vertex = 1;
+            } else if (!inside01 && !inside02) {
+                // crossed vertex 0
+                cd.crossed_vertex = 0;
+            } else if (!inside21 && !inside02) {
+                // crossed vertex 2
+                cd.crossed_vertex = 2;
+            } // else crossed one edge
         } else {
             std::cout << "No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
         }
@@ -603,13 +618,13 @@ int main (int argc, char* argv[])
                 // 2. Determine if that component will cross any edge of the triangle
                 // 3. Work out what the new edge is and find a location on that triangle
                 // 4. Find the 'hover location' over that new location
-                //
 
                 // Debug/vis
-                std::cout << "Current hover triangle is " << tv_landframe << std::endl;
+                std::cout << "Current hover triangle is " << tv_landframe;
                 svp_t0->setViewTranslation (land_to_scene * tv_landframe[0]);
                 svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
                 svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
+                std::cout << " with normal " << tn0_land << std::endl;
 
                 // Does camloc_landframe in dirn tn0_land intersect the tv_landframe triangle?
                 auto [ isect, hovlocn ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land);
@@ -623,12 +638,13 @@ int main (int argc, char* argv[])
                 if (isect) {
 
                     bool done = false;
-                    bool done2 = false;
+                    //bool done2 = false;
                     bool simple = false;
 
                     sm::mat44<float> sink;
                     sm::mat44<float> unsink;
                     sm::mat44<float> reorient_final;
+                    sm::mat44<float> reorient_cam_final;
 
                     while (!done) {
 
@@ -641,6 +657,9 @@ int main (int argc, char* argv[])
                         if (cd.crossed) {
 
                             // Can work out new triangle here
+                            std::cout << "find_other_triangle_containing ("
+                                      << cd.edge_idx_a << ", " <<  cd.edge_idx_b
+                                      << ", [" <<  ti0[0] << "," << ti0[1] << "," << ti0[2] << "])" << std::endl;
                             auto [_ti, _tn] = land->find_other_triangle_containing (cd.edge_idx_a, cd.edge_idx_b, ti0);
 
                             if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
@@ -666,12 +685,11 @@ int main (int argc, char* argv[])
                                     // Apply pre- and post-translations.
                                     reorient_land.translate (cd.pm.mv.plus_one_dim() + mv_rest);
                                 }
-                                reorient_final = reorient_land * reorient_final;
 
                                 // At this point, can test to see if the end point of the movement
                                 // lands in the adjacent triangle. If so, we're done, if not, time
                                 // for another loop.
-                                sm::vec<float> endmv = (reorient_final * hovlocn).less_one_dim();
+                                sm::vec<float> endmv = (reorient_land * reorient_final * hovlocn).less_one_dim();
                                 // Is endmv in newtv_landframe/_ti?
                                 bool isect2 = false;
                                 sm::vec<> isectpoint2 = {};
@@ -682,32 +700,35 @@ int main (int argc, char* argv[])
                                 std::cout << "endmv = " << endmv << (isect2 ? " DOES " : " DOES NOT ")
                                           << "land in the next triangle" << std::endl;
 
-                                if (isect2 || done2) {
+                                if (isect2 /* || done2*/) {
                                     // Complete, exit loop
+                                    reorient_final = reorient_land * reorient_final;
                                     done = true;
-                                    // Set sink/unsink for last triangle only
-                                    sink.setToIdentity();
-                                    sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
-                                    unsink.setToIdentity();
-                                    unsink.translate (_tn * hoverheight); // assumes we normalized _tn
 
                                 } else {
                                     // Incomplete.
                                     // We've sailed past newtv_landframe
                                     // We need to set an end-point that is on newtv_landframe, update hovlocn, then recurse.
+                                    // also recompute the movement encoded in reorient_land
+                                    reorient_land.translate (-mv_rest);
+                                    reorient_final = reorient_land * reorient_final;
+
                                     hovlocn = cd.pm.end; // crossing data planned movement end
 
                                     // Also update planned move, which is now shorter and in a new direction
                                     tv_landframe = newtv_landframe;
                                     mv_inplane = mv_rest.less_one_dim();
-
-                                    std::cout << "Frigging it with done2=true to avoid inf loop during dev\n";
-                                    done2 = true;
                                 }
+
+                                // Set sink/unsink and apply to camera transform
+                                sink.setToIdentity();
+                                sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
+                                unsink.setToIdentity();
+                                unsink.translate (_tn * hoverheight); // assumes we normalized _tn
+                                reorient_cam_final = unsink * reorient_land * sink * reorient_cam_final;
 
                                 ti0 = _ti;
                                 tn0_land = _tn;
-
                             }
 
                         } else {
@@ -733,7 +754,7 @@ int main (int argc, char* argv[])
                         sm::mat44<float> sphereTransform = land_to_scene * reorient_final * scene_to_land;
                         svp->setViewTranslation (sphereTransform * svp->get_viewmatrix_origin());
 
-                        sm::mat44<float> camposeTransform = land_to_scene * unsink * reorient_final * sink * scene_to_land * cam_to_scene;
+                        sm::mat44<float> camposeTransform = land_to_scene * reorient_cam_final * scene_to_land * cam_to_scene;
                         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (camposeTransform));
                     }
 
@@ -743,7 +764,7 @@ int main (int argc, char* argv[])
                     svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
                 }
 
-            } else {
+            } else { // no landscape object to follow
                 std::cout << "No land, translate cameras only.\n";
                 translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
             }
