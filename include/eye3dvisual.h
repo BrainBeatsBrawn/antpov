@@ -144,7 +144,7 @@ protected:
     void key_callback_extra (int key, int scancode, int action, int mods) override
     {
         // Process press/repeat key actions (none will work with Ctrl or Shift)
-        if (action == mplot::keyaction::press || action == mplot::keyaction::repeat) {
+        if ((action == mplot::keyaction::press || action == mplot::keyaction::repeat) && !(mods & keymod::shift)) {
             if (key == mplot::key::w) {
                 this->stop();
                 this->move_state.set (move_sense::forward);
