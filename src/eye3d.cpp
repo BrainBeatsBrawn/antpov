@@ -654,7 +654,12 @@ int main (int argc, char* argv[])
 
                     sm::mat44<float> sink;
                     sm::mat44<float> unsink;
+
                     sm::mat44<float> reorient_final;
+                    // Do I need to set up the initial matrix containing the camera's initial orientation?
+                    // reorient_final = cam_to_land;
+                    // reorient_final.translate (-tn0_land * hoverheight);
+
                     sm::mat44<float> reorient_cam_final;
 
                     while (!done) {
@@ -683,20 +688,31 @@ int main (int argc, char* argv[])
 
                                 sm::mat44<float> reorient_land; // reorientation transformation in landframe
                                 sm::vec<float, 4> mv_rest;
+
+                                sm::mat44<float> r_t1;
+                                sm::mat44<float> r_t_to;
+                                sm::mat44<float> r_r;
+                                sm::mat44<float> r_t_fro;
+                                sm::mat44<float> r_t2;
                                 {
+                                    // Initial rotational state of the land!
+
                                     // Rotate by the angle between the normals. I think this is constrained to be <= pi
                                     float rotn_angle = tn0_land.angle (_tn, cd.tri_edge);
                                     std::cout << "rotn_angle is " << rotn_angle << std::endl;
-                                    std::cout << "alt angle is " <<  tn0_land.angle (_tn) << std::endl;
+
                                     // Use the *edge* as the rotation axis.
-                                    reorient_land.rotate (cd.tri_edge, rotn_angle);
+                                    r_r.rotate (cd.tri_edge, rotn_angle);
                                     // Before doing any additional work, apply this rotation to mv_rest
-                                    mv_rest = reorient_land * (mv_inplane - cd.pm.mv);
+                                    mv_rest = r_r * (mv_inplane - cd.pm.mv);
                                     // The edge may not already be a coordinate axis, so pre- and post-translate by hovlocn
-                                    reorient_land.pretranslate (-hovlocn);
-                                    reorient_land.translate (hovlocn);
+                                    r_t_to.translate (-(hovlocn + cd.pm.mv));
+                                    r_t_fro.translate (hovlocn + cd.pm.mv);
                                     // Apply pre- and post-translations.
-                                    reorient_land.translate (cd.pm.mv.plus_one_dim() + mv_rest);
+                                    r_t1.translate (cd.pm.mv);
+                                    r_t2.translate (mv_rest);
+
+                                    reorient_land = r_t2 * r_t_fro * r_r * r_t_to * r_t1;
                                 }
 
                                 // At this point, can test to see if the end point of the movement
