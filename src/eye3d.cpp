@@ -643,7 +643,17 @@ int main (int argc, char* argv[])
 
                 // Debug/vis
                 //std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
-                svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
+
+                // Ideally, want to keep the orientation from cam_to_land, but move it to hovlocn.
+                std::cout << "cam_to_land = \n" << cam_to_land << " and hovlocn is " << hovlocn << std::endl;
+                sm::vec<> cam_displacement  = cam_to_land.translation() - hovlocn;
+                std::cout << "Cam displacement: " << cam_displacement << std::endl;
+                sm::mat44<float> surface = cam_to_land;
+                surface.translate (-cam_displacement); // This is our init pose, placed on the surface
+
+                //svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
+                svp2->setViewTranslation (land_to_scene * surface * sm::vec<>{}); // last hover locn is magenta
+
                 rvp2->update (hovlocn, hovlocn + mv_inplane);
 
                 if (isect) {
@@ -655,10 +665,8 @@ int main (int argc, char* argv[])
                     sm::mat44<float> sink;
                     sm::mat44<float> unsink;
 
-                    sm::mat44<float> reorient_final;
-                    // Do I need to set up the initial matrix containing the camera's initial orientation?
-                    // reorient_final = cam_to_land;
-                    // reorient_final.translate (-tn0_land * hoverheight);
+                    // Want initial pose matrix here.
+                    sm::mat44<float> reorient_final = surface;
 
                     sm::mat44<float> reorient_cam_final;
 
@@ -718,7 +726,7 @@ int main (int argc, char* argv[])
                                 // At this point, can test to see if the end point of the movement
                                 // lands in the adjacent triangle. If so, we're done, if not, time
                                 // for another loop.
-                                sm::vec<float> endmv = (reorient_land * reorient_final * hovlocn).less_one_dim();
+                                sm::vec<float> endmv = (reorient_land * reorient_final * sm::vec<>{}).less_one_dim();
                                 // Is endmv in newtv_landframe/_ti?
                                 bool isect2 = false;
                                 sm::vec<> isectpoint2 = {};
