@@ -463,7 +463,7 @@ int main (int argc, char* argv[])
             std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
         }
 
-        land_to_scene = land->get_viewmatrix();
+        land_to_scene = land->getViewMatrix();
         scene_to_land = land_to_scene.inverse();
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
         auto camloc = camspace * sm::vec<>{0,10,0};
@@ -723,9 +723,9 @@ int main (int argc, char* argv[])
 
                                     // Rotate by the angle between the normals. I think this is constrained to be <= pi
                                     float rotn_angle = tn0_land.angle (_tn, cd.tri_edge);
-                                    std::cout << "rotn_angle is " << rotn_angle << std::endl;
-
+                                    std::cout << "rotn edge is " << cd.tri_edge << " and angle is " << rotn_angle << "\n";
                                     // Use the *edge* as the rotation axis.
+                                    cd.tri_edge.renormalize(); // !!! although in future this won't be necessary (maths main has quaternion that auto-renormalizes)
                                     r_r.rotate (cd.tri_edge, rotn_angle);
                                     // Before doing any additional work, apply this rotation to mv_rest
                                     mv_rest = r_r * (mv_inplane - cd.pm.mv);
@@ -785,9 +785,10 @@ int main (int argc, char* argv[])
                                 // Set sink/unsink and apply to camera transform
                                 sink.setToIdentity();
                                 sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
+
                                 unsink.setToIdentity();
                                 unsink.translate (_tn * hoverheight); // assumes we normalized _tn
-                                reorient_cam_final = unsink * reorient_land * sink * reorient_cam_final;
+                                reorient_cam_final = unsink * reorient_final;
 
                                 ti0 = _ti;
                                 tn0_land = _tn;
@@ -813,11 +814,9 @@ int main (int argc, char* argv[])
                         // c) Return sphere lcon into scene coordinates (or bunch it all together):
                         // d) Update svp->viewmatrix
                         // All in one line to update the sphere indicator's location
-                        sm::mat44<float> sphereTransform = land_to_scene * reorient_final * scene_to_land;
-                        svp->setViewTranslation (sphereTransform * svp->get_viewmatrix_origin());
+                        svp->setViewMatrix (land_to_scene * reorient_final);
 
-                        sm::mat44<float> camposeTransform = land_to_scene * reorient_cam_final * scene_to_land * cam_to_scene;
-                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (camposeTransform));
+                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * reorient_cam_final));
                     }
 
                 } else {
