@@ -22,6 +22,7 @@
 #include <mplot/GridVisual.h>
 #include <mplot/SphereVisual.h> // debug really
 #include <mplot/RodVisual.h>    // also debug
+#include <mplot/PolygonVisual.h> // debug
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -409,13 +410,16 @@ int main (int argc, char* argv[])
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
             // The 'land' is a cube for now
             if (vmp->name == "Cube.002" && land == nullptr) { land = vmp; }
+            else if (vmp->name == "Cube.001" && land == nullptr) { land = vmp; }
             else if (vmp->name == "Landscape.003" && land == nullptr) { land = vmp; }
             else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; }
             else { std::cout << "Model name " << vmp->name << std::endl; }
         }
     }
     sm::vec<> hp_scene = {};
-    mplot::SphereVisual<>* svp = nullptr;
+
+    mplot::PolygonVisual<>* svp = nullptr;
+
     mplot::SphereVisual<>* svp2 = nullptr;
     mplot::SphereVisual<>* svp4 = nullptr;
 
@@ -425,6 +429,7 @@ int main (int argc, char* argv[])
 
     mplot::RodVisual<>* rvp1 = nullptr;
     mplot::RodVisual<>* rvp2 = nullptr;
+    mplot::RodVisual<>* rvp3 = nullptr;
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
     sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
@@ -477,17 +482,19 @@ int main (int argc, char* argv[])
         }
         hp_scene = (land_to_scene * hit).less_one_dim();
 
-        auto sv = std::make_unique<mplot::SphereVisual<>>(hp_scene, 0.005, mplot::colour::goldenrod3);
-        v.bindmodel (sv);
-        sv->finalize();
-        svp = v.addVisualModel (sv);
+        sm::vec<float, 3> posn = {0, 0, -0.0025};
+        sm::vec<float, 3> dirvertex = {-1, 0, 0};
+        auto pv = std::make_unique<mplot::PolygonVisual<>>(hp_scene, posn, dirvertex, 0.005, 0.005, mplot::colour::goldenrod3, 4);
+        v.bindmodel (pv);
+        pv->finalize();
+        svp = v.addVisualModel (pv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::magenta3);
+        auto sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::magenta3);
         v.bindmodel (sv);
         sv->finalize();
         svp2 = v.addVisualModel (sv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::black);
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0025, mplot::colour::black);
         v.bindmodel (sv);
         sv->finalize();
         svp4 = v.addVisualModel (sv);
@@ -512,11 +519,18 @@ int main (int argc, char* argv[])
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp2 = v.addVisualModel (rv);
+
         rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.001f, mplot::colour::blue);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp1 = v.addVisualModel (rv);
+
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0011f, mplot::colour::springgreen);
+        v.bindmodel (rv);
+        rv->use_oriented_tube = false;
+        rv->finalize();
+        rvp3 = v.addVisualModel (rv);
 
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti[0] == std::numeric_limits<uint32_t>::max()) {
@@ -593,7 +607,7 @@ int main (int argc, char* argv[])
      * Subroutine: Move the camera according to key events in the mathplot window
      */
     auto subr_key_move_camera = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                 opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2, &rvp1, &rvp2, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
+                                 opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2, &rvp1, &rvp2, &rvp3, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -645,14 +659,15 @@ int main (int argc, char* argv[])
                 //std::cout << "hovlocn: " << hovlocn << std::endl;   // hovlocn is in landframe
 
                 // Ideally, want to keep the orientation from cam_to_land, but move it to hovlocn.
-                std::cout << "cam_to_land = \n" << cam_to_land << " and hovlocn is " << hovlocn << std::endl;
+                // std::cout << "cam_to_land = \n" << cam_to_land << " and hovlocn is " << hovlocn << std::endl;
+
                 sm::vec<> cam_displacement  = cam_to_land.translation() - hovlocn;
-                std::cout << "Cam displacement: " << cam_displacement << std::endl;
-                sm::mat44<float> surface = cam_to_land;
-                surface.translate (-cam_displacement); // This is our init pose, placed on the surface
+                sm::mat44<float> cam_to_surface = cam_to_land;
+                cam_to_surface.translate (-cam_displacement); // This is our init pose, placed on the surface
 
                 //svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
-                svp2->setViewTranslation (land_to_scene * surface * sm::vec<>{}); // last hover locn is magenta
+                svp2->setViewMatrix (land_to_scene * cam_to_surface); // last hover locn is magenta
+                svp->setViewMatrix (land_to_scene * cam_to_surface);
 
                 rvp2->update (hovlocn, hovlocn + mv_inplane);
 
@@ -666,7 +681,8 @@ int main (int argc, char* argv[])
                     sm::mat44<float> unsink;
 
                     // Want initial pose matrix here.
-                    sm::mat44<float> reorient_final = surface;
+                    sm::mat44<float> reorient_final = cam_to_surface;
+                    std::cout << "Initial sphere pose:\n" << cam_to_surface << std::endl;
 
                     sm::mat44<float> reorient_cam_final;
 
@@ -676,7 +692,7 @@ int main (int argc, char* argv[])
                         eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
 
                         // Debug/vis
-                        svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black (not yet in right location)
+                        svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black sphere
 
                         if (cd.crossed) {
 
@@ -723,6 +739,13 @@ int main (int argc, char* argv[])
                                     reorient_land = r_t2 * r_t_fro * r_r * r_t_to * r_t1;
                                 }
 
+                                // Show mv_rest as green tube, which should enclose the blue tube of rvp1
+                                rvp3->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
+
+                                // Angle between cm.pm.mv and mv_rest?
+                                std::cout << "Angle between pre-rotate and post- moves? "
+                                          << sm::mathconst<float>::rad2deg * cd.pm.mv.angle (mv_rest.less_one_dim()) << std::endl;
+
                                 // At this point, can test to see if the end point of the movement
                                 // lands in the adjacent triangle. If so, we're done, if not, time
                                 // for another loop.
@@ -734,8 +757,7 @@ int main (int argc, char* argv[])
                                 std::tie (isect2, isectpoint2) = sm::algo::ray_tri_intersection<float> (newtv_landframe[0], newtv_landframe[1], newtv_landframe[2],
                                                                                                         endmv + (_tn / 2.0f), -_tn);
 
-                                std::cout << "endmv = " << endmv << (isect2 ? " DOES " : " DOES NOT ")
-                                          << "land in the next triangle" << std::endl;
+                                std::cout << "endmv = " << endmv << " DOES " << (isect2 ? "" : "NOT ") << "land in next tri\n";
 
                                 if (isect2 /* || done2*/) {
                                     // Complete, exit loop
