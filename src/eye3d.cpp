@@ -663,7 +663,7 @@ int main (int argc, char* argv[])
 
                 sm::vec<> cam_displacement  = cam_to_land.translation() - hovlocn;
                 sm::mat44<float> cam_to_surface = cam_to_land;
-                cam_to_surface.translate (-cam_displacement); // This is our init pose, placed on the surface
+                cam_to_surface.pretranslate (-cam_displacement); // This is our init pose, placed on the surface
 
                 //svp2->setViewTranslation (land_to_scene * hovlocn); // last hover locn is magenta
                 svp2->setViewMatrix (land_to_scene * cam_to_surface); // last hover locn is magenta
