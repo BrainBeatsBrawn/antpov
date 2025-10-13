@@ -47,9 +47,16 @@ struct eye3dvisual final : public mplot::Visual<>
         campose_reset_request, // A request to reset the pose of the camera
         show_camframe,         // Show camera axes?
         paused,                // Pause sim (i.e. pause time)?
-        stepfwd                // If true and if paused is true, step forward one timestep in the camera input
+        stepfwd,               // If true and if paused is true, step forward one timestep in the camera input
+        freeze                 // Freeze movement
     };
     sm::flags<state> vstate;
+
+    void freeze (const bool val)
+    {
+        this->vstate.set (state::freeze, val);
+        this->stop();
+    }
 
     // Get the camera's movement vector.
     sm::vec<float, 3> getMovementVector (const bool retain_move_state = false)
@@ -143,6 +150,8 @@ protected:
     static constexpr bool debug_callback_extra = false;
     void key_callback_extra (int key, int scancode, int action, int mods) override
     {
+        if (this->vstate.test (state::freeze)) { return; } // Don't respond to movement keys
+
         // Process press/repeat key actions (none will work with Ctrl or Shift)
         if ((action == mplot::keyaction::press || action == mplot::keyaction::repeat) && !(mods & keymod::shift)) {
             if (key == mplot::key::w) {
