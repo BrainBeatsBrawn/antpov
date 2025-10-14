@@ -94,8 +94,8 @@ namespace eye3d
         sm::vec<float> mv = {};
         // The end coordinate of the movement
         sm::vec<float> end = {};
-        // debug bool
-        bool stop = false;
+        // Means 'there was no crossing'
+        bool no_cross_point = false;
     };
 
     /*
@@ -124,10 +124,8 @@ namespace eye3d
                                                 const sm::vec<float>& mv_s,
                                                 const sm::vec<float>& mv_inplane)
     {
-        constexpr bool debug = false;
-
+        constexpr bool debug = true;
         eye3d::partial_movement pm;
-
         sm::vec<float> edge = edge_e - edge_s;
 
         sm::vec<float> u_y = edge;
@@ -136,45 +134,28 @@ namespace eye3d
         u_z.renormalize();
         sm::vec<float> u_x = u_y.cross (u_z);
         if constexpr (debug) {
-            std::cout << "edge = " << edge << std::endl;
-            std::cout << "Basis: " << u_x << " " << u_y << " " << u_z << std::endl;
+            std::cout << "fec: edge = " << edge << std::endl;
+            std::cout << "fec: Basis: " << u_x << " " << u_y << " " << u_z << std::endl;
         }
 
         // Create a matrix to convert from mdl frame movements to the triangle frame of ref.
         sm::mat44<float> from_triangle_frame = sm::mat44<float>::frombasis (u_x, u_y, u_z);
-
         sm::mat44<float> to_triangle_frame = from_triangle_frame.inverse();
 
         // Use Edge as our 'y' and the orthogonal as our 'x', then express mv_inplane in terms
         // of these two unit vectors. We also have our 'z' which is the triangle normal.
         sm::vec<float, 4> mv_inplane4d = to_triangle_frame * mv_inplane;
         sm::vec<float, 2> mv_inplane2d = { mv_inplane4d[0], mv_inplane4d[1] };
-
         sm::vec<float, 4> h_4d = to_triangle_frame * mv_s;
         sm::vec<float, 2> h_2d =  { h_4d[0], h_4d[1] };
-
         sm::vec<float, 4> edge_4d = to_triangle_frame * edge;
         sm::vec<float, 2> edge_2d =  { edge_4d[0], edge_4d[1] };
-
         sm::vec<float, 4> edge_s_4d = to_triangle_frame * edge_s;
         sm::vec<float, 2> edge_s_2d =  { edge_s_4d[0], edge_s_4d[1] };
 
-        sm::vec<float, 4> edge_e_4d = to_triangle_frame * edge_e;
-        sm::vec<float, 2> edge_e_2d =  { edge_e_4d[0], edge_e_4d[1] };
-
-        if constexpr (debug) {
-            std::cout << "mv_inplane2d: " << mv_inplane2d  << std::endl;
-            std::cout << "h_2d: " << h_2d  << std::endl;
-            std::cout << "edge_2d: " << edge_2d  << std::endl;
-            std::cout << "edge_s_2d: " << edge_s_2d  << std::endl;
-            std::cout << "edge_e_2d: " << edge_e_2d  << std::endl;
-        }
-        // A 2d null vector for the origin in 2D
-        //constexpr sm::vec<float, 2> orig_2d = {};
-
         // Can now apply algo to find crossing point
         if constexpr (debug) {
-            std::cout << "intersection test for lines: " << edge_s_2d << " --> " << (edge_2d + edge_s_2d)
+            std::cout << "fec: intersection test for lines: " << edge_s_2d << " --> " << (edge_2d + edge_s_2d)
                       << " and " << h_2d << " --> " << (h_2d + mv_inplane2d) << "\n";
         }
 
@@ -185,22 +166,20 @@ namespace eye3d
             if (si.test(0)) {
                 // Intersects as expected
                 sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (edge_s_2d, edge_s_2d + edge_2d, h_2d, h_2d + mv_inplane2d);
-                if constexpr (debug) { std::cout << "Cross point (2d) is " << cross_point_2d << std::endl; }
                 // Now go from cross point 2d to a point in model coordinates?
                 pm.end = (from_triangle_frame * cross_point_2d.plus_one_dim(edge_s_4d[2])).less_one_dim();
-                if constexpr (debug) { std::cout << "Cross point in mdl frame: " << pm.end << std::endl; }
+                if constexpr (debug) { std::cout << "fec: Cross point in mdl frame: " << pm.end << std::endl; }
                 pm.mv = pm.end - mv_s;
+
             } else {
                 // This can occur when the movement goes over/close to the end of the edge.
                 std::cout <<  "fec: NO INTERSECTION ACROSS EDGE FOR: "
                           << (edge_s_2d) << " -- " << (edge_2d + edge_s_2d) << " AND "
                           << h_2d << " -- " << (h_2d + mv_inplane2d) << std::endl;
                 // Mark that there was no intersection
-                pm.stop = true;
-                std::cout << "fec: Marking pm.mv = mv_inplane = " << mv_inplane << std::endl;
-                pm.mv = mv_inplane; // NOT the right thing to do!! FIXME next
-                pm.end = mv_s + mv_inplane;
-
+                pm.no_cross_point = true;
+                pm.mv = sm::vec<>{};
+                pm.end = mv_s;
             }
         }
 
@@ -224,6 +203,11 @@ namespace eye3d
         sm::vec<float> tri_edge = {};
         // The partial movement. pm.mv is the movement, pm.end is the crossing point
         eye3d::partial_movement pm = {};
+        // Debug
+        sm::vec<> es;
+        sm::vec<> ee;
+        sm::vec<> ms;
+        sm::vec<> me;
     };
 
     /*
@@ -255,6 +239,7 @@ namespace eye3d
                                                     const sm::vec<float>& t_norm)
     {
         eye3d::crossing_data cd;
+        cd.pm.no_cross_point = true;
 
         const sm::vec<float>& t0 = t_verts[0];
         const sm::vec<float>& t1 = t_verts[1];
@@ -265,46 +250,76 @@ namespace eye3d
         sm::vec<float> ptoe = p - t0;
         bool inside01 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside01) {
-            cd.edge_idx_a = t_indices[0]; cd.edge_idx_b = t_indices[1];
-            cd.pm = eye3d::find_edge_crossing (t0, t1, t_norm, mv_s, mv_inplane);
-            if (cd.pm.stop) {
+            eye3d::partial_movement pm = eye3d::find_edge_crossing (t0, t1, t_norm, mv_s, mv_inplane);
+            if (pm.no_cross_point) {
                 // This was no good
                 inside01 = true;
+                // Debug edges if it didn't hit a cross point
+                std::cout << "No intersection for edge t0t1 " << t0 << " -- " << t1
+                          << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
+                cd.es = t0;
+                cd.ee = t1;
+                cd.ms = mv_s;
+                cd.me = mv_s + mv_inplane;
             } else {
+                std::cout << "Intersection for edge t0t1 " <<  t0 << " -- " << t1 << std::endl;
+                cd.pm = pm;
                 cd.tri_edge = edge;
+                cd.edge_idx_a = t_indices[0];
+                cd.edge_idx_b = t_indices[1];
             }
         }
 
         edge = t2 - t1; ptoe = p - t1;
         bool inside21 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside21) {
-            cd.edge_idx_a = t_indices[2]; cd.edge_idx_b = t_indices[1];
-            cd.pm = eye3d::find_edge_crossing (t1, t2, t_norm, mv_s, mv_inplane);
-            if (cd.pm.stop) {
+            cd.pm.no_cross_point = false;
+            eye3d::partial_movement pm = eye3d::find_edge_crossing (t1, t2, t_norm, mv_s, mv_inplane);
+            if (pm.no_cross_point) {
                 // This was no good
                 inside21 = true;
+                // Debug edges if it didn't hit a cross point
+                std::cout << "No intersection for edge t1t2 " << t1 << " -- " << t2
+                          << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
+                cd.es = t1;
+                cd.ee = t2;
+                cd.ms = mv_s;
+                cd.me = mv_s + mv_inplane;
             } else {
+                std::cout << "Intersection for edge t1t2 " <<  t1 << " -- " << t2 << std::endl;
+                cd.pm = pm;
                 cd.tri_edge = edge;
+                cd.edge_idx_a = t_indices[2];
+                cd.edge_idx_b = t_indices[1];
             }
         }
 
         edge = t0 - t2; ptoe = p - t2;
         bool inside02 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside02) {
-            cd.edge_idx_a = t_indices[0]; cd.edge_idx_b = t_indices[2];
-            cd.pm = eye3d::find_edge_crossing (t2, t0, t_norm, mv_s, mv_inplane);
-            if (cd.pm.stop) {
+            cd.pm.no_cross_point = false;
+            eye3d::partial_movement pm = eye3d::find_edge_crossing (t2, t0, t_norm, mv_s, mv_inplane);
+            if (pm.no_cross_point) {
                 // This was no good
                 inside02 = true;
+                // Debug edges if it didn't hit a cross point
+                std::cout << "No intersection for edge t2t0 " << t2 << " -- " << t0
+                          << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
+                cd.es = t2;
+                cd.ee = t0;
+                cd.ms = mv_s;
+                cd.me = mv_s + mv_inplane;
             } else {
+                std::cout << "Intersection for edge t2t0 " <<  t2 << " -- " << t0 << std::endl;
+                cd.pm = pm;
                 cd.tri_edge = edge;
+                cd.edge_idx_a = t_indices[0];
+                cd.edge_idx_b = t_indices[2];
             }
-            cd.tri_edge = edge;
         }
         if (!inside01 || !inside21 || !inside02) {
             std::cout << "ccl: Crossed over " << (inside01 ? " " : "0-1") << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
             cd.crossed = true;
-            if (cd.pm.stop == true) { cd.pm.stop = false; }
             if (!inside01 && !inside21) {
                 // crossed vertex 1
                 cd.crossed_vertex = 1;
@@ -322,6 +337,7 @@ namespace eye3d
         return cd;
     }
 
+    // Find the land location. land: obvious; loc1: location to start from in land model frame.
     std::tuple<sm::vec<>, sm::vec<>, std::array<uint32_t, 3>>
     find_land (mplot::VisualModel<>* land, const sm::vec<>& loc1)
     {
@@ -362,6 +378,42 @@ namespace eye3d
         sm::vec<> hp_scene = (land_to_scene * hit).less_one_dim();
 
         return { hp_scene, tn0_land, ti0 };
+    }
+
+    // Using data about the land location for the camera found with eye3d::find_land, set the camera posn
+    void set_landlocked_camera (const sm::vec<>& hp_scene, const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
+                                mplot::PolygonVisual<>* svp, const float hoverheight, bool randomize_dir = true)
+    {
+        // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
+        if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
+            std::cout << "No hit\n";
+        } else {
+            // In this case, place the camera on the land, and orient it randomly in the 'land plane'
+            std::cout << "In scene coordinates, hit = " << hp_scene << std::endl;
+            // Turn the hit point into a translation matrix
+            sm::mat44<float> hitlocn_mat;
+            hitlocn_mat.translate (hp_scene);
+            svp->setViewMatrix (hitlocn_mat); // reposition sphere
+            // The camera frame always has y up. Choose a random vector in the plane for 'x'
+            // and then set z from this random x and the triangle norm (y).
+            sm::mat44<float> coord_rotn;
+            if (randomize_dir) {
+                sm::vec<> rand_vec;
+                rand_vec.randomize();
+                sm::vec<> _x = rand_vec.cross (tn0_land);
+                _x.renormalize();
+                sm::vec<> _z = _x.cross (tn0_land);
+                coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z);
+            } else {
+                // Get current camera orientation, extract rotation, use that?
+                // otherwise, just use identity rotation (this will be wrong)
+            }
+
+            // Want to place camera just 'above' hp.
+            coord_rotn.translate (hoverheight * tn0_land);
+
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * coord_rotn));
+        }
     }
 
 } // namespace eye3d
@@ -445,10 +497,12 @@ int main (int argc, char* argv[])
     //sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
     // Or hack it for debug:
     sm::mat44<float> initial_camera_space =
-    { -3.23477e-06 , -1 , -1.92021e-05 , 0.903487 ,
-      -0.933629 , -3.92646e-06 , 0.358244 , 0.38604 ,
-      -0.358244 , 1.9107e-05 , -0.933629 , 0.466975 ,
-      0 , 0 , 0 , 1 };
+    {
+        0.000111132 , 1.00007 , 0.000546686 , 2.08052 ,
+       -0.997771 , 0.000147738 , -0.06705 , -0.49677 ,
+       -0.0670472 , -0.000538523 , 0.997796 , 0.48927 ,
+       0 , 0 , 0 , 1
+    };
     initial_camera_space.transpose_inplace();
     std::cout << "Initial camera space for reset:\n" << initial_camera_space << std::endl;
 
@@ -522,10 +576,10 @@ int main (int argc, char* argv[])
 
         auto loc1 = sm::vec<>{8.9f, -1.0f, 0.0f};
 
-        std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, loc1);
-
-        land_to_scene = land->getViewMatrix();
+        land_to_scene = land->getViewMatrix();   // could be passed to find_land
         scene_to_land = land_to_scene.inverse();
+
+        std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, loc1);
 
         sm::vec<float, 3> posn = {0, 0, -0.0025};
         sm::vec<float, 3> dirvertex = {-1, 0, 0};
@@ -544,17 +598,17 @@ int main (int argc, char* argv[])
         sv->finalize();
         svp4 = v.addVisualModel (sv);
 
-        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.0005f, mplot::colour::crimson);
-        v.bindmodel (rv);
-        rv->use_oriented_tube = false;
-        rv->finalize();
-        rvp2 = v.addVisualModel (rv);
-
-        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.0005f, mplot::colour::blue);
+        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.0005f, mplot::colour::blue);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp1 = v.addVisualModel (rv);
+
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.0005f, mplot::colour::crimson);
+        v.bindmodel (rv);
+        rv->use_oriented_tube = false;
+        rv->finalize();
+        rvp2 = v.addVisualModel (rv);
 
         rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::springgreen);
         v.bindmodel (rv);
@@ -562,13 +616,13 @@ int main (int argc, char* argv[])
         rv->finalize();
         rvp3 = v.addVisualModel (rv);
 
-        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::dodgerblue1);
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::orange2);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp4 = v.addVisualModel (rv);
 
-        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::dodgerblue2);
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::darkgreen);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
@@ -592,30 +646,8 @@ int main (int argc, char* argv[])
         sv->finalize();
         svp_t2 = v.addVisualModel (sv);
 
-        // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
-        if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
-            std::cout << "No hit\n";
-        } else {
-            // In this case, place the camera on the land, and orient it randomly in the 'land plane'
-            std::cout << "In scene coordinates, hit = " << hp_scene << std::endl;
-            // Turn the hit point into a translation matrix
-            sm::mat44<float> hitlocn_mat;
-            hitlocn_mat.translate (hp_scene);
-            svp->setViewMatrix (hitlocn_mat); // reposition sphere
-            // The camera frame always has y up. Choose a random vector in the plane for 'x'
-            // and then set z from this random x and the triangle norm (y).
-            sm::vec<> rand_vec;
-            rand_vec.randomize();
-            sm::vec<> _x = rand_vec.cross (tn0_land);
-            _x.renormalize();
-            sm::vec<> _z = _x.cross (tn0_land);
-            auto coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z);
-
-            // Want to place camera just 'above'  hp.
-            coord_rotn.translate (hoverheight * tn0_land);
-
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * coord_rotn));
-        }
+        // Set up our camera using the data obtained from find_land()
+        eye3d::set_landlocked_camera (hp_scene, tn0_land, ti0, svp, hoverheight);
     }
 
     /**
@@ -694,14 +726,18 @@ int main (int argc, char* argv[])
             v.stop(); // cancel any active movements
             cam_to_scene = initial_camera_space;
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
-
-            // Find my triangle
         }
         // Update the view matrix of eye and eye localspace axes
         eyevm_ptr->setViewMatrix (cam_to_scene);
         cam_cs_ptr->setViewMatrix (cam_to_scene);
     };
 
+    // 0. Find vertices of triangle, given its indices. These are in the land model frame
+    // 1. Find component of t that is in the current triangle plane. t is in camera frame.
+    // 2. Determine if that component will cross any edge of the triangle
+    // 3. Work out what the new edge is and find a location on that triangle OR the next crossing
+    // point to recurse through...
+    // 4. Find the 'hover location' over that new location
     auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
                                     opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2,
                                     &rvp1, &rvp2, &rvp3, &rvp4, &rvp5,
@@ -709,6 +745,7 @@ int main (int argc, char* argv[])
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene;
+        sm::mat44<float> cam_to_land;
         if (v.isActivelyMoving()) {
 
             // Reset
@@ -722,15 +759,9 @@ int main (int argc, char* argv[])
             sm::mat44<float> mv_camframe_mat;
             mv_camframe_mat.translate (mv_camframe);
 
-            // If constrained by land, determine here if t will move it into a new triangle on the land
-
             // Compute transform amtrices that we'll be needing:
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-            // cam_to_scene transforms camera frame to scene frame
-            // scene_to_land * cam_to_scene transforms camera frame to model frame
-            sm::mat44<float> cam_to_land = scene_to_land * cam_to_scene;
-            // Movement in the land frame
-            // sm::mat44<float> mv_landframe_mat = cam_to_land * mv_camframe_mat;
+            cam_to_land = scene_to_land * cam_to_scene;
             // Camera location in the land frame
             sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
 
@@ -745,11 +776,7 @@ int main (int argc, char* argv[])
             sm::vec<> mv_orthog = tn0_land * (mv_landframe.dot (tn0_land) / (tn0_land.dot(tn0_land)));
             sm::vec<> mv_inplane = mv_landframe - mv_orthog; // landframe
 
-            // 2. Determine if that component will cross any edge of the triangle
-            // 3. Work out what the new edge is and find a location on that triangle
-            // 4. Find the 'hover location' over that new location
-
-            // Debug/vis
+            // Debug/vis the triangle corners
             svp_t0->setViewTranslation (land_to_scene * tv_landframe[0]);
             svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
             svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
@@ -761,7 +788,6 @@ int main (int argc, char* argv[])
             sm::mat44<float> cam_to_surface = cam_to_land;
             cam_to_surface.pretranslate (-cam_displacement); // This is our init pose, placed on the surface
 
-            std::cout << "Setting svp/svp2 viewmatrix\n";
             svp2->setViewMatrix (land_to_scene * cam_to_surface); // last hover locn is magenta
             svp->setViewMatrix (land_to_scene * cam_to_surface);
 
@@ -775,16 +801,16 @@ int main (int argc, char* argv[])
                 sm::mat44<float> sink;
                 sm::mat44<float> unsink;
 
-                // Want initial pose matrix here.
+                // Initialize reorient_final
                 sm::mat44<float> reorient_final = cam_to_surface;
-                // std::cout << "Initial sphere pose:\n" << cam_to_surface << std::endl;
-
                 sm::mat44<float> reorient_cam_final;
 
                 int lc = 0;
                 while (!done) {
+                    std::cout << "+++++\n";
+                    // mv_inplane is in land frame but relative to current location
+                    std::cout << "mv_inplane: " << mv_inplane << " hovlocn: " << hovlocn << std::endl;
 
-                    std::cout << "mv_inplane: " << mv_inplane << std::endl;
                     if (mv_inplane.length() == 0 && v.isActivelyRotating() == false) {
                         std::cout << "Zero length mv_inplane so stop/freeze\n";
                         done = true;
@@ -796,15 +822,21 @@ int main (int argc, char* argv[])
 
                     // For each edge in triangle, compute distance to edge for hovlocn and (hovlocn + mv_inplane)
                     eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
-                    if (cd.pm.stop) {
-                        std::cout << "cd.pm.stop==true so stop/freeze\n";
+#if 0
+                    if (cd.pm.no_cross_point && v.isActivelyRotating() == false) {
+                        std::cout << "cd.pm.no_cross_point==true so stop/freeze\n";
                         v.stop();
                         v.freeze (true);
                         done = true;
+                        // draw edges for debug
+                        std::cout << "Edge is " << cd.es << " to " << cd.ee << std::endl;
+                        rvp4->update (cd.es, cd.ee);
+                        std::cout << "Move is " << cd.ms << " to " << cd.me << std::endl;
+                        rvp5->update (cd.ms, cd.me);
                     }
-
+#endif
                     // Debug/vis
-                    if (!cd.pm.stop) {
+                    if (!cd.pm.no_cross_point) {
                         std::cout << "Set crosspoint " << cd.pm.end << " compare mv_inplane "
                                   << mv_inplane << " and cd.pm.mv " << cd.pm.mv  << std::endl;
                         svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black sphere
@@ -857,17 +889,18 @@ int main (int argc, char* argv[])
 
                             if (mv_rest.less_one_dim().length() == 0) {
                                 // The first movement to edge completed the movement. We actually landed ON the edge.
+                                std::cout << "Landed on the edge!\n";
                                 reorient_final = reorient_land * reorient_final;
                                 done = true;
                             } else {
 
                                 // There's additional movement to complete
                                 // Show mv_rest as green tube, which should enclose the blue tube of rvp1
-                                //rvp3->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
+                                rvp3->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
 
                                 // Angle between cm.pm.mv and mv_rest?
-                                std::cout << "Angle between pre-rotate (" << cd.pm.mv << ") and post- " << mv_rest << " moves? "
-                                          << sm::mathconst<float>::rad2deg * cd.pm.mv.angle (mv_rest.less_one_dim()) << std::endl;
+                                std::cout << "Angle between pre-rotate (" << cd.pm.mv << ") and post- " << mv_rest.less_one_dim() << " moves? "
+                                          << sm::mathconst<float>::rad2deg * cd.pm.mv.angle (mv_rest.less_one_dim()) << " deg\n";
 
                                 // At this point, can test to see if the end point of the movement
                                 // lands in the adjacent triangle. If so, we're done, if not, time
@@ -882,35 +915,30 @@ int main (int argc, char* argv[])
 
                                 std::cout << "endmv = " << endmv << " DOES" << (isect2 ? "" : " NOT") << " land in next tri\n";
                                 if (isect2) {
-                                    // Complete, exit loop
+                                    std::cout << "Complete, exit loop\n";
                                     reorient_final = reorient_land * reorient_final;
-                                    // Show remaining movement in blue
-                                    rvp1->update (hovlocn + cd.pm.mv, isectpoint2);
+                                    // rvp1->update (hovlocn + cd.pm.mv, isectpoint2); // right??
                                     done = true;
                                 } else {
-                                    // Incomplete.
-
-                                    // We've sailed past newtv_landframe
-
-                                    // We need to set an end-point that is on newtv_landframe, update hovlocn, then recurse.
+                                    // Incomplete; We've sailed past newtv_landframe
+                                    std::cout << "Incomplete, sailed past\n";
                                     if (lc == 0) {
-                                        rvp4->update (hovlocn + cd.pm.mv, isectpoint2);
+                                        rvp4->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv); // orange
                                     } else {
-                                        rvp5->update (hovlocn + cd.pm.mv, isectpoint2);
+                                        rvp5->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv); // dark green
                                     }
-
+                                    // We need to set an end-point that is on newtv_landframe, update hovlocn, then recurse.
                                     // also recompute the movement encoded in reorient_land
                                     reorient_land.translate (-mv_rest);
                                     reorient_final = reorient_land * reorient_final;
-
                                     hovlocn = cd.pm.end; // crossing data planned movement end
-
                                     // Also update planned move, which is now shorter and in a new direction
                                     tv_landframe = newtv_landframe;
                                     mv_inplane = mv_rest.less_one_dim();
                                 }
                                 lc++;
                             }
+                            std::cout << "reorient_final is now\n" << reorient_final << std::endl;
 
                             // Set sink/unsink and apply to camera transform
                             sink.setToIdentity();
@@ -922,9 +950,10 @@ int main (int argc, char* argv[])
 
                             ti0 = _ti;
                             tn0_land = _tn;
-                        }
 
-                    } else {
+                        } else { throw std::runtime_error ("other triangle not found?!"); }
+
+                    } else { // no triangle edge crossing, perform 'simple' movement
 
                         // Update green line as we go
                         rvp3->update ((cam_to_land * sm::vec<>{0, -hoverheight, 0}).less_one_dim(),
@@ -938,39 +967,32 @@ int main (int argc, char* argv[])
                         done = true;
                         simple = true; // to avoid a further transformation with reorient_final
                     }
+                    std::cout << "====\n";
+                    if (lc > 1) {
+                        done = true;
+                    } // debug
 
                 } // end while
 
-                if (simple) {
-                    // Already moved camera (or it didn't need to)
-                } else {
-                    // a) Get sphere locn into land model frame. Note: *starts* with sphere location
-                    // b) apply reorient_land
-                    // c) Return sphere lcon into scene coordinates (or bunch it all together):
-                    // d) Update svp->viewmatrix
-                    // All in one line to update the sphere indicator's location
+                if (!simple) {
+                    // Use the final transformation matrices to set camera (and sphere) poses
+                    std::cout << "svp->setViewMatrix with reorient_final =\n" << reorient_final << std::endl;
                     svp->setViewMatrix (land_to_scene * reorient_final);
-
                     setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * reorient_cam_final));
-                }
+                } // else already moved camera (or it didn't need to)
+
 
             } else {
-                //throw std::runtime_error ("No intersection with triangle t1t2t3\n"); // this is an error
                 if (v.isActivelyRotating() == false) {
                     std::cout << "No intersection with triangle t1t2t3 so stop/freeze";
                     v.stop();
                     v.freeze (true);
                 }
-                //translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
-                //svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
             }
 
-            // Up-down (pitch) is rotation about local camera frame axis x
-            //rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
-            // Left-and-right (yaw) is rotation about local camera frame axis y
+            //rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f); // disable up/down
             rotateCamerasLocallyAround (v.getHorizontalRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 1.0f, 0.0f);
-            // Roll
-            //rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f);
+            //rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f); // disable roll
 
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
@@ -983,9 +1005,28 @@ int main (int argc, char* argv[])
 
         // reset to initial camera space if requested
         if (v.vstate.test (eye3dvisual::state::campose_reset_request) == true) {
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
+
+            std::cout << "campose_reset_request\n";
+
             v.stop(); // cancel any active movements
-            cam_to_scene = initial_camera_space;
+
+            sm::vec<> zv = {};
+            rvp1->update (zv, zv);
+            rvp2->update (zv, zv);
+            rvp3->update (zv, zv);
+            rvp4->update (zv, zv);
+            rvp5->update (zv, zv);
+
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
+
+            cam_to_land = scene_to_land * initial_camera_space;
+            sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
+            sm::vec<> hp_scene;
+            std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, camloc_landframe); // sets tn0_land and ti0
+            //eye3d::set_landlocked_camera (hp_scene, tn0_land, ti0, svp, hoverheight);
+
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
         }
 
