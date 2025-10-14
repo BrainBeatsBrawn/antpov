@@ -73,6 +73,8 @@ namespace eye3d
                 opts |= eye3d::options::blender_axes;
             } else if (arg == "-x") {
                 opts |= eye3d::options::max_fps;
+            } else if (arg == "-k") {
+                opts |= eye3d::options::keep_moving;
             }
         }
         if (path.empty()) {
@@ -190,13 +192,13 @@ namespace eye3d
                 pm.mv = pm.end - mv_s;
             } else {
                 // This can occur when the movement goes over/close to the end of the edge.
-                std::cout <<  "NO INTERSECTION ACROSS EDGE FOR: "
+                std::cout <<  "fec: NO INTERSECTION ACROSS EDGE FOR: "
                           << (edge_s_2d) << " -- " << (edge_2d + edge_s_2d) << " AND "
                           << h_2d << " -- " << (h_2d + mv_inplane2d) << std::endl;
                 // Mark that there was no intersection
                 pm.stop = true;
-                std::cout << "Marking pm.mv = mv_inplane = " << mv_inplane << std::endl;
-                pm.mv = mv_inplane;
+                std::cout << "fec: Marking pm.mv = mv_inplane = " << mv_inplane << std::endl;
+                pm.mv = mv_inplane; // NOT the right thing to do!! FIXME next
                 pm.end = mv_s + mv_inplane;
 
             }
@@ -300,7 +302,7 @@ namespace eye3d
             cd.tri_edge = edge;
         }
         if (!inside01 || !inside21 || !inside02) {
-            std::cout << "Crossed over " << (inside01 ? " " : "0-1") << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
+            std::cout << "ccl: Crossed over " << (inside01 ? " " : "0-1") << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
             cd.crossed = true;
             if (cd.pm.stop == true) { cd.pm.stop = false; }
             if (!inside01 && !inside21) {
@@ -314,7 +316,7 @@ namespace eye3d
                 cd.crossed_vertex = 2;
             } // else crossed one edge
         } else {
-            std::cout << "No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << " for mv_inplane " << mv_inplane << " length " << mv_inplane.length() << std::endl;
+            std::cout << "ccl: No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << " for mv_inplane " << mv_inplane << " length " << mv_inplane.length() << std::endl;
         }
 
         return cd;
@@ -330,9 +332,6 @@ int main (int argc, char* argv[])
     sm::flags<eye3d::options> opts;
     std::string path = eye3d::parse_inputs (argc, argv, opts);
     if (opts.test (eye3d::options::can_exit)) { return 1; }
-
-    // Keep moving?
-    opts.set (eye3d::options::keep_moving, true);
 
     // Boilerplate memory alloc for compound-ray
     multicamAlloc();
@@ -369,6 +368,8 @@ int main (int argc, char* argv[])
         v.switch_scene_vertical_axis(); // to uz up
     }
 #endif
+    v.vstate.flip (eye3dvisual::state::show_camframe);
+
     // Use a FPS profiling with a text object on screen
     mplotext::fps::profiler fps_profiler;
     mplot::VisualTextModel<>* fps_label;
@@ -452,6 +453,8 @@ int main (int argc, char* argv[])
     mplot::RodVisual<>* rvp1 = nullptr;
     mplot::RodVisual<>* rvp2 = nullptr;
     mplot::RodVisual<>* rvp3 = nullptr;
+    mplot::RodVisual<>* rvp4 = nullptr;
+    mplot::RodVisual<>* rvp5 = nullptr;
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
     sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
@@ -506,56 +509,68 @@ int main (int argc, char* argv[])
 
         sm::vec<float, 3> posn = {0, 0, -0.0025};
         sm::vec<float, 3> dirvertex = {-1, 0, 0};
-        auto pv = std::make_unique<mplot::PolygonVisual<>>(hp_scene, posn, dirvertex, 0.005, 0.005, mplot::colour::goldenrod3, 4);
+        auto pv = std::make_unique<mplot::PolygonVisual<>>(hp_scene, posn, dirvertex, 0.0025, 0.0025, mplot::colour::goldenrod3, 4);
         v.bindmodel (pv);
         pv->finalize();
         svp = v.addVisualModel (pv);
 
-        auto sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.005, mplot::colour::magenta3);
+        auto sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.001, mplot::colour::magenta3);
         v.bindmodel (sv);
         sv->finalize();
         svp2 = v.addVisualModel (sv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0025, mplot::colour::black);
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.00105, mplot::colour::black);
         v.bindmodel (sv);
         sv->finalize();
         svp4 = v.addVisualModel (sv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.012, mplot::colour::orangered1);
-        v.bindmodel (sv);
-        sv->setAlpha (0.1f);
-        sv->finalize();
-        svp_t0 = v.addVisualModel (sv);
-
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.012, mplot::colour::darkgreen);
-        v.bindmodel (sv);
-        sv->setAlpha (0.1f);
-        sv->finalize();
-        svp_t1 = v.addVisualModel (sv);
-
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.012, mplot::colour::blue2);
-        v.bindmodel (sv);
-        sv->setAlpha (0.1f);
-        sv->finalize();
-        svp_t2 = v.addVisualModel (sv);
-
-        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.001f, mplot::colour::crimson);
+        auto rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.0005f, mplot::colour::crimson);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp2 = v.addVisualModel (rv);
 
-        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.001f, mplot::colour::blue);
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,2,2}, 0.0005f, mplot::colour::blue);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp1 = v.addVisualModel (rv);
 
-        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0011f, mplot::colour::springgreen);
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::springgreen);
         v.bindmodel (rv);
         rv->use_oriented_tube = false;
         rv->finalize();
         rvp3 = v.addVisualModel (rv);
+
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::dodgerblue1);
+        v.bindmodel (rv);
+        rv->use_oriented_tube = false;
+        rv->finalize();
+        rvp4 = v.addVisualModel (rv);
+
+        rv = std::make_unique<mplot::RodVisual<>>(land->get_viewmatrix_origin(), sm::vec<>{}, sm::vec<>{-2,1,2}, 0.0005f, mplot::colour::dodgerblue2);
+        v.bindmodel (rv);
+        rv->use_oriented_tube = false;
+        rv->finalize();
+        rvp5 = v.addVisualModel (rv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0008, mplot::colour::orangered1);
+        v.bindmodel (sv);
+        sv->setAlpha (0.8f);
+        sv->finalize();
+        svp_t0 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0008, mplot::colour::darkgreen);
+        v.bindmodel (sv);
+        sv->setAlpha (0.8f);
+        sv->finalize();
+        svp_t1 = v.addVisualModel (sv);
+
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0008, mplot::colour::blue2);
+        v.bindmodel (sv);
+        sv->setAlpha (0.8f);
+        sv->finalize();
+        svp_t2 = v.addVisualModel (sv);
 
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti[0] == std::numeric_limits<uint32_t>::max()) {
@@ -667,12 +682,20 @@ int main (int argc, char* argv[])
     };
 
     auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                    opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2, &rvp1, &rvp2, &rvp3,
+                                    opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2,
+                                    &rvp1, &rvp2, &rvp3, &rvp4, &rvp5,
                                     land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene;
         if (v.isActivelyMoving()) {
+
+            // Reset
+            std::cout << "Resetting svp/svp2 viewmatrix\n";
+            sm::mat44<float> identity;
+            svp2->setViewMatrix (identity);      // last hover locn is magenta
+            svp->setViewMatrix (identity);       // svp is the yellow thing
+            svp4->setViewMatrix (identity); // cross point is black sphere
 
             sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
             sm::mat44<float> mv_camframe_mat;
@@ -717,6 +740,7 @@ int main (int argc, char* argv[])
             sm::mat44<float> cam_to_surface = cam_to_land;
             cam_to_surface.pretranslate (-cam_displacement); // This is our init pose, placed on the surface
 
+            std::cout << "Setting svp/svp2 viewmatrix\n";
             svp2->setViewMatrix (land_to_scene * cam_to_surface); // last hover locn is magenta
             svp->setViewMatrix (land_to_scene * cam_to_surface);
 
@@ -736,10 +760,11 @@ int main (int argc, char* argv[])
 
                 sm::mat44<float> reorient_cam_final;
 
+                int lc = 0;
                 while (!done) {
 
                     std::cout << "mv_inplane: " << mv_inplane << std::endl;
-                    if (mv_inplane.length() == 0) {
+                    if (mv_inplane.length() == 0 && v.isActivelyRotating() == false) {
                         std::cout << "Zero length mv_inplane so stop/freeze\n";
                         done = true;
                         simple = true;
@@ -759,6 +784,8 @@ int main (int argc, char* argv[])
 
                     // Debug/vis
                     if (!cd.pm.stop) {
+                        std::cout << "Set crosspoint " << cd.pm.end << " compare mv_inplane "
+                                  << mv_inplane << " and cd.pm.mv " << cd.pm.mv  << std::endl;
                         svp4->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black sphere
                     }
 
@@ -807,15 +834,15 @@ int main (int argc, char* argv[])
                                 reorient_land = r_t2 * r_t_fro * r_r * r_t_to * r_t1;
                             }
 
-                            // Show mv_rest as green tube, which should enclose the blue tube of rvp1
-                            rvp3->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
-
                             if (mv_rest.less_one_dim().length() == 0) {
                                 // The first movement to edge completed the movement. We actually landed ON the edge.
                                 reorient_final = reorient_land * reorient_final;
                                 done = true;
                             } else {
+
                                 // There's additional movement to complete
+                                // Show mv_rest as green tube, which should enclose the blue tube of rvp1
+                                //rvp3->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
 
                                 // Angle between cm.pm.mv and mv_rest?
                                 std::cout << "Angle between pre-rotate (" << cd.pm.mv << ") and post- " << mv_rest << " moves? "
@@ -841,8 +868,16 @@ int main (int argc, char* argv[])
                                     done = true;
                                 } else {
                                     // Incomplete.
+
                                     // We've sailed past newtv_landframe
+
                                     // We need to set an end-point that is on newtv_landframe, update hovlocn, then recurse.
+                                    if (lc == 0) {
+                                        rvp4->update (hovlocn + cd.pm.mv, isectpoint2);
+                                    } else {
+                                        rvp5->update (hovlocn + cd.pm.mv, isectpoint2);
+                                    }
+
                                     // also recompute the movement encoded in reorient_land
                                     reorient_land.translate (-mv_rest);
                                     reorient_final = reorient_land * reorient_final;
@@ -853,6 +888,7 @@ int main (int argc, char* argv[])
                                     tv_landframe = newtv_landframe;
                                     mv_inplane = mv_rest.less_one_dim();
                                 }
+                                lc++;
                             }
 
                             // Set sink/unsink and apply to camera transform
@@ -868,6 +904,11 @@ int main (int argc, char* argv[])
                         }
 
                     } else {
+
+                        // Update green line as we go
+                        rvp3->update ((cam_to_land * sm::vec<>{0, -hoverheight, 0}).less_one_dim(),
+                                      (cam_to_land * (mv_camframe + sm::vec<>{0, -hoverheight, 0})).less_one_dim());
+
                         translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
                         // Whats the movement of the camera in the scene frame?
                         sm::vec<float, 4> mv_sceneframe = cam_to_scene * mv_camframe;
@@ -894,9 +935,11 @@ int main (int argc, char* argv[])
 
             } else {
                 //throw std::runtime_error ("No intersection with triangle t1t2t3\n"); // this is an error
-                std::cout << "No intersection with triangle t1t2t3 so stop/freeze";
-                v.stop();
-                v.freeze (true);
+                if (v.isActivelyRotating() == false) {
+                    std::cout << "No intersection with triangle t1t2t3 so stop/freeze";
+                    v.stop();
+                    v.freeze (true);
+                }
                 //translateCamerasLocally (mv_camframe.x(), mv_camframe.y(), mv_camframe.z());
                 //svp->setViewTranslation (land_to_scene * mv_landframe_mat * scene_to_land * svp->get_viewmatrix_origin());
             }

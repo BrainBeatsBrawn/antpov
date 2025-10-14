@@ -134,6 +134,15 @@ struct eye3dvisual final : public mplot::Visual<>
         return out;
     }
 
+    bool isActivelyRotating()
+    {
+        return (this->move_state.test (move_sense::rotUp)
+                || this->move_state.test (move_sense::rotDown)
+                || this->move_state.test (move_sense::rotLeft)
+                || this->move_state.test (move_sense::rotRight)
+                || this->move_state.test (move_sense::rotRollLeft)
+                || this->move_state.test (move_sense::rotRollRight));
+    }
 
     // Is the camera 'actively moving'?
     bool isActivelyMoving() { return this->move_state.any(); }
