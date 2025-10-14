@@ -322,6 +322,48 @@ namespace eye3d
         return cd;
     }
 
+    std::tuple<sm::vec<>, sm::vec<>, std::array<uint32_t, 3>>
+    find_land (mplot::VisualModel<>* land, const sm::vec<>& loc1)
+    {
+        uint32_t idx1 = land->find_vp1_nearest (loc1);
+        std::cout << "Index " << idx1 << " " << land->vp1[idx1] << " is nearest to loc1: " << loc1 << std::endl;
+
+        // Neighbours of idx1?
+        std::cout << "neighbours of idx1=" << idx1 << ": " << land->neighbours (idx1) << std::endl;
+        sm::vvec<std::array<uint32_t, 3>> nbt = land->neighbour_triangles (idx1);
+        std::cout << "neighbour tris:\n";
+        for (auto t : nbt) {
+            std::cout << "  " << t[0] << "," << t[1] << "," << t[2] << std::endl;
+        }
+
+        // idx1 indices?
+        std::cout << "equivalent indices to idx1: " << land->vp1_to_indices[idx1] << std::endl;
+        for (auto i : land->vp1_to_indices[idx1]) {
+            std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
+        }
+
+        sm::mat44<float> land_to_scene = land->getViewMatrix();
+        sm::mat44<float> scene_to_land = land_to_scene.inverse();
+
+        sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
+        auto camloc = camspace * sm::vec<>{0,10,0};
+        auto camloc_landframe = (scene_to_land * camloc).less_one_dim();
+        std::array<uint32_t, 3> ti0;
+        sm::vec<> tn0_land = {};
+        sm::vec<> hit = {};
+        std::tie (hit, ti0, tn0_land) = land->find_triangle_crossing (camloc_landframe);
+        std::cout << "find_triangle_crossing hit: " << hit << ", ti0[0] = " << ti0[0] << "\n";
+        // Can I make hit the centre of the triangle?
+        constexpr bool hit_tri_centre = true;
+        if constexpr (hit_tri_centre) {
+            sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
+            hit = tv_landframe.mean();
+        }
+        sm::vec<> hp_scene = (land_to_scene * hit).less_one_dim();
+
+        return { hp_scene, tn0_land, ti0 };
+    }
+
 } // namespace eye3d
 
 int main (int argc, char* argv[])
@@ -400,7 +442,15 @@ int main (int argc, char* argv[])
     }
 
     // We get the initial camera localspace. This also serves to reset the camera pose. This is set in the GLTF file.
-    sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
+    //sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
+    // Or hack it for debug:
+    sm::mat44<float> initial_camera_space =
+    { -3.23477e-06 , -1 , -1.92021e-05 , 0.903487 ,
+      -0.933629 , -3.92646e-06 , 0.358244 , 0.38604 ,
+      -0.358244 , 1.9107e-05 , -0.933629 , 0.466975 ,
+      0 , 0 , 0 , 1 };
+    initial_camera_space.transpose_inplace();
+    std::cout << "Initial camera space for reset:\n" << initial_camera_space << std::endl;
 
     // Plot the visual models
     mplot::compoundray::scene_to_visualmodels (scene, &v);
@@ -471,41 +521,11 @@ int main (int argc, char* argv[])
         std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
 
         auto loc1 = sm::vec<>{8.9f, -1.0f, 0.0f};
-        uint32_t idx1 = land->find_vp1_nearest (loc1);
-        std::cout << "Index " << idx1 << " " << land->vp1[idx1] << " is nearest to loc1: " << loc1 << std::endl;
 
-        // Neighbours of idx1?
-        std::cout << "neighbours of idx1=" << idx1 << ": " << land->neighbours (idx1) << std::endl;
-        sm::vvec<std::array<uint32_t, 3>> nbt = land->neighbour_triangles (idx1);
-        std::cout << "neighbour tris:\n";
-        for (auto t : nbt) {
-            std::cout << "  " << t[0] << "," << t[1] << "," << t[2] << std::endl;
-        }
-
-        // idx1 indices?
-        std::cout << "equivalent indices to idx1: " << land->vp1_to_indices[idx1] << std::endl;
-        for (auto i : land->vp1_to_indices[idx1]) {
-            std::cout << "pos: " << land->get_position(i) << ", norm " << land->get_normal(i) << std::endl;
-        }
+        std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, loc1);
 
         land_to_scene = land->getViewMatrix();
         scene_to_land = land_to_scene.inverse();
-        sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
-        auto camloc = camspace * sm::vec<>{0,10,0};
-        auto camloc_landframe = (scene_to_land * camloc).less_one_dim();
-        auto [hit, ti, tn] = land->find_triangle_crossing (camloc_landframe);
-        std::cout << "find_triangle_crossing hit: " << hit << ", ti[0] = " << ti[0] << "\n";
-        ti0 = ti;
-        // Populate neighbours of ti0 with something like:
-        // ti0_neighbours = land->neighbour_triangles (ti0); // ??
-        tn0_land = tn; // landframe
-        // Can I make hit the centre of the triangle?
-        constexpr bool hit_tri_centre = true;
-        if constexpr (hit_tri_centre) {
-            sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
-            hit = tv_landframe.mean();
-        }
-        hp_scene = (land_to_scene * hit).less_one_dim();
 
         sm::vec<float, 3> posn = {0, 0, -0.0025};
         sm::vec<float, 3> dirvertex = {-1, 0, 0};
@@ -573,11 +593,10 @@ int main (int argc, char* argv[])
         svp_t2 = v.addVisualModel (sv);
 
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
-        if (ti[0] == std::numeric_limits<uint32_t>::max()) {
+        if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
             std::cout << "No hit\n";
         } else {
             // In this case, place the camera on the land, and orient it randomly in the 'land plane'
-            std::cout << "Hit at " << hit << std::endl;
             std::cout << "In scene coordinates, hit = " << hp_scene << std::endl;
             // Turn the hit point into a translation matrix
             sm::mat44<float> hitlocn_mat;
@@ -587,13 +606,13 @@ int main (int argc, char* argv[])
             // and then set z from this random x and the triangle norm (y).
             sm::vec<> rand_vec;
             rand_vec.randomize();
-            sm::vec<> _x = rand_vec.cross (tn);
+            sm::vec<> _x = rand_vec.cross (tn0_land);
             _x.renormalize();
-            sm::vec<> _z = _x.cross (tn);
-            auto coord_rotn = sm::mat44<float>::frombasis (_x, tn, _z);
+            sm::vec<> _z = _x.cross (tn0_land);
+            auto coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z);
 
             // Want to place camera just 'above'  hp.
-            coord_rotn.translate (hoverheight * tn);
+            coord_rotn.translate (hoverheight * tn0_land);
 
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * coord_rotn));
         }
@@ -675,6 +694,8 @@ int main (int argc, char* argv[])
             v.stop(); // cancel any active movements
             cam_to_scene = initial_camera_space;
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
+
+            // Find my triangle
         }
         // Update the view matrix of eye and eye localspace axes
         eyevm_ptr->setViewMatrix (cam_to_scene);
@@ -953,7 +974,7 @@ int main (int argc, char* argv[])
 
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
-            std::cout << std::endl; // debug
+            std::cout << "Final position matrix:\n" << cam_to_scene << std::endl; // debug
 
         } else { // not actively moving
             // Get the camera space and update our eye and camera-frame models
