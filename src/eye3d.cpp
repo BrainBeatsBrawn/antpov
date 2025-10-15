@@ -546,6 +546,8 @@ int main (int argc, char* argv[])
     sm::vec<> hp_scene = {};
 
     mplot::PolygonVisual<>* svp = nullptr;
+    mplot::PolygonVisual<>* pvp2 = nullptr;
+    mplot::PolygonVisual<>* pvp3 = nullptr;
 
     mplot::SphereVisual<>* svp2 = nullptr;
     mplot::SphereVisual<>* svp4 = nullptr;
@@ -587,6 +589,16 @@ int main (int argc, char* argv[])
         v.bindmodel (pv);
         pv->finalize();
         svp = v.addVisualModel (pv);
+
+        pv = std::make_unique<mplot::PolygonVisual<>>(hp_scene, posn, dirvertex, 0.0025, 0.0025, mplot::colour::orange2, 4);
+        v.bindmodel (pv);
+        pv->finalize();
+        pvp2 = v.addVisualModel (pv);
+
+        pv = std::make_unique<mplot::PolygonVisual<>>(hp_scene, posn, dirvertex, 0.0025, 0.0025, mplot::colour::blue2, 4);
+        v.bindmodel (pv);
+        pv->finalize();
+        pvp3 = v.addVisualModel (pv);
 
         auto sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.001, mplot::colour::magenta3);
         v.bindmodel (sv);
@@ -739,7 +751,7 @@ int main (int argc, char* argv[])
     // point to recurse through...
     // 4. Find the 'hover location' over that new location
     auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                    opts, land, &svp, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2,
+                                    opts, land, &svp, &pvp2, &pvp3, &svp2, &svp4, &svp_t0, &svp_t1, &svp_t2,
                                     &rvp1, &rvp2, &rvp3, &rvp4, &rvp5,
                                     land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
@@ -884,7 +896,7 @@ int main (int argc, char* argv[])
                                 r_t1.translate (cd.pm.mv);
                                 r_t2.translate (mv_rest);
 
-                                reorient_land = r_t2 * r_t_fro * r_r * r_t_to * r_t1;
+                                reorient_land = r_t2 * r_t_fro * r_r * r_t_to * r_t1; // FIXME consolidate into fewer mat44s
                             }
 
                             if (mv_rest.less_one_dim().length() == 0) {
@@ -894,9 +906,8 @@ int main (int argc, char* argv[])
                                 done = true;
                             } else {
 
-                                // There's additional movement to complete
-                                // Show mv_rest as green tube, which should enclose the blue tube of rvp1
-                                rvp3->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
+                                // There's additional movement to complete. Show it as a tube
+                                rvp4->update (hovlocn + cd.pm.mv, hovlocn + cd.pm.mv + mv_rest.less_one_dim());
 
                                 // Angle between cm.pm.mv and mv_rest?
                                 std::cout << "Angle between pre-rotate (" << cd.pm.mv << ") and post- " << mv_rest.less_one_dim() << " moves? "
@@ -929,7 +940,7 @@ int main (int argc, char* argv[])
                                     }
                                     // We need to set an end-point that is on newtv_landframe, update hovlocn, then recurse.
                                     // also recompute the movement encoded in reorient_land
-                                    reorient_land.translate (-mv_rest);
+                                    reorient_land.pretranslate (-mv_rest);
                                     reorient_final = reorient_land * reorient_final;
                                     hovlocn = cd.pm.end; // crossing data planned movement end
                                     // Also update planned move, which is now shorter and in a new direction
@@ -938,8 +949,15 @@ int main (int argc, char* argv[])
                                 }
                                 lc++;
                             }
-                            std::cout << "reorient_final is now\n" << reorient_final << std::endl;
-
+                            //std::cout << "reorient_final is now\n" << reorient_final << std::endl;
+                            std::cout << "pvp->setViewMatrix with reorient_final =\n" << reorient_final << std::endl;
+                            if (lc < 2) {
+                                pvp2->setViewMatrix (land_to_scene * reorient_final);
+                            } else if (lc < 3) {
+                                pvp3->setViewMatrix (land_to_scene * reorient_final);
+                            } else {
+                                svp->setViewMatrix (land_to_scene * reorient_final);
+                            }
                             // Set sink/unsink and apply to camera transform
                             sink.setToIdentity();
                             sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
@@ -968,16 +986,14 @@ int main (int argc, char* argv[])
                         simple = true; // to avoid a further transformation with reorient_final
                     }
                     std::cout << "====\n";
-                    if (lc > 1) {
-                        done = true;
-                    } // debug
+                    //if (lc > 1) { done = true; } // debug
 
                 } // end while
 
                 if (!simple) {
                     // Use the final transformation matrices to set camera (and sphere) poses
-                    std::cout << "svp->setViewMatrix with reorient_final =\n" << reorient_final << std::endl;
-                    svp->setViewMatrix (land_to_scene * reorient_final);
+                    std::cout << "FIXME: omit svp->setViewMatrix with reorient_final =\n" << reorient_final << std::endl;
+                    //svp->setViewMatrix (land_to_scene * reorient_final);
                     setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * reorient_cam_final));
                 } // else already moved camera (or it didn't need to)
 
