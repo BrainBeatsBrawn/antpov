@@ -422,6 +422,7 @@ namespace eye3d
                 sm::vec<> _z = _x.cross (tn0_land);
                 std::cout << "calling frombasis (" << _x << ", " << tn0_land << ", " << _z << ")\n = \n";
                 coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z);
+                // coord_rotn.inverse_inplace(); // Nope
                 std::cout << coord_rotn << std::endl;
             } else {
                 // Get current camera orientation, extract rotation, use that?
