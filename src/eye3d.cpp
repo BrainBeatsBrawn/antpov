@@ -23,6 +23,7 @@
 #include <mplot/SphereVisual.h> // debug really
 #include <mplot/RodVisual.h>    // also debug
 #include <mplot/PolygonVisual.h> // debug
+#include <mplot/NormalsVisual.h> // debug
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -368,7 +369,8 @@ namespace eye3d
         sm::vec<> tn0_land = {};
         sm::vec<> hit = {};
         std::tie (hit, ti0, tn0_land) = land->find_triangle_crossing (camloc_landframe);
-        std::cout << "find_triangle_crossing hit: " << hit << ", ti0[0] = " << ti0[0] << "\n";
+        std::cout << "find_triangle_crossing hit: " << hit << ", ti0[0] = " << ti0[0]
+                  << ", tn0_land = " << tn0_land << " length " << tn0_land.length() << "\n";
         // Can I make hit the centre of the triangle?
         constexpr bool hit_tri_centre = true;
         if constexpr (hit_tri_centre) {
@@ -575,6 +577,12 @@ int main (int argc, char* argv[])
         std::cout << "Landscape name: " << land->name << " was found\n";
         std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
         std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
+
+        // Create NormalsVisual
+        auto nv = std::make_unique<mplot::NormalsVisual<>>(land);
+        v.bindmodel (nv);
+        nv->finalize();
+        v.addVisualModel (nv);
 
         auto loc1 = sm::vec<>{8.9f, -1.0f, 0.0f};
 
