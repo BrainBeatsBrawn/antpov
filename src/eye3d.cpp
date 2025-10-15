@@ -331,7 +331,7 @@ namespace eye3d
                 cd.crossed_vertex = 2;
             } // else crossed one edge
         } else {
-            std::cout << "ccl: No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << " for mv_inplane " << mv_inplane << " length " << mv_inplane.length() << std::endl;
+            std::cout << "ccl: No crossings " << (inside01 ? " " : "!!0-1") << (inside21 ? " " : "!!2-1") <<  (inside02 ? " " : "!!0-2") << std::endl;
         }
 
         return cd;
@@ -834,19 +834,7 @@ int main (int argc, char* argv[])
 
                     // For each edge in triangle, compute distance to edge for hovlocn and (hovlocn + mv_inplane)
                     eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hovlocn, mv_inplane, tn0_land);
-#if 0
-                    if (cd.pm.no_cross_point && v.isActivelyRotating() == false) {
-                        std::cout << "cd.pm.no_cross_point==true so stop/freeze\n";
-                        v.stop();
-                        v.freeze (true);
-                        done = true;
-                        // draw edges for debug
-                        std::cout << "Edge is " << cd.es << " to " << cd.ee << std::endl;
-                        rvp4->update (cd.es, cd.ee);
-                        std::cout << "Move is " << cd.ms << " to " << cd.me << std::endl;
-                        rvp5->update (cd.ms, cd.me);
-                    }
-#endif
+
                     // Debug/vis
                     if (!cd.pm.no_cross_point) {
                         std::cout << "Set crosspoint " << cd.pm.end << " compare mv_inplane "
@@ -867,25 +855,23 @@ int main (int argc, char* argv[])
                             // Re-orient onto the new triangle
 
                             sm::vec<sm::vec<>, 3> newtv_landframe = land->triangle_vertices (_ti);
+
                             std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2]
                                       << "[ " << newtv_landframe << " ] with normal " << _tn << "\n";
 
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
                             sm::vec<float, 4> mv_rest;
-
-                            sm::mat44<float> r_t1;
-                            sm::mat44<float> r_t_to;
-                            sm::mat44<float> r_r;
-                            sm::mat44<float> r_t_fro;
-                            sm::mat44<float> r_t2;
                             {
-                                // Initial rotational state of the land!
+                                // Compute the reorientation due to the requested movement.
+                                sm::mat44<float> r_t1;
+                                sm::mat44<float> r_t_to;
+                                sm::mat44<float> r_r;
+                                sm::mat44<float> r_t_fro;
+                                sm::mat44<float> r_t2;
 
                                 // Rotate by the angle between the normals. I think this is constrained to be <= pi
                                 float rotn_angle = tn0_land.angle (_tn, cd.tri_edge);
-                                std::cout << "rotn edge is " << cd.tri_edge << " and angle is " << rotn_angle << "\n";
                                 // Use the *edge* as the rotation axis.
-                                cd.tri_edge.renormalize(); // !!! although in future this won't be necessary (maths main has quaternion that auto-renormalizes)
                                 r_r.rotate (cd.tri_edge, rotn_angle);
                                 // Before doing any additional work, apply this rotation to mv_rest
                                 mv_rest = r_r * (mv_inplane - cd.pm.mv);
@@ -992,8 +978,7 @@ int main (int argc, char* argv[])
 
                 if (!simple) {
                     // Use the final transformation matrices to set camera (and sphere) poses
-                    std::cout << "FIXME: omit svp->setViewMatrix with reorient_final =\n" << reorient_final << std::endl;
-                    //svp->setViewMatrix (land_to_scene * reorient_final);
+                    svp->setViewMatrix (land_to_scene * reorient_final);
                     setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * reorient_cam_final));
                 } // else already moved camera (or it didn't need to)
 
