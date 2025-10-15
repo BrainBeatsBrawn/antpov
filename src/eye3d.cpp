@@ -383,38 +383,59 @@ namespace eye3d
     }
 
     // Using data about the land location for the camera found with eye3d::find_land, set the camera posn
-    void set_landlocked_camera (const sm::vec<>& hp_scene, const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
-                                mplot::PolygonVisual<>* svp, const float hoverheight, bool randomize_dir = true)
+    void set_landlocked_camera (const sm::vec<>& hp_scene, const sm::mat44<float>& land_to_scene,
+                                mplot::VisualModel<>* land,
+                                const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
+                                mplot::PolygonVisual<>* svp,
+                                mplot::PolygonVisual<>* pvp2,
+                                mplot::PolygonVisual<>* pvp3,
+                                mplot::SphereVisual<>* tv0,
+                                mplot::SphereVisual<>* tv1,
+                                mplot::SphereVisual<>* tv2,
+                                const float hoverheight, bool randomize_dir = true)
     {
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
             std::cout << "No hit\n";
         } else {
+
+            sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
+            tv0->setViewTranslation (land_to_scene * tv_landframe[0]);
+            tv1->setViewTranslation (land_to_scene * tv_landframe[1]);
+            tv2->setViewTranslation (land_to_scene * tv_landframe[2]);
+
             // In this case, place the camera on the land, and orient it randomly in the 'land plane'
             std::cout << "In scene coordinates, hit = " << hp_scene << std::endl;
             // Turn the hit point into a translation matrix
             sm::mat44<float> hitlocn_mat;
-            hitlocn_mat.translate (hp_scene);
-            svp->setViewMatrix (hitlocn_mat); // reposition sphere
+            hitlocn_mat.translate (hp_scene); // That's hp in scene coordinates
+            svp->setViewMatrix (hitlocn_mat); // reposition sphere (not rotated correctly)
             // The camera frame always has y up. Choose a random vector in the plane for 'x'
             // and then set z from this random x and the triangle norm (y).
             sm::mat44<float> coord_rotn;
             if (randomize_dir) {
                 sm::vec<> rand_vec;
                 rand_vec.randomize();
+                std::cout << "tn0_land length: " << tn0_land.length() << std::endl;
                 sm::vec<> _x = rand_vec.cross (tn0_land);
                 _x.renormalize();
                 sm::vec<> _z = _x.cross (tn0_land);
+                std::cout << "calling frombasis (" << _x << ", " << tn0_land << ", " << _z << ")\n = \n";
                 coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z);
+                std::cout << coord_rotn << std::endl;
             } else {
                 // Get current camera orientation, extract rotation, use that?
                 // otherwise, just use identity rotation (this will be wrong)
             }
 
             // Want to place camera just 'above' hp.
-            coord_rotn.translate (hoverheight * tn0_land);
+            //coord_rotn.pretranslate (hoverheight * tn0_land);
+            sm::mat44<float> hov;
+            hov.translate (hoverheight * tn0_land);
 
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * coord_rotn));
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * hov * coord_rotn));
+            pvp2->setViewMatrix (hitlocn_mat * hov * coord_rotn);
+            pvp3->setViewMatrix (coord_rotn);
         }
     }
 
@@ -572,17 +593,20 @@ int main (int argc, char* argv[])
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
     constexpr float hoverheight = 0.08f;
+    constexpr bool show_normals = false;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
         std::cout << "It has bounding box " << land->get_viewmatrix_modelbb() << std::endl;
         std::cout << "It has " << (land->vpos_size() / 3) << " vertices\n";
 
-        // Create NormalsVisual
-        auto nv = std::make_unique<mplot::NormalsVisual<>>(land);
-        v.bindmodel (nv);
-        nv->finalize();
-        v.addVisualModel (nv);
+        if constexpr (show_normals) {
+            // Create NormalsVisual
+            auto nv = std::make_unique<mplot::NormalsVisual<>>(land);
+            v.bindmodel (nv);
+            nv->finalize();
+            v.addVisualModel (nv);
+        }
 
         auto loc1 = sm::vec<>{8.9f, -1.0f, 0.0f};
 
@@ -648,26 +672,27 @@ int main (int argc, char* argv[])
         rv->finalize();
         rvp5 = v.addVisualModel (rv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0008, mplot::colour::orangered1);
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.004, mplot::colour::orangered1);
         v.bindmodel (sv);
         sv->setAlpha (0.8f);
         sv->finalize();
         svp_t0 = v.addVisualModel (sv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0008, mplot::colour::darkgreen);
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.004, mplot::colour::darkgreen);
         v.bindmodel (sv);
         sv->setAlpha (0.8f);
         sv->finalize();
         svp_t1 = v.addVisualModel (sv);
 
-        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.0008, mplot::colour::blue2);
+        sv = std::make_unique<mplot::SphereVisual<>>(sm::vec<>{}, 0.004, mplot::colour::blue2);
         v.bindmodel (sv);
         sv->setAlpha (0.8f);
         sv->finalize();
         svp_t2 = v.addVisualModel (sv);
 
         // Set up our camera using the data obtained from find_land()
-        eye3d::set_landlocked_camera (hp_scene, tn0_land, ti0, svp, hoverheight);
+        eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0,
+                                      svp, pvp2, pvp3, svp_t0, svp_t1, svp_t2, hoverheight);
     }
 
     /**
