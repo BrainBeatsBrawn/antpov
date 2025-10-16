@@ -529,17 +529,6 @@ int main (int argc, char* argv[])
 
     // We get the initial camera localspace. This also serves to reset the camera pose. This is set in the GLTF file.
     sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
-#if 0
-    // Or hack it for debug:
-    sm::mat44<float> initial_camera_space =
-    {
-        0.000111132 , 1.00007 , 0.000546686 , 2.08052 ,
-       -0.997771 , 0.000147738 , -0.06705 , -0.49677 ,
-       -0.0670472 , -0.000538523 , 0.997796 , 0.48927 ,
-       0 , 0 , 0 , 1
-    };
-    initial_camera_space.transpose_inplace();
-#endif
     std::cout << "Initial camera space for reset:\n" << initial_camera_space << std::endl;
 
     // Plot the visual models
@@ -1013,7 +1002,9 @@ int main (int argc, char* argv[])
             sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
             sm::vec<> hp_scene;
             std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, camloc_landframe); // sets tn0_land and ti0
+
             //eye3d::set_landlocked_camera (hp_scene, tn0_land, ti0, pvp1, hoverheight);
+            eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0, pvp1, hoverheight);
 
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
@@ -1046,7 +1037,6 @@ int main (int argc, char* argv[])
         } else {
             subr_key_move_camera();
         }
-
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed
