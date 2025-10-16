@@ -386,62 +386,48 @@ namespace eye3d
     void set_landlocked_camera (const sm::vec<>& hp_scene, const sm::mat44<float>& land_to_scene,
                                 mplot::VisualModel<>* land,
                                 const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
-                                mplot::CoordArrows<>* cap,
-                                mplot::PolygonVisual<>* svp,
-                                mplot::PolygonVisual<>* pvp2,
-                                mplot::PolygonVisual<>* pvp3,
-                                mplot::SphereVisual<>* tv0,
-                                mplot::SphereVisual<>* tv1,
-                                mplot::SphereVisual<>* tv2,
-                                const float hoverheight, bool randomize_dir = true)
+                                mplot::PolygonVisual<>* svp, const float hoverheight, bool randomize_dir = true)
     {
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
             std::cout << "No hit\n";
         } else {
 
-            sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
-            tv0->setViewTranslation (land_to_scene * tv_landframe[0]);
-            tv1->setViewTranslation (land_to_scene * tv_landframe[1]);
-            tv2->setViewTranslation (land_to_scene * tv_landframe[2]);
-
             // In this case, place the camera on the land, and orient it randomly in the 'land plane'
             std::cout << "In scene coordinates, hit = " << hp_scene << std::endl;
             // Turn the hit point into a translation matrix
             sm::mat44<float> hitlocn_mat;
             hitlocn_mat.translate (hp_scene); // That's hp in scene coordinates
-            svp->setViewMatrix (hitlocn_mat); // reposition sphere (not rotated correctly)
+
             // The camera frame always has y up. Choose a random vector in the plane for 'x'
             // and then set z from this random x and the triangle norm (y).
             sm::mat44<float> coord_rotn;
             if (randomize_dir) {
+                // First determine rotation wrt the 'land' model
                 sm::vec<> rand_vec;
                 rand_vec.randomize();
-                std::cout << "tn0_land length: " << tn0_land.length() << std::endl; // model frame
                 sm::vec<> _x = rand_vec.cross (tn0_land);
                 _x.renormalize();
                 sm::vec<> _z = _x.cross (tn0_land);
-                std::cout << "calling frombasis (" << _x << ", " << tn0_land << ", " << _z << ")\n = \n";
                 coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z); // rotn from model frame to triangle
-                std::cout << coord_rotn << std::endl;
             } else {
                 // Get current camera orientation, extract rotation, use that?
                 // otherwise, just use identity rotation (this will be wrong)
+                throw std::runtime_error ("handle this case");
             }
 
-            // What's rotation from scene frame to model?
-            sm::mat44<float> lsr (land_to_scene.linear());
-
+            // Get the rotation from scene frame to model
+            sm::mat44<float> lsr (land_to_scene.linear()); // if hp_scene were passed as hp_land, we
+                                                           // could use land_to_scene as is, and
+                                                           // lose hitlocn_mat
             coord_rotn = lsr * coord_rotn;
 
-            // Want to place camera just 'above' hp.
-            //coord_rotn.pretranslate (hoverheight * tn0_land);
-            sm::mat44<float> hov;
-            hov.translate (hoverheight * tn0_land);
+            svp->setViewMatrix (hitlocn_mat * coord_rotn); // reposition sphere
 
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * hov * coord_rotn));
-            pvp2->setViewMatrix (hitlocn_mat * hov * coord_rotn);
-            cap->setViewMatrix (coord_rotn);
+            // Want to place camera just 'above' hp.
+            coord_rotn.pretranslate (hoverheight * tn0_land);
+
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * coord_rotn));
         }
     }
 
@@ -523,7 +509,8 @@ int main (int argc, char* argv[])
     }
 
     // We get the initial camera localspace. This also serves to reset the camera pose. This is set in the GLTF file.
-    //sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
+    sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
+#if 0
     // Or hack it for debug:
     sm::mat44<float> initial_camera_space =
     {
@@ -533,6 +520,7 @@ int main (int argc, char* argv[])
        0 , 0 , 0 , 1
     };
     initial_camera_space.transpose_inplace();
+#endif
     std::cout << "Initial camera space for reset:\n" << initial_camera_space << std::endl;
 
     // Plot the visual models
@@ -603,7 +591,7 @@ int main (int argc, char* argv[])
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
     constexpr float hoverheight = 0.08f;
-    constexpr bool show_normals = true;
+    constexpr bool show_normals = false;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
@@ -701,8 +689,7 @@ int main (int argc, char* argv[])
         svp_t2 = v.addVisualModel (sv);
 
         // Set up our camera using the data obtained from find_land()
-        eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0,
-                                      tframe_ptr, svp, pvp2, pvp3, svp_t0, svp_t1, svp_t2, hoverheight);
+        eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0, svp, hoverheight);
     }
 
     /**
