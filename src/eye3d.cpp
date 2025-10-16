@@ -386,6 +386,7 @@ namespace eye3d
     void set_landlocked_camera (const sm::vec<>& hp_scene, const sm::mat44<float>& land_to_scene,
                                 mplot::VisualModel<>* land,
                                 const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
+                                mplot::CoordArrows<>* cap,
                                 mplot::PolygonVisual<>* svp,
                                 mplot::PolygonVisual<>* pvp2,
                                 mplot::PolygonVisual<>* pvp3,
@@ -416,18 +417,22 @@ namespace eye3d
             if (randomize_dir) {
                 sm::vec<> rand_vec;
                 rand_vec.randomize();
-                std::cout << "tn0_land length: " << tn0_land.length() << std::endl;
+                std::cout << "tn0_land length: " << tn0_land.length() << std::endl; // model frame
                 sm::vec<> _x = rand_vec.cross (tn0_land);
                 _x.renormalize();
                 sm::vec<> _z = _x.cross (tn0_land);
                 std::cout << "calling frombasis (" << _x << ", " << tn0_land << ", " << _z << ")\n = \n";
-                coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z);
-                // coord_rotn.inverse_inplace(); // Nope
+                coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z); // rotn from model frame to triangle
                 std::cout << coord_rotn << std::endl;
             } else {
                 // Get current camera orientation, extract rotation, use that?
                 // otherwise, just use identity rotation (this will be wrong)
             }
+
+            // What's rotation from scene frame to model?
+            sm::mat44<float> lsr (land_to_scene.linear());
+
+            coord_rotn = lsr * coord_rotn;
 
             // Want to place camera just 'above' hp.
             //coord_rotn.pretranslate (hoverheight * tn0_land);
@@ -436,7 +441,7 @@ namespace eye3d
 
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hitlocn_mat * hov * coord_rotn));
             pvp2->setViewMatrix (hitlocn_mat * hov * coord_rotn);
-            pvp3->setViewMatrix (coord_rotn);
+            cap->setViewMatrix (coord_rotn);
         }
     }
 
@@ -548,6 +553,10 @@ int main (int argc, char* argv[])
     cam_cs_ptr->name = "eye frame";
     cam_cs_ptr->setViewMatrix (initial_camera_space);
 
+    mplot::CoordArrows<>* tframe_ptr = eye3d::plot_axes (&v);
+    tframe_ptr->name = "test frame";
+    //tframe_ptr->setViewMatrix (initial_camera_space);
+
     /**
      * Get access to the landscape VisualModel
      *
@@ -594,7 +603,7 @@ int main (int argc, char* argv[])
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
     constexpr float hoverheight = 0.08f;
-    constexpr bool show_normals = false;
+    constexpr bool show_normals = true;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
@@ -693,7 +702,7 @@ int main (int argc, char* argv[])
 
         // Set up our camera using the data obtained from find_land()
         eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0,
-                                      svp, pvp2, pvp3, svp_t0, svp_t1, svp_t2, hoverheight);
+                                      tframe_ptr, svp, pvp2, pvp3, svp_t0, svp_t1, svp_t2, hoverheight);
     }
 
     /**
