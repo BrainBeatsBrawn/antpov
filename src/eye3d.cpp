@@ -85,6 +85,12 @@ namespace eye3d
         return path;
     }
 
+    // Flags class
+    enum class pm_fl : uint32_t
+    {
+        no_cross_point, // Means 'there was no crossing'
+        colinear        // Means the movement was colinear with an edge
+    };
     /*
      * The partial movement that takes us to the crossing point, specified as movement + endpoint
      * (rather than startpoint + movement)
@@ -95,8 +101,8 @@ namespace eye3d
         sm::vec<float> mv = {};
         // The end coordinate of the movement
         sm::vec<float> end = {};
-        // Means 'there was no crossing'
-        bool no_cross_point = false;
+        // boolean state
+        sm::flags<eye3d::pm_fl> flags;
     };
 
     /*
@@ -135,6 +141,7 @@ namespace eye3d
         u_z.renormalize();
         sm::vec<float> u_x = u_y.cross (u_z);
         if constexpr (debug) {
+            std::cout << "fec: mv_inplane = " << mv_inplane << std::endl;
             std::cout << "fec: edge = " << edge << std::endl;
             std::cout << "fec: Basis: " << u_x << " " << u_y << " " << u_z << std::endl;
         }
@@ -162,7 +169,9 @@ namespace eye3d
 
         std::bitset<2> si = sm::algo::segments_intersect<float> (edge_s_2d, edge_s_2d + edge_2d, h_2d, h_2d + mv_inplane2d);
         if (si.test(1)) {
-            throw std::runtime_error ("Deal with colinear movement and triangle edge!\n");
+            std::cout << "Colinear with triangle edge!\n";
+            pm.flags.set (eye3d::pm_fl::no_cross_point, true);
+            pm.flags.set (eye3d::pm_fl::colinear, true);
         } else {
             if (si.test(0)) {
                 // Intersects as expected
@@ -184,7 +193,7 @@ namespace eye3d
                           << h_2d << " -- " << (h_2d + mv_inplane2d) << std::endl;
                 //}
                 // Mark that there was no intersection
-                pm.no_cross_point = true;
+                pm.flags.set (eye3d::pm_fl::no_cross_point, true);
                 pm.mv = sm::vec<>{};
                 pm.end = mv_s;
             }
@@ -193,16 +202,21 @@ namespace eye3d
         return pm;
     }
 
+    enum class cd_fl : uint32_t
+    {
+        crossed, // Did we get an intersection of the movement mv_inplane through a triangle edge?
+        crossed_vtx0, // We crossed over triangle vertex 0
+        crossed_vtx1, // We crossed over triangle vertex 1
+        crossed_vtx2  // We crossed over triangle vertex 2
+    };
     /*
      * After testing up to all three edges of a triangle, we return information about the crossing
      * location and the indices of the triangle that form the crossed edge in this structure.
      */
     struct crossing_data
     {
-        // Did we get an intersection of the movement mv_inplane through a triangle edge?
-        bool crossed = false;
-        // If we crossed a specific vertex, say which one here
-        uint32_t crossed_vertex = std::numeric_limits<uint32_t>::max();
+        // Boolean state
+        sm::flags<eye3d::cd_fl> flags;
         // edge_idx_a/b are the indices of the triangle vertices on the crossed edge
         uint32_t edge_idx_a = 0;
         uint32_t edge_idx_b = 0;
@@ -222,7 +236,7 @@ namespace eye3d
      * the edges of the triangle specified by the three vertices in t_verts/t_indices.
      *
      * IT IS ASSUMED that the triangle normal passing through mv_s WILL intersect the
-     * triangle. (Test beforehand with sm::algo::ray_tri_intersection)
+     * triangle (this may include an edge or vertex intersection). (Test beforehand with sm::algo::ray_tri_intersection)
      *
      * All coordinates are in the frame of the model that contains this triangle.
      *
@@ -245,9 +259,9 @@ namespace eye3d
                                                     const sm::vec<float>& mv_inplane,
                                                     const sm::vec<float>& t_norm)
     {
-        constexpr bool debug = false;
+        constexpr bool debug = true;
         eye3d::crossing_data cd;
-        cd.pm.no_cross_point = true;
+        cd.pm.flags.set (eye3d::pm_fl::no_cross_point, true);
 
         const sm::vec<float>& t0 = t_verts[0];
         const sm::vec<float>& t1 = t_verts[1];
@@ -258,13 +272,14 @@ namespace eye3d
         sm::vec<float> ptoe = p - t0;
         bool inside01 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside01) {
+            cd.pm.flags.set (eye3d::pm_fl::no_cross_point, false);
             eye3d::partial_movement pm = eye3d::find_edge_crossing (t0, t1, t_norm, mv_s, mv_inplane);
-            if (pm.no_cross_point) {
+            if (pm.flags.test (eye3d::pm_fl::no_cross_point)) {
                 // This was no good
                 inside01 = true;
                 // Debug edges if it didn't hit a cross point
                 if constexpr (debug) {
-                    std::cout << "No intersection for edge t0t1 " << t0 << " -- " << t1
+                    std::cout << "ccl: No intersection for edge t0t1 " << t0 << " -- " << t1
                               << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
                 }
                 cd.es = t0;
@@ -273,7 +288,8 @@ namespace eye3d
                 cd.me = mv_s + mv_inplane;
             } else {
                 if constexpr (debug) {
-                    std::cout << "Intersection for edge t0t1 " <<  t0 << " -- " << t1 << std::endl;
+                    std::cout << "ccl: Intersection for edge t0t1 " <<  t0 << " -- " << t1
+                              << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
                 }
                 cd.pm = pm;
                 cd.tri_edge = edge;
@@ -285,14 +301,14 @@ namespace eye3d
         edge = t2 - t1; ptoe = p - t1;
         bool inside21 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside21) {
-            cd.pm.no_cross_point = false;
+            cd.pm.flags.set (eye3d::pm_fl::no_cross_point, false);
             eye3d::partial_movement pm = eye3d::find_edge_crossing (t1, t2, t_norm, mv_s, mv_inplane);
-            if (pm.no_cross_point) {
+            if (pm.flags.test (eye3d::pm_fl::no_cross_point)) {
                 // This was no good
                 inside21 = true;
                 // Debug edges if it didn't hit a cross point
                 if constexpr (debug) {
-                    std::cout << "No intersection for edge t1t2 " << t1 << " -- " << t2
+                    std::cout << "ccl: No intersection for edge t1t2 " << t1 << " -- " << t2
                               << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
                 }
                 cd.es = t1;
@@ -301,7 +317,8 @@ namespace eye3d
                 cd.me = mv_s + mv_inplane;
             } else {
                 if constexpr (debug) {
-                    std::cout << "Intersection for edge t1t2 " <<  t1 << " -- " << t2 << std::endl;
+                    std::cout << "ccl: Intersection for edge t1t2 " <<  t1 << " -- " << t2
+                              << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
                 }
                 cd.pm = pm;
                 cd.tri_edge = edge;
@@ -313,14 +330,14 @@ namespace eye3d
         edge = t0 - t2; ptoe = p - t2;
         bool inside02 = (t_norm.dot (edge.cross (ptoe)) >= 0);
         if (!inside02) {
-            cd.pm.no_cross_point = false;
+            cd.pm.flags.set (eye3d::pm_fl::no_cross_point, false);
             eye3d::partial_movement pm = eye3d::find_edge_crossing (t2, t0, t_norm, mv_s, mv_inplane);
-            if (pm.no_cross_point) {
+            if (pm.flags.test (eye3d::pm_fl::no_cross_point)) {
                 // This was no good
                 inside02 = true;
                 // Debug edges if it didn't hit a cross point
                 if constexpr (debug) {
-                    std::cout << "No intersection for edge t2t0 " << t2 << " -- " << t0
+                    std::cout << "ccl: No intersection for edge t2t0 " << t2 << " -- " << t0
                               << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
                 }
                 cd.es = t2;
@@ -329,7 +346,8 @@ namespace eye3d
                 cd.me = mv_s + mv_inplane;
             } else {
                 if constexpr (debug) {
-                    std::cout << "Intersection for edge t2t0 " <<  t2 << " -- " << t0 << std::endl;
+                    std::cout << "ccl: Intersection for edge t2t0 " <<  t2 << " -- " << t0
+                              << " and move " << mv_s << " -- " << (mv_s + mv_inplane) << std::endl;
                 }
                 cd.pm = pm;
                 cd.tri_edge = edge;
@@ -339,19 +357,22 @@ namespace eye3d
         }
         if (!inside01 || !inside21 || !inside02) {
             if constexpr (debug) {
-                std::cout << "ccl: Crossed over " << (inside01 ? " " : "0-1")
-                          << (inside21 ? " " : "2-1") <<  (inside02 ? " " : "0-2") << std::endl;
+                std::cout << "ccl: Crossed over" << (inside01 ? " " : " 0-1")
+                          << (inside21 ? " " : " 2-1") <<  (inside02 ? " " : " 0-2") << std::endl;
             }
-            cd.crossed = true;
+            cd.flags.set (eye3d::cd_fl::crossed);
             if (!inside01 && !inside21) {
                 // crossed vertex 1
-                cd.crossed_vertex = 1;
+                std::cout << "ccl: Crossed vertex 1!\n";
+                cd.flags.set (eye3d::cd_fl::crossed_vtx1);
             } else if (!inside01 && !inside02) {
                 // crossed vertex 0
-                cd.crossed_vertex = 0;
+                std::cout << "ccl: Crossed vertex 0!\n";
+                cd.flags.set (eye3d::cd_fl::crossed_vtx0);
             } else if (!inside21 && !inside02) {
                 // crossed vertex 2
-                cd.crossed_vertex = 2;
+                std::cout << "ccl: Crossed vertex 2!\n";
+                cd.flags.set (eye3d::cd_fl::crossed_vtx2);
             } // else crossed one edge
         } else {
             if constexpr (debug) {
@@ -388,16 +409,23 @@ namespace eye3d
         sm::mat44<float> scene_to_land = land_to_scene.inverse();
 
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
-        auto camloc = camspace * sm::vec<>{0,10,0};
+
+        sm::vec<> camstart = {}; // use camera location in gltf to start from, then find land surface.
+        auto camloc = camspace * camstart;
+
         auto camloc_landframe = (scene_to_land * camloc).less_one_dim();
         std::array<uint32_t, 3> ti0;
         sm::vec<> tn0_land = {};
         sm::vec<> hit = {};
         std::tie (hit, ti0, tn0_land) = land->find_triangle_crossing (camloc_landframe);
-        std::cout << "find_triangle_crossing hit: " << hit << ", ti0[0] = " << ti0[0]
+        std::cout << "find_triangle_crossing(" << camloc_landframe << ") hit: " << hit << ", ti0[0] = " << ti0[0]
                   << ", tn0_land = " << tn0_land << " length " << tn0_land.length() << "\n";
+        std::vector<std::tuple<sm::vec<float, 3>, std::array<uint32_t, 3>, sm::vec<float, 3>>> crossing_tris = land->find_all_triangles_crossing (camloc_landframe);
+
+        std::cout << "find_all_triangles_crossing returns container size " << crossing_tris.size() << std::endl;
+
         // Can I make hit the centre of the triangle?
-        constexpr bool hit_tri_centre = true;
+        constexpr bool hit_tri_centre = false;
         if constexpr (hit_tri_centre) {
             sm::vec<sm::vec<>, 3> tv_landframe = land->triangle_vertices (ti0);
             hit = tv_landframe.mean();
@@ -435,9 +463,16 @@ namespace eye3d
                 sm::vec<> _z = _x.cross (tn0_land);
                 coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z); // rotn from model frame to triangle
             } else {
+                //throw std::runtime_error ("handle this case");
+                // THIS IS DEBUG code
                 // Get current camera orientation, extract rotation, use that?
                 // otherwise, just use identity rotation (this will be wrong)
-                throw std::runtime_error ("handle this case");
+                sm::vec<> _x = {0,1,-1};
+                _x.renormalize();
+                sm::vec<> _z = {0,-1,-1};
+                _z.renormalize();
+                std::cout << "call frombasis ("<<_x<<", "<<tn0_land<<", "<<_z<<std::endl;
+                coord_rotn = sm::mat44<float>::frombasis (_x, tn0_land, _z); // rotn from model frame to triangle
             }
 
             // Get the rotation from scene frame to model
@@ -665,7 +700,7 @@ int main (int argc, char* argv[])
         svp_t2 = v.addVisualModel (sv);
 
         // Set up our camera using the data obtained from find_land()
-        eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0, pvp1, hoverheight);
+        eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0, pvp1, hoverheight, false);
     }
 
     /**
@@ -761,12 +796,13 @@ int main (int argc, char* argv[])
                                     &rvp1, &rvp2,
                                     land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
-        constexpr bool debug_move = false;
+        constexpr bool debug_move = true;
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene;
         sm::mat44<float> cam_to_land;
         if (v.isActivelyMoving()) {
 
+            std::cout << std::endl;
             // Reset
             sm::mat44<float> identity;
             svp1->setViewMatrix (identity); // last hover locn is magenta
@@ -777,7 +813,7 @@ int main (int argc, char* argv[])
             sm::mat44<float> mv_camframe_mat;
             mv_camframe_mat.translate (mv_camframe); // has no rotation
 
-            // Compute transform amtrices that we'll be needing:
+            // Compute transform matrices that we'll be needing:
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
             cam_to_land = scene_to_land * cam_to_scene;
             // Camera location in the land frame
@@ -801,8 +837,22 @@ int main (int argc, char* argv[])
             svp_t1->setViewTranslation (land_to_scene * tv_landframe[1]);
             svp_t2->setViewTranslation (land_to_scene * tv_landframe[2]);
 
-            // Does camloc_landframe in dirn tn0_land intersect the tv_landframe triangle?
+            // Does camloc_landframe in dirn tn0_land intersect the tv_landframe triangle? This
+            // returns true if camloc_landframe is on the edge of the triangle or on a vertex.
+            //
+            // IF we're on an edge, then this intersection algo may disagree with
+            // compute_crossing_location, due to numerical precision errors.
+            //
+            // This could say: "Start of move is IN triangle tv_landframe", while at the same time
+            // compute_crossing_location says "we did not cross triangle tv_landframe"! This occurs
+            // if we're right on the edge, and we move in a direction away from
+            // tv_landframe. Solution? Know if you're on the edge, you may not cross, but at the end
+            // of the movement you have to determine the new current triangle?
+            //
             auto [ isect, hov_land ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land);
+            if (isect) {
+                std::cout << "Start of move is IN triangle " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
+            }
 
             sm::vec<> cam_displacement  = cam_to_land.translation() - hov_land;
             sm::mat44<float> cam_to_surface = cam_to_land;
@@ -840,11 +890,76 @@ int main (int argc, char* argv[])
                     eye3d::crossing_data cd = eye3d::compute_crossing_location (tv_landframe, ti0, hov_land, mv_inplane, tn0_land);
 
                     // Debug/vis
-                    if (!cd.pm.no_cross_point) {
+                    if (!cd.pm.flags.test (eye3d::pm_fl::no_cross_point)) {
                         svp2->setViewTranslation (land_to_scene * cd.pm.end); // cross point is black sphere
                     }
 
-                    if (cd.crossed) {
+                    // FIXME: Think everything in this should probably be part of eye3d::compute_crossing_location
+                    if (!cd.flags.test (eye3d::cd_fl::crossed)) {
+                        // Now - We had intersection but not crossing. Either we moved within the starting triangle, but perhaps we went into a neighbour triangle?
+                        // Test 3 neighbours across the edges. Kind of annoying to have to do this...
+                        std::array<uint32_t, 3> _ti_also = { std::numeric_limits<uint32_t>::max() };
+                        sm::vec<>_tn_also = {};
+                        for (uint32_t i = 0u; i < 3u; i++) {
+                            uint32_t i1 = i;
+                            uint32_t i2 = (i+1) % 3u;
+                            auto [_ti, _tn] = land->find_other_triangle_containing (ti0[i1], ti0[i2], ti0);
+                            if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
+                                // Test to see if start location was inside a neighbour
+                                sm::vec<sm::vec<>, 3> tv_lf = land->triangle_vertices (_ti);
+                                auto [ is, h ] = sm::algo::ray_tri_intersection<float> (tv_lf[0], tv_lf[1], tv_lf[2], hov_land, -_tn);
+                                if (is) {
+                                    std::cout << "Start of move is ALSO in " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
+                                }
+                                auto [ endis, endh ] = sm::algo::ray_tri_intersection<float> (tv_lf[0], tv_lf[1], tv_lf[2], hov_land + mv_inplane, -_tn);
+                                if (endis) {
+                                    std::cout << "End of move is ALSO in " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
+                                    _ti_also = _ti;
+                                    _tn_also = _tn;
+                                }
+
+                            }
+                        }
+                        auto [ endis, endh ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], hov_land + mv_inplane, -tn0_land);
+                        if (endis) {
+                            std::cout << "End of move is in orig tri " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
+                        } else {
+                            std::cout << "End of move is NOT in orig tri " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
+
+                            // FIXME: test if we went over the vertex or not
+
+                            // This could be because we went over a vertex (FIXME) or if not, we can
+                            // say we DID cross the edge after all and change our current triangle
+                            if (_ti_also[0] != std::numeric_limits<uint32_t>::max()) {
+                                std::cout << "Switch triangle...\n";
+                                // Now maybe also set crossed: cd.flags.set (eye3d::cd_fl::crossed) to trigger the process of finding the correct next triangle
+                                // Otherwise, we'll just move forward by a step, whatever its size.
+                                //
+                                if (_ti_also[0] != ti0[0] && _ti_also[0] != ti0[1] && _ti_also[0] != ti0[2]) {
+                                    cd.edge_idx_a = ti0[1]; // 0 is not common
+                                    cd.edge_idx_b = ti0[2];
+                                    cd.tri_edge = tv_landframe[2] - tv_landframe[1];
+                                }
+                                if (_ti_also[1] != ti0[0] && _ti_also[1] != ti0[1] && _ti_also[1] != ti0[2]) {
+                                    cd.edge_idx_a = ti0[0]; // 1 is not common
+                                    cd.edge_idx_b = ti0[2];
+                                    cd.tri_edge = tv_landframe[2] - tv_landframe[0];
+                                }
+                                if (_ti_also[2] != ti0[0] && _ti_also[2] != ti0[1] && _ti_also[2] != ti0[2]) {
+                                    cd.edge_idx_a = ti0[0]; // 2 is not common
+                                    cd.edge_idx_b = ti0[1];
+                                    cd.tri_edge = tv_landframe[1] - tv_landframe[0];
+                                }
+                                ti0 = _ti_also;
+                                tn0_land = _tn_also;
+                                cd.flags.set (eye3d::cd_fl::crossed);
+                                cd.pm.mv = sm::vec<>{};
+                                cd.pm.end = sm::vec<>{};
+                            }
+                        }
+                    }
+
+                    if (cd.flags.test (eye3d::cd_fl::crossed)) {
 
                         // Can work out new triangle here
                         if constexpr (debug_move) {
@@ -857,12 +972,14 @@ int main (int argc, char* argv[])
                         if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
 
                             // Re-orient onto the new triangle
-
                             sm::vec<sm::vec<>, 3> newtv_landframe = land->triangle_vertices (_ti);
 
                             if constexpr (debug_move) {
                                 std::cout << "Re-orient to new triangle " << _ti[0] << "," << _ti[1] << "," << _ti[2]
                                           << "[ " << newtv_landframe << " ] with normal " << _tn << "\n";
+                                svp_t0->setViewTranslation (land_to_scene * newtv_landframe[0]);
+                                svp_t1->setViewTranslation (land_to_scene * newtv_landframe[1]);
+                                svp_t2->setViewTranslation (land_to_scene * newtv_landframe[2]);
                             }
 
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
