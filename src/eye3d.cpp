@@ -644,7 +644,7 @@ int main (int argc, char* argv[])
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
     constexpr float hoverheight = 0.08f;
-    constexpr bool show_normals = false;
+    constexpr bool show_normals = true;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found\n";
@@ -856,10 +856,6 @@ int main (int argc, char* argv[])
             // Solution may be to do further tests within compute_crossing_location when necessary.
             //
             auto [ isect, hov_land ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], camloc_landframe, -tn0_land);
-            if (isect) {
-                std::cout << "Start of move is IN triangle " << ti0[0] << "," << ti0[1] << "," << ti0[2] << std::endl;
-            }
-
 
             sm::vec<> cam_displacement  = cam_to_land.translation() - hov_land;
             sm::mat44<float> cam_to_surface = cam_to_land;
@@ -868,8 +864,60 @@ int main (int argc, char* argv[])
             svp1->setViewMatrix (land_to_scene * cam_to_surface); // last hover locn is magenta
             pvp1->setViewMatrix (land_to_scene * cam_to_surface);
 
+            if (isect == false) {
+                if (v.isActivelyRotating() == false) {
 
-            if (isect) {
+                    // When very close to the boundary, ray_tri_intersection may fail, which could
+                    // trigger a search for the right tri, which will probably be the one next door.
+                    std::cout << "No intersection (at start) with triangle "
+                              << ti0[0] << "," << ti0[1] << "," << ti0[2]
+                              << " from coord " << camloc_landframe << " and dirn " << -tn0_land
+                              << ", so correct ti0 and tn0_land (if we can)" << std::endl;
+
+                    for (uint32_t i = 0u; i < 3u; i++) {
+                        uint32_t i1 = i;
+                        uint32_t i2 = (i+1) % 3u;
+                        auto [_ti, _tn] = land->find_other_triangle_containing (ti0[i1], ti0[i2], ti0);
+                        if (_ti[0] != std::numeric_limits<uint32_t>::max()) {
+                            // Test to see if start location was inside a neighbour
+                            sm::vec<sm::vec<>, 3> tv_lf = land->triangle_vertices (_ti);
+                            auto [ is, h ] = sm::algo::ray_tri_intersection<float> (tv_lf[0], tv_lf[1], tv_lf[2], camloc_landframe, -_tn);
+                            std::cout << "Start of move " << (is ? "IS" : "is NOT") << " in " << _ti[0] << "," << _ti[1] << "," << _ti[2] << std::endl;
+                            if (is) {
+                                std::cout << "*** Correcting!\n";
+                                // We're in this one
+                                ti0 = _ti;
+                                tn0_land = _tn;
+                                isect = true;
+
+                                // Re-computations:
+                                hov_land = h;
+                                cam_displacement  = cam_to_land.translation() - hov_land;
+                                cam_to_surface = cam_to_land;
+                                cam_to_surface.pretranslate (-cam_displacement); // This is our init pose, placed on the surface
+                                svp1->setViewMatrix (land_to_scene * cam_to_surface); // last hover locn is magenta
+                                pvp1->setViewMatrix (land_to_scene * cam_to_surface);
+
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isect == false) {
+                std::cout << "No intersection (at start) with triangle "
+                          << ti0[0] << "," << ti0[1] << "," << ti0[2]
+                          << " from coord " << camloc_landframe << " and dirn " << -tn0_land
+                          << ", so stop/freeze" << std::endl;
+                v.stop();
+                v.freeze (true);
+
+            } else {
+
+                std::cout << "Start of move is IN triangle "
+                          << ti0[0] << "," << ti0[1] << "," << ti0[2]
+                          << " from coord " << camloc_landframe << " and dirn " << -tn0_land << std::endl;
 
                 bool done = false;
                 bool simple = false;
@@ -897,7 +945,7 @@ int main (int argc, char* argv[])
                     if (wcount++ > 5) { std::cout << "wcount!\n"; break; } // for debug
                     // mv_inplane is in land frame but relative to current location
                     if (mv_inplane.length() == 0 && v.isActivelyRotating() == false) {
-                        std::cout << "Zero length mv_inplane so stop/freeze\n";
+                        std::cout << "Zero length mv_inplane so stop/freeze" << std::endl;
                         done = true;
                         simple = true;
                         v.stop();
@@ -1036,7 +1084,7 @@ int main (int argc, char* argv[])
                         // Either we moved within the starting triangle, but perhaps we went into a neighbour triangle?
 
                         // Test if it was movement-within; the simplest case
-                        std::cout << "No cross point. Testing if " << (hov_land + mv_inplane) << " is inside tv_landframe (self)...\n";
+                        std::cout << "No cross point. Testing if " << (hov_land + mv_inplane) << " is inside tv_landframe (" << tv_landframe << ")...\n";
 
                         auto [ endis, he ] = sm::algo::ray_tri_intersection<float> (tv_landframe[0], tv_landframe[1], tv_landframe[2], hov_land + mv_inplane, -tn0_land);
                         if (endis) {
@@ -1111,14 +1159,6 @@ int main (int argc, char* argv[])
                     pvp1->setViewMatrix (land_to_scene * reorient_final);
                     setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * reorient_cam_final));
                 } // else already moved camera (or it didn't need to)
-
-
-            } else {
-                if (v.isActivelyRotating() == false) {
-                    std::cout << "No intersection with triangle t1t2t3 so stop/freeze";
-                    v.stop();
-                    v.freeze (true);
-                }
             }
 
             // Only permit rotation around one axis:
