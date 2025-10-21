@@ -20,10 +20,10 @@
 #include <mplot/compoundray/EyeVisual.h>
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
-#include <mplot/SphereVisual.h> // debug really
-#include <mplot/RodVisual.h>    // also debug
+#include <mplot/SphereVisual.h>  // for debug
+#include <mplot/RodVisual.h>     // also for debug
 #include <mplot/PolygonVisual.h> // debug
-#include <mplot/NormalsVisual.h> // debug
+#include <mplot/NormalsVisual.h>
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -208,9 +208,9 @@ namespace eye3d
         } else {
             if (si.test(0)) {
                 // Intersects as expected
-                sm::vec<float, 2> cross_point_2d = sm::algo::crossing_point<float> (edge_s_2d, edge_s_2d + edge_2d, h_2d, h_2d + mv_inplane2d);
+                sm::vec<float, 2> cp2d = sm::algo::crossing_point<float> (edge_s_2d, edge_s_2d + edge_2d, h_2d, h_2d + mv_inplane2d);
                 // Now go from cross point 2d to a point in model coordinates?
-                pm.end = (from_triangle_frame * cross_point_2d.plus_one_dim(edge_s_4d[2])).less_one_dim();
+                pm.end = (from_triangle_frame * cp2d.plus_one_dim(edge_s_4d[2])).less_one_dim();
                 if constexpr (debug) { std::cout << "fec: Cross point in mdl frame: " << pm.end << std::endl; }
                 pm.mv = pm.end - mv_s;
 
@@ -403,9 +403,10 @@ namespace eye3d
     find_land (mplot::VisualModel<>* land, const sm::vec<>& loc1)
     {
         sm::mat44<float> land_to_scene = land->getViewMatrix();
-        std::cout << "land_to_scene: " << land_to_scene << std::endl;
+        std::cout << "land_to_scene:\n" << land_to_scene << std::endl;
         sm::mat44<float> scene_to_land = land_to_scene.inverse();
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
+        std::cout << "camspace\n" << camspace << std::endl;
         sm::vec<float> camstart = {}; // use camera location in gltf to start from, then find land surface.
         sm::vec<float, 4> camloc = camspace * camstart;
         sm::vec<float> camloc_landframe = (scene_to_land * camloc).less_one_dim();
@@ -468,9 +469,17 @@ namespace eye3d
             }
 
             // Get the rotation from scene frame to model
-            sm::mat44<float> lsr (land_to_scene.linear()); // if hp_scene were passed as hp_land, we
+            sm::mat33<float> lsl = land_to_scene.linear(); // if hp_scene were passed as hp_land, we
                                                            // could use land_to_scene as is, and
                                                            // lose hp_scene_mat
+            // Assume uniform scaling (if any) and remove that from the rotation:
+            sm::vec<float, 3> r0 = lsl.col (0);
+            sm::vec<float, 3> r1 = lsl.col (1);
+            sm::vec<float, 3> r2 = lsl.col (2);
+            r0.renormalize();
+            r1.renormalize();
+            r2.renormalize();
+            sm::mat44<float> lsr ({ r0[0], r0[1], r0[2], 0, r1[0], r1[1], r1[2], 0, r2[0], r2[1], r2[2], 0, 0, 0, 0, 1 });
             coord_rotn = lsr * coord_rotn;
             pvp->setViewMatrix (hp_scene_mat * coord_rotn); // reposition sphere
             // Want to place camera just 'above' hp.
@@ -636,6 +645,25 @@ int main (int argc, char* argv[])
 
         // I have an issue where this may be a *scaling* transformation. This becomes awkward.
         land_to_scene = land->getViewMatrix();   // could be passed to find_land
+
+        // Obtain scaling from land_to_scene
+        sm::mat33<float> l2s_lin = land_to_scene.linear();
+        std::cout << "l2s lin:\n" << l2s_lin << std::endl;
+        sm::vec<float, 3> c0 = l2s_lin.col (0);
+        sm::vec<float, 3> c1 = l2s_lin.col (1);
+        sm::vec<float, 3> c2 = l2s_lin.col (2);
+        float c0_len = c0.length();
+        float c1_len = c1.length();
+        float c2_len = c2.length();
+        c0 /= c0_len;
+        c1 /= c1_len;
+        c2 /= c2_len;
+        sm::mat33<float> l2s_rot({ c0[0], c0[1], c0[2], c1[0], c1[1], c1[2], c2[0], c2[1], c2[2],  });
+        std::cout << "l2s rot:\n" << l2s_rot << std::endl;
+        sm::mat33<float> l2s_sc({ c0_len, 0, 0, 0, c1_len, 0, 0, 0, c2_len});
+        std::cout << "l2s sc:\n" << l2s_sc << std::endl;
+        std::cout << "l2s tr: " << land_to_scene.translation() << std::endl;
+
         scene_to_land = land_to_scene.inverse();
 
         std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, loc1);
@@ -903,9 +931,6 @@ int main (int argc, char* argv[])
                 bool done = false;
                 bool simple = false;
 
-                sm::mat44<float> sink;
-                sm::mat44<float> unsink;
-
                 // Initialize reorient_final
                 sm::mat44<float> reorient_final = cam_to_surface;
                 sm::mat44<float> reorient_cam_final;
@@ -972,32 +997,16 @@ int main (int argc, char* argv[])
                             }
 
                             sm::mat44<float> reorient_land; // reorientation transformation in landframe
-                            sm::vec<float, 4> mv_rest;
-                            {
-                                // Compute the reorientation due to the requested movement.
-                                sm::mat44<float> r_t1;
-                                sm::mat44<float> r_t_to;
-                                sm::mat44<float> r_r;
-                                sm::mat44<float> r_t_fro;
-                                sm::mat44<float> r_t2;
+                            sm::vec<float, 3> mv_rest;
+                            // Compute the reorientation due to the requested movement.
+                            // Rotate by the angle between the normals. I think this is constrained to be <= pi
+                            float rotn_angle = tn0_land.angle (_tn, cd.tri_edge);
+                            reorient_land.rotate (cd.tri_edge, rotn_angle);
+                            mv_rest = (reorient_land * (mv_inplane - cd.pm.mv)).less_one_dim();
+                            reorient_land.pretranslate (hov_land + cd.pm.mv + mv_rest);
+                            reorient_land.translate (-hov_land); // r_t_to + r_t1 = -(hov_land + cd.pm.mv) + cd.pm.mv = -hov_land
 
-                                // Rotate by the angle between the normals. I think this is constrained to be <= pi
-                                float rotn_angle = tn0_land.angle (_tn, cd.tri_edge);
-                                // Use the *edge* as the rotation axis.
-                                r_r.rotate (cd.tri_edge, rotn_angle);
-                                // Before doing any additional work, apply this rotation to mv_rest
-                                mv_rest = r_r * (mv_inplane - cd.pm.mv);
-                                // The edge may not already be a coordinate axis, so pre- and post-translate by hov_land
-                                r_t_to.translate (-(hov_land + cd.pm.mv));
-                                r_t_fro.translate (hov_land + cd.pm.mv);
-                                // Apply pre- and post-translations.
-                                r_t1.translate (cd.pm.mv);
-                                r_t2.translate (mv_rest);
-
-                                reorient_land = r_t2 * r_t_fro * r_r * r_t_to * r_t1; // FIXME consolidate into fewer mat44s
-                            }
-
-                            if (mv_rest.less_one_dim().length() == 0) {
+                            if (mv_rest.length() == 0) {
                                 // The first movement to edge completed the movement. We actually landed ON the edge.
                                 reorient_final = reorient_land * reorient_final;
                                 done = true;
@@ -1005,12 +1014,12 @@ int main (int argc, char* argv[])
 
                                 // There's additional movement to complete. Show it as a tube. blue
                                 rvp1->update (land_to_scene * (hov_land + cd.pm.mv),
-                                              land_to_scene * (hov_land + cd.pm.mv + mv_rest.less_one_dim()));
+                                              land_to_scene * (hov_land + cd.pm.mv + mv_rest));
 
                                 // Angle between cm.pm.mv and mv_rest?
                                 if constexpr (debug_move) {
-                                    std::cout << "Angle between pre-rotate (" << cd.pm.mv << ") and post- " << mv_rest.less_one_dim() << " moves? "
-                                              << sm::mathconst<float>::rad2deg * cd.pm.mv.angle (mv_rest.less_one_dim()) << " deg\n";
+                                    std::cout << "Angle between pre-rotate (" << cd.pm.mv << ") and post- " << mv_rest << " moves? "
+                                              << sm::mathconst<float>::rad2deg * cd.pm.mv.angle (mv_rest) << " deg\n";
                                 }
                                 // At this point, can test to see if the end point of the movement
                                 // lands in the adjacent triangle. If so, we're done, if not, time
@@ -1038,16 +1047,13 @@ int main (int argc, char* argv[])
                                     hov_land = cd.pm.end; // crossing data planned movement end
                                     // Also update planned move, which is now shorter and in a new direction
                                     tv_landframe = newtv_landframe;
-                                    mv_inplane = mv_rest.less_one_dim();
+                                    mv_inplane = mv_rest;
                                 }
                             }
-                            // Set sink/unsink and apply to camera transform
-                            sink.setToIdentity();
-                            sink.translate (-tn0_land * hoverheight); // assumes we normalized tn0
 
-                            unsink.setToIdentity();
-                            unsink.translate (_tn * hoverheight); // assumes we normalized _tn
-                            reorient_cam_final = unsink * reorient_final;
+                            reorient_cam_final = reorient_final;
+                            // reorient_cam_final is just reorient final with a pretranslation
+                            reorient_cam_final.pretranslate (_tn * hoverheight);
 
                             ti0 = _ti;
                             tn0_land = _tn;
@@ -1158,6 +1164,7 @@ int main (int argc, char* argv[])
                 if (!simple) {
                     // Use the final transformation matrices to set camera (and sphere) poses
                     pvp1->setViewMatrix (land_to_scene * reorient_final);
+                    // land_to_scene isn't right, as it may incorporate scaling.
                     setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * reorient_cam_final));
                 } // else already moved camera (or it didn't need to)
             }
