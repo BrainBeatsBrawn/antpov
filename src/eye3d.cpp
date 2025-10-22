@@ -422,16 +422,15 @@ namespace eye3d
         return { hp_scene, tn0_land, ti0 };
     }
 
-    // Using data about the land location for the camera found with eye3d::find_land, set the camera posn
-    void set_landlocked_camera (const sm::vec<>& hp_scene, const sm::mat44<float>& land_to_scene,
-                                mplot::VisualModel<>* land,
-                                const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
-                                mplot::PolygonVisual<>* pvp, const float hoverheight, bool randomize_dir = true)
+    // Using data about the land location for the camera found with eye3d::find_land, return the camera position matrix (scene frame)
+    sm::mat44<float> set_landlocked_camera (const sm::vec<>& hp_scene, const sm::mat44<float>& land_to_scene,
+                                            const sm::vec<>& tn0_land, const std::array<uint32_t, 3>& ti0,
+                                            mplot::PolygonVisual<>* pvp, const float hoverheight, bool randomize_dir = true)
     {
         // Let's 'draw' the camera towards the land and then arrange its normal upwards wrt to the normal of the land.
         if (ti0[0] == std::numeric_limits<uint32_t>::max()) {
             std::cout << "set_landlocked_camera: No hit\n";
-            return;
+            return sm::mat44<float>{}; // identity matrix
         }
 
         // Place the camera on the land, and orient it randomly in the 'land plane'
@@ -470,15 +469,16 @@ namespace eye3d
         pvp->setViewMatrix (hp_scene_mat * coord_rotn); // reposition sphere
         // Want to place camera just 'above' hp.
         coord_rotn.pretranslate (hoverheight * tn0_land);
-        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (hp_scene_mat * coord_rotn));
+
+        return (hp_scene_mat * coord_rotn);
     }
 
-    // Compute a movement over a triangle mesh contained in 'land'
-    sm::mat44<float> compute_mesh_movement (/* const */ mplot::VisualModel<>* land, // ideally const
+    // Compute a movement over a triangle mesh contained in 'land'. Return the final camera
+    // transform matrix in the scene frame of reference.
+    sm::mat44<float> compute_mesh_movement (const mplot::VisualModel<>* land,
                                             const sm::vec<float>& mv_camframe,
-                                            const sm::mat44<float>& scene_to_land,
-                                            const sm::mat44<float>& land_to_scene,
-                                            sm::mat44<float>& cam_to_scene,
+                                            const sm::mat44<float>& cam_to_land,
+                                            const sm::mat44<float>& land_to_scene, // required to extract scaling
                                             std::array<uint32_t, 3>& ti0,
                                             sm::vec<float>& tn0_land,
                                             const float hoverheight)
@@ -488,8 +488,6 @@ namespace eye3d
         // our return object, the final transformation matrix for the camera after the movement
         sm::mat44<float> cam_final;
 
-        // Compute transform matrices between camera, land model and scene/world frames
-        sm::mat44<float> cam_to_land = scene_to_land * cam_to_scene;
         // Camera location in the land frame
         sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
 
@@ -770,7 +768,7 @@ namespace eye3d
         auto _tn_scaled = land_to_scene.scaling_mat33().inverse() * tn0_land;
         cam_final.pretranslate (_tn_scaled * hoverheight);
 
-        return cam_final;
+        return land_to_scene * cam_final;
     }
 
 } // namespace eye3d
@@ -982,7 +980,8 @@ int main (int argc, char* argv[])
         svp_t2 = v.addVisualModel (sv);
 
         // Set up our camera using the data obtained from find_land()
-        eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0, pvp1, hoverheight, true);
+        sm::mat44<float> cam_to_scene = eye3d::set_landlocked_camera (hp_scene, land_to_scene, tn0_land, ti0, pvp1, hoverheight, true);
+        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
     }
 
     /**
@@ -1072,24 +1071,23 @@ int main (int argc, char* argv[])
                                     land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
-        sm::mat44<float> cam_to_scene;
+
+        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         if (v.isActivelyRotating()) {
             // Only permit rotation around one axis for now
             rotateCamerasLocallyAround (v.getHorizontalRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 1.0f, 0.0f);
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
 
         } else if (v.isActivelyMoving()) { // translating
 
             // Obtain the commanded movement vector and turn this into a translation matrix
             sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
-            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-            sm::mat44<float> cam_final = eye3d::compute_mesh_movement (land, mv_camframe, scene_to_land, land_to_scene, cam_to_scene, ti0, tn0_land, hoverheight);
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (land_to_scene * cam_final));
+            sm::mat44<float> cam_to_land = scene_to_land * cam_to_scene;
+            cam_to_scene = eye3d::compute_mesh_movement (land, mv_camframe, cam_to_land, land_to_scene, ti0, tn0_land, hoverheight);
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
         } // else not actively moving or rotating
-
-        // Get the camera space and update our eye and camera-frame models
-        cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         // reset to initial camera space if requested
         if (v.vstate.test (eye3dvisual::state::campose_reset_request) == true) {
@@ -1099,8 +1097,8 @@ int main (int argc, char* argv[])
             sm::vec<> camloc_landframe = (cam_to_land * sm::vec<>{}).less_one_dim();
             sm::vec<> hp_scene;
             std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, camloc_landframe); // sets tn0_land and ti0
-            eye3d::set_landlocked_camera (hp_scene, land_to_scene, land, tn0_land, ti0, pvp1, hoverheight);
-            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+            cam_to_scene = eye3d::set_landlocked_camera (hp_scene, land_to_scene, tn0_land, ti0, pvp1, hoverheight);
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
         }
 
