@@ -645,25 +645,6 @@ int main (int argc, char* argv[])
 
         // I have an issue where this may be a *scaling* transformation. This becomes awkward.
         land_to_scene = land->getViewMatrix();   // could be passed to find_land
-
-        // Obtain scaling from land_to_scene
-        sm::mat33<float> l2s_lin = land_to_scene.linear();
-        std::cout << "l2s lin:\n" << l2s_lin << std::endl;
-        sm::vec<float, 3> c0 = l2s_lin.col (0);
-        sm::vec<float, 3> c1 = l2s_lin.col (1);
-        sm::vec<float, 3> c2 = l2s_lin.col (2);
-        float c0_len = c0.length();
-        float c1_len = c1.length();
-        float c2_len = c2.length();
-        c0 /= c0_len;
-        c1 /= c1_len;
-        c2 /= c2_len;
-        sm::mat33<float> l2s_rot({ c0[0], c0[1], c0[2], c1[0], c1[1], c1[2], c2[0], c2[1], c2[2],  });
-        std::cout << "l2s rot:\n" << l2s_rot << std::endl;
-        sm::mat33<float> l2s_sc({ c0_len, 0, 0, 0, c1_len, 0, 0, 0, c2_len});
-        std::cout << "l2s sc:\n" << l2s_sc << std::endl;
-        std::cout << "l2s tr: " << land_to_scene.translation() << std::endl;
-
         scene_to_land = land_to_scene.inverse();
 
         std::tie(hp_scene, tn0_land, ti0) = eye3d::find_land (land, loc1);
@@ -1052,8 +1033,9 @@ int main (int argc, char* argv[])
                             }
 
                             reorient_cam_final = reorient_final;
-                            // reorient_cam_final is just reorient final with a pretranslation
-                            reorient_cam_final.pretranslate (_tn * hoverheight);
+                            // reorient_cam_final is just reorient final with a pretranslation (possibly scaled)
+                            auto _tn_scaled = land_to_scene.scaling_mat33().inverse() * _tn;
+                            reorient_cam_final.pretranslate (_tn_scaled * hoverheight);
 
                             ti0 = _ti;
                             tn0_land = _tn;
