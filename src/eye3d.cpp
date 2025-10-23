@@ -205,7 +205,6 @@ int main (int argc, char* argv[])
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
         sm::vec<float> hp_scene = {};
         std::tie(hp_scene, tn0_land, ti0) = land->navmesh->find_triangle_hit (camspace, land_to_scene);
-        std::cout << "After find_triangle_hit. tn0_land = " << tn0_land << " and ti0[0]: " << ti0[0] << std::endl;
 
         // Set up our camera using the data obtained from find_triangle_hit()
         sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, hoverheight);
@@ -218,11 +217,6 @@ int main (int argc, char* argv[])
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
 
-    /**
-     * Subroutine lambda: Detect changes in the camera (there can be multiple cameras, some
-     * compound ray, some non-compound ray). The complexity here results from this complexity in
-     * compound-ray and the fact that we have multiple ways to visualize the eye's ommatidia
-     */
     auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData, &ommatidiaPositions,
                                        &last_eye_size, &eyevm_ptr, opts] ()
     {
@@ -255,7 +249,6 @@ int main (int argc, char* argv[])
         }
     };
 
-    // Can consolidate this with the above now, as it's much the same
     auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
                                     opts, land, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
     {
@@ -264,8 +257,13 @@ int main (int argc, char* argv[])
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         if (v.isActivelyRotating()) {
-            // Only permit rotation around one axis for now
+            // Up-down (pitch) is rotation about local camera frame axis x
+            rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
+            // Left-and-right (yaw) is rotation about local camera frame axis y
             rotateCamerasLocallyAround (v.getHorizontalRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 1.0f, 0.0f);
+            // Roll
+            rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f);
+
             cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
 
         } else if (v.isActivelyMoving()) { // translating
