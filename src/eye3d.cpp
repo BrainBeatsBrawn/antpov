@@ -116,8 +116,8 @@ int main (int argc, char* argv[])
     v.zFar = 2400;
     // Rotate about the nearest VisualModel
     v.rotateAboutNearest (true);
-    // Rotate about a scene vertical axis
-    v.rotateAboutVertical (true);
+    // Rotate about a scene vertical axis? true for landscapes, false for cubes/objects (Ctrl-k changes I think, at runtime)
+    v.rotateAboutVertical (false);
     if (opts.test(eye3d::options::blender_axes)) {
         v.switch_scene_vertical_axis(); // to uz up
     }
@@ -181,7 +181,7 @@ int main (int argc, char* argv[])
             // The 'land' is a cube for now
             if (vmp->name == "Cube.002" && land == nullptr) { land = vmp; }
             else if (vmp->name == "Cube.001" && land == nullptr) { land = vmp; }
-            else if (vmp->name == "Landscape.003" && land == nullptr) { land = vmp; }
+            else if (vmp->name == "Landscape.003" /* && land == nullptr */) { land = vmp; } // land trumps other objects
             else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; }
             else { std::cout << "Model name " << vmp->name << std::endl; }
         }
@@ -190,11 +190,11 @@ int main (int argc, char* argv[])
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
     sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
 
+    // FIXME These should be state in navmesh?
     std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
-    sm::vvec<std::array<uint32_t, 3>> ti0_neighbours;
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
-    constexpr float hoverheight = 0.08f;
+    constexpr float hoverheight = 0.1f;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found [" << (land->vpos_size() / 3) << " vertices]\n";
@@ -208,6 +208,9 @@ int main (int argc, char* argv[])
 
         // Set up our camera using the data obtained from find_triangle_hit()
         sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, hoverheight);
+        sm::mat44<float> cam_to_scene_surf = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, 0.0f);
+        std::cout << "Compare cam_to_scene " << (cam_to_scene * sm::vec<>{}).less_one_dim() <<" with hp_scene: " << hp_scene << std::endl;
+        std::cout << "Compare cam_to_scene_surf " << (cam_to_scene_surf * sm::vec<>{}).less_one_dim() <<" with hp_scene: " << hp_scene << std::endl;
         sm::mat44<float> ident;
         if (cam_to_scene != ident) {
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
