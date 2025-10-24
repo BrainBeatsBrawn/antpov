@@ -194,7 +194,7 @@ int main (int argc, char* argv[])
     std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
-    constexpr float hoverheight = 0.1f;
+    constexpr float hoverheight = 0.08f;
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found [" << (land->vpos_size() / 3) << " vertices]\n";
