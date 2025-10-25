@@ -208,9 +208,7 @@ int main (int argc, char* argv[])
 
         // Set up our camera using the data obtained from find_triangle_hit()
         sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, hoverheight);
-        sm::mat44<float> cam_to_scene_surf = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, 0.0f);
         std::cout << "Compare cam_to_scene " << (cam_to_scene * sm::vec<>{}).less_one_dim() <<" with hp_scene: " << hp_scene << std::endl;
-        std::cout << "Compare cam_to_scene_surf " << (cam_to_scene_surf * sm::vec<>{}).less_one_dim() <<" with hp_scene: " << hp_scene << std::endl;
         sm::mat44<float> ident;
         if (cam_to_scene != ident) {
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -273,8 +271,7 @@ int main (int argc, char* argv[])
 
             // Obtain the commanded movement vector and turn this into a translation matrix
             sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
-            sm::mat44<float> cam_to_land = scene_to_land * cam_to_scene;
-            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_land, land_to_scene, ti0, tn0_land, hoverheight);
+            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, scene_to_land, land_to_scene, ti0, tn0_land, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
         } // else not actively moving or rotating
