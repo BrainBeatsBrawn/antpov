@@ -188,7 +188,6 @@ int main (int argc, char* argv[])
     }
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
-    sm::mat44<float> scene_to_land;  // inverse of land_to_scene, converts scene to land model
 
     // FIXME These should be state in navmesh?
     std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
@@ -200,7 +199,6 @@ int main (int argc, char* argv[])
         std::cout << "Landscape name: " << land->name << " was found [" << (land->vpos_size() / 3) << " vertices]\n";
 
         land_to_scene = land->getViewMatrix();
-        scene_to_land = land_to_scene.inverse();
 
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
         sm::vec<float> hp_scene = {};
@@ -250,8 +248,8 @@ int main (int argc, char* argv[])
         }
     };
 
-    auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space,
-                                    opts, land, land_to_scene, scene_to_land, &tn0_land, &ti0, hoverheight]()
+    auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space, &ti0,
+                                    opts, land, land_to_scene, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -282,6 +280,7 @@ int main (int argc, char* argv[])
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
             sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
             sm::vec<float> hp_scene = {};
+            sm::vec<float> tn0_land = {};
             std::tie(hp_scene, tn0_land, ti0) = land->navmesh->find_triangle_hit (camspace, land_to_scene); // sets tn0_land and ti0
             cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
