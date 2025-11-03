@@ -107,7 +107,7 @@ int main (int argc, char* argv[])
                                   ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
 
     // Create a mathplot window to render the eye/sensor
-    eye3dvisual v (2000, 1200, "Eye 3D (mathplot graphics)", opts.test(eye3d::options::blender_axes));
+    eye3dvisual v (2000, 1200, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.05f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
@@ -122,6 +122,11 @@ int main (int argc, char* argv[])
         v.switch_scene_vertical_axis(); // to uz up
     }
     v.vstate.flip (eye3dvisual::state::show_camframe);
+
+    // A window for the eye view
+    mplot::Visual<> veye (512, 512, "Eye view");
+    veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
+    veye.setSceneRotation (sm::quaternion<float>{ float{0.658107}, float{0.752674}, float{0.0157197}, float{0.0114156} });
 
     // Use a FPS profiling with a text object on screen
     mplotext::fps::profiler fps_profiler;
@@ -159,13 +164,21 @@ int main (int argc, char* argv[])
     mplot::compoundray::scene_to_visualmodels (scene, &v, true); // true for 'make_navmeshes'
 
     // Create an EyeVisual 'eye' in our mathplot scene, v.
-    mplot::compoundray::EyeVisual<>* eyevm_ptr = nullptr;
+    mplot::compoundray::EyeVisual<>* ep1 = nullptr;
     auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData, ommatidia);
     v.bindmodel (eyevm);
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
     eyevm->finalize();
-    eyevm_ptr = v.addVisualModel (eyevm);
+    ep1 = v.addVisualModel (eyevm);
+
+    // A second eye goes in the 'eye only' window
+    mplot::compoundray::EyeVisual<>* ep2 = nullptr;
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData, ommatidia);
+    veye.bindmodel (eyevm2);
+    eyevm2->name = "Big Eye";
+    eyevm2->finalize();
+    ep2 = veye.addVisualModel (eyevm2);
 
     // Make CoordArrows axes to show our camera's localspace
     mplot::CoordArrows<>* cam_cs_ptr = eye3d::plot_axes (&v);
@@ -216,8 +229,9 @@ int main (int argc, char* argv[])
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
 
+    uint32_t render_counter = 0u;
     auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData, &ommatidiaPositions,
-                                       &last_eye_size, &eyevm_ptr, opts] ()
+                                       &last_eye_size, &ep1, &ep2, &render_counter, opts] ()
     {
         size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
@@ -226,29 +240,36 @@ int main (int argc, char* argv[])
         } // else no need to re-get data
 
         // Change showing the 'cones' of the compound eye visual model?
-        if (eyevm_ptr->show_cones != v.vstate.test(eye3dvisual::state::show_cones)) {
-            eyevm_ptr->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
-            eyevm_ptr->reinit();
+        if (ep1->show_cones != v.vstate.test(eye3dvisual::state::show_cones)) {
+            ep1->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
+            ep1->reinit();
+            ep2->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
+            ep2->reinit();
         }
         // Change the length of the cones?
-        if (eyevm_ptr->get_cone_length() != v.manual_cone_length) {
-            eyevm_ptr->set_cone_length (v.manual_cone_length);
+        if (ep1->get_cone_length() != v.manual_cone_length) {
+            ep1->set_cone_length (v.manual_cone_length);
+            ep2->set_cone_length (v.manual_cone_length);
         }
         // Update eyevm model (or just update colours)
-        eyevm_ptr->ommatidia = ommatidia;
+        ep1->ommatidia = ommatidia;
+        ep2->ommatidia = ommatidia;
 
         if (ommatidia != nullptr) {
             curr_eye_size = ommatidia->size();
             if (curr_eye_size != last_eye_size) {
-                eyevm_ptr->reinit();
+                if (render_counter % 60u == 0u) { ep1->reinit(); }
+                ep2->reinit();
                 last_eye_size = curr_eye_size;
             } else {
-                eyevm_ptr->reinitColours(); // 4x faster to just reinitColours
+                if (render_counter % 60u == 0u) { ep1->reinitColours(); }
+                ep2->reinitColours(); // 4x faster to just reinitColours
             }
+            ++render_counter;
         }
     };
 
-    auto subr_key_move_over_land = [&v, &eyevm_ptr, &cam_cs_ptr, &initial_camera_space, &ti0,
+    auto subr_key_move_over_land = [&v, &ep1, &cam_cs_ptr, &initial_camera_space, &ti0,
                                     opts, land, land_to_scene, hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
@@ -288,7 +309,8 @@ int main (int argc, char* argv[])
         }
 
         // Update the view matrix of eye and eye localspace axes
-        eyevm_ptr->setViewMatrix (cam_to_scene);
+        v.setContext();
+        ep1->setViewMatrix (cam_to_scene);
         cam_cs_ptr->setViewMatrix (cam_to_scene);
     };
 
@@ -307,6 +329,8 @@ int main (int argc, char* argv[])
         v.render();
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.waitevents (0.018); }
+        // Render the eye-only window
+        veye.render();
         // Deal with any movements commanded by key press events (including reset)
         subr_key_move_over_land();
         // Do the compound-ray ray casting to recompute the scene
