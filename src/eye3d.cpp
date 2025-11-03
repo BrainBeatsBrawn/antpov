@@ -271,7 +271,7 @@ int main (int argc, char* argv[])
 
             // Obtain the commanded movement vector and turn this into a translation matrix
             sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
-            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, scene_to_land, land_to_scene, ti0, tn0_land, hoverheight);
+            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
         } // else not actively moving or rotating
