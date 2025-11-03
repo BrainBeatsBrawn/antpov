@@ -55,9 +55,10 @@ namespace eye3d
         can_exit
     };
     // Parse cmd line to find the path and set options
-    std::string parse_inputs (int argc, char* argv[], sm::flags<eye3d::options>& opts)
+    std::tuple<std::string, std::string> parse_inputs (int argc, char* argv[], sm::flags<eye3d::options>& opts)
     {
         std::string path = "";
+        std::string hovh = "";
         for (int i=0; i<argc; i++) {
             std::string arg = std::string(argv[i]);
             if (arg == "-h") {
@@ -66,6 +67,9 @@ namespace eye3d
             } else if (arg == "-f") {
                 i++;
                 path = std::string(argv[i]);
+            } else if (arg == "-H") {
+                i++;
+                hovh = std::string(argv[i]);
             } else if (arg == "-b") {
                 opts |= eye3d::options::blender_axes;
             } else if (arg == "-x") {
@@ -78,7 +82,7 @@ namespace eye3d
             eye3d::printHelp();
             opts |= eye3d::options::can_exit;
         }
-        return path;
+        return {path, hovh};
     }
 
 } // namespace eye3d
@@ -89,7 +93,7 @@ int main (int argc, char* argv[])
 
     // Program options and boolean state
     sm::flags<eye3d::options> opts;
-    std::string path = eye3d::parse_inputs (argc, argv, opts);
+    auto[path, hovh] = eye3d::parse_inputs (argc, argv, opts);
     if (opts.test (eye3d::options::can_exit)) { return 1; }
 
     // Boilerplate memory alloc for compound-ray
@@ -206,7 +210,8 @@ int main (int argc, char* argv[])
     std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
-    constexpr float hoverheight = 0.08f;
+    float hoverheight = 0.08f;
+    if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found [" << (land->vpos_size() / 3) << " vertices]\n";
@@ -270,7 +275,7 @@ int main (int argc, char* argv[])
     };
 
     auto subr_key_move_over_land = [&v, &ep1, &cam_cs_ptr, &initial_camera_space, &ti0,
-                                    opts, land, land_to_scene, hoverheight]()
+                                    opts, land, land_to_scene, &hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -287,6 +292,13 @@ int main (int argc, char* argv[])
             cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
 
         } else if (v.isActivelyMoving()) { // translating
+
+            if (v.move_state.test (eye3dvisual::move_sense::up)) {
+                hoverheight += 0.002f;
+            } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
+                hoverheight -= 0.002f;
+                if (hoverheight < 0.0f) { hoverheight = 0.0f; }
+            }
 
             // Obtain the commanded movement vector and turn this into a translation matrix
             sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
