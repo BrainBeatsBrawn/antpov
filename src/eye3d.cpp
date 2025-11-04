@@ -21,6 +21,8 @@
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
 
+#include "spline.hpp" // tkspline plus wrapper in sm::algo space
+
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
 
@@ -32,10 +34,10 @@ namespace eye3d
     // Your application-specific help message
     void printHelp()
     {
-        std::cout << "USAGE:\neye3d -f <path to gltf scene>" << std::endl << std::endl;
-        std::cout << "\t-h\tDisplay this help information." << std::endl;
-        std::cout << "\t-f\tPath to a gltf scene file (absolute or relative to current "
-                  << "working directory, e.g. './data/axis_coloured_blocks.gltf')." << std::endl;
+        std::cout << "USAGE:\neye3d -f <path to gltf scene>\n\n"
+                  << "\t-h\tDisplay this help information.\n"
+                  << "\t-f\tPath to a gltf scene file (absolute or relative to current "
+                  << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
     }
     // Helper to plot coords
     mplot::CoordArrows<>* plot_axes (mplot::Visual<>* thevisual)
@@ -52,6 +54,7 @@ namespace eye3d
         blender_axes,     // Set true to transform glTF into Blender's z-up axes
         keep_moving,      // If true, movements keep moving
         max_fps,          // If true, poll, instead of fps
+        random_walk,
         can_exit
     };
     // Parse cmd line to find the path and set options
@@ -76,6 +79,8 @@ namespace eye3d
                 opts |= eye3d::options::max_fps;
             } else if (arg == "-k") {
                 opts |= eye3d::options::keep_moving;
+            } else if (arg == "-w") {
+                opts |= eye3d::options::random_walk;
             }
         }
         if (path.empty()) {
@@ -84,6 +89,94 @@ namespace eye3d
         }
         return {path, hovh};
     }
+
+    // Make a randomized path to follow
+    template <typename T>
+    struct random_outbound
+    {
+        random_outbound (const uint32_t _n_steps, const uint32_t _a_tau)
+        {
+            this->n_steps = _n_steps;
+            this->a_tau = _a_tau;
+            this->init();
+        }
+
+        random_outbound (const uint32_t _n_steps, const uint32_t _a_tau, const T& _kappa)
+        {
+            this->n_steps = _n_steps;
+            this->a_tau = _a_tau;
+            this->kappa = _kappa;
+            this->init();
+        }
+
+        void init()
+        {
+            this->rVM = std::make_unique<sm::rand_vonmises<T>> (T{0}, kappa);
+            this->a.resize (this->n_steps / this->a_tau);
+            this->a.randomize();
+            this->a *= (amm.span());
+            this->a += amm.min;
+            // pass this to cubic_spline to make a
+            sm::algo::cubic_spline (this->a, this->a_tau);
+        }
+
+        // Reset state
+        void reset()
+        {
+            this->t = 0;
+            this->theta = T{0};
+            this->omega = T{0};
+            this->velocity = {};
+            this->speed = T{0};
+        }
+
+        // Advance the route generation by one timestep
+        void step()
+        {
+            // This is the model as stated in the paper and it should be equivalent to lfilter
+            // function.
+            T epsilon = this->rVM->get(); // Angular acceleration
+            this->omega = this->lambda * this->omega + epsilon;
+            this->theta += this->omega;
+
+            T accel = T{0};
+            if (t < this->a.size()) { accel = this->a[this->t]; }
+
+            sm::vec<T, 2> thrust = { accel * std::sin (theta), accel * std::cos (theta) };
+            this->velocity = (this->velocity + thrust) * one_minus_FD;
+            this->speed = (this->speed + accel) * one_minus_FD;
+
+            ++this->t;
+            if (this->t > this->n_steps) { this->reset(); }
+        }
+
+        // Number of steps total.
+        uint32_t n_steps = 0;
+        // Current time step
+        uint32_t t = 0;
+
+        // State
+        T theta = T{0};              // Heading/theta
+        T omega = T{0};              // Angular velocity
+        sm::vec<T, 2> velocity = {}; // Cartesian velocity (or can use speed):
+        T speed = T{0};              // Linear speed
+
+        // Parameters
+        const T lambda = T{0.4};
+        T kappa = T{100};                   // Von Mises concentration parameter
+        sm::vvec<T> a = {};                       // Acceleration values
+        // Uniform RNG range outbound [0, 0.15]
+        const sm::range<T> amm = { T{0}, T{0.02} };
+        // how often does the acceleration change?
+        uint32_t a_tau = 50;
+
+        // FD is the drag coefficient
+        static constexpr T FD = T{0.15};
+        static constexpr T one_minus_FD = (T{1} - FD);
+
+        // Random number generation
+        std::unique_ptr<sm::rand_vonmises<T>> rVM;
+    };
 
 } // namespace eye3d
 
@@ -231,6 +324,9 @@ int main (int argc, char* argv[])
         }
     }
 
+    // Random route generation
+    eye3d::random_outbound<float> rrg(1500, 50, 50);
+
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
 
@@ -274,38 +370,58 @@ int main (int argc, char* argv[])
         }
     };
 
-    auto subr_key_move_over_land = [&v, &ep1, &cam_cs_ptr, &initial_camera_space, &ti0,
-                                    opts, land, land_to_scene, &hoverheight]()
+    auto subr_key_move_over_land = [&v, &ep1, &cam_cs_ptr, &initial_camera_space, &ti0, &rrg,
+                                    &opts, land, land_to_scene, &hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
-        if (v.isActivelyRotating()) {
-            // Up-down (pitch) is rotation about local camera frame axis x
-            rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
-            // Left-and-right (yaw) is rotation about local camera frame axis y
-            rotateCamerasLocallyAround (v.getHorizontalRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 1.0f, 0.0f);
-            // Roll
-            rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f);
-
-            cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
-
-        } else if (v.isActivelyMoving()) { // translating
-
-            if (v.move_state.test (eye3dvisual::move_sense::up)) {
-                hoverheight += 0.002f;
-            } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
-                hoverheight -= 0.002f;
-                if (hoverheight < 0.0f) { hoverheight = 0.0f; }
+        // A random walk mode
+        if (opts.test (eye3d::options::random_walk)) {
+            // set rotation and step length according to the Stone paper
+            rrg.step();
+            // rrg.omega is the angular speed rrg.speed is the linear speed
+            //std::cout << "rotating in this step by " << rrg.omega << " and moving forward by " << rrg.speed << std::endl;
+            rotateCamerasLocallyAround (rrg.omega, 0.0f, 1.0f, 0.0f);
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+            sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
+            try {
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
+            } catch (const std::exception& e) {
+                std::cout << "Exception navigating mesh: " << e.what() << std::endl;
+                opts.set (eye3d::options::random_walk, false);
             }
-
-            // Obtain the commanded movement vector and turn this into a translation matrix
-            sm::vec mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
-            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
-        } // else not actively moving or rotating
+        } else {
+
+            if (v.isActivelyRotating()) {
+                // Up-down (pitch) is rotation about local camera frame axis x
+                rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
+                // Left-and-right (yaw) is rotation about local camera frame axis y
+                rotateCamerasLocallyAround (v.getHorizontalRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 1.0f, 0.0f);
+                // Roll
+                rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f);
+
+                cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
+
+            } else if (v.isActivelyMoving()) { // translating
+
+                if (v.move_state.test (eye3dvisual::move_sense::up)) {
+                    hoverheight += 0.002f;
+                } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
+                    hoverheight -= 0.002f;
+                    if (hoverheight < 0.0f) { hoverheight = 0.0f; }
+                }
+
+                // Obtain the commanded movement vector and turn this into a translation matrix
+                sm::vec<float> mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+
+            } // else not actively moving or rotating
+        }
 
         // reset to initial camera space if requested
         if (v.vstate.test (eye3dvisual::state::campose_reset_request) == true) {
@@ -340,7 +456,7 @@ int main (int argc, char* argv[])
         // Change label after render (it needs v's context, not veye's)
         fps_label->setupText (fps_profiler.fps_txt);
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
-        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.waitevents (0.018); }
+        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (0.018); }
         // Render the eye-only window
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
