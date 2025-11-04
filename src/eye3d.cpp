@@ -40,11 +40,12 @@ namespace eye3d
                   << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
     }
     // Helper to plot coords
-    mplot::CoordArrows<>* plot_axes (mplot::Visual<>* thevisual)
+    mplot::CoordArrows<>* plot_axes (mplot::Visual<>* thevisual, const float len = 1.0f)
     {
         auto cavm = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
         thevisual->bindmodel (cavm);
         cavm->em = 0.0f; // labels don't work so well
+        cavm->lengths = { len, len, len };
         cavm->finalize();
         return thevisual->addVisualModel (cavm);
     }
@@ -278,7 +279,7 @@ int main (int argc, char* argv[])
     ep2 = veye.addVisualModel (eyevm2);
 
     // Make CoordArrows axes to show our camera's localspace
-    mplot::CoordArrows<>* cam_cs_ptr = eye3d::plot_axes (&v);
+    mplot::CoordArrows<>* cam_cs_ptr = eye3d::plot_axes (&v, 3.0f);
     cam_cs_ptr->name = "eye frame";
     cam_cs_ptr->setViewMatrix (initial_camera_space);
 
@@ -388,8 +389,16 @@ int main (int argc, char* argv[])
             sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
             try {
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
-            } catch (const std::exception& e) {
+            } catch (const mplot::NavException& e) {
                 std::cout << "Exception navigating mesh: " << e.what() << std::endl;
+
+                // Could make triangle from ti0
+                sm::vec<sm::vec<float>, 3> tv_excp = land->navmesh->triangle_vertices (ti0, land_to_scene);
+                std::cout << "Triangle ti0 for exception: " << tv_excp << std::endl;
+                for (auto t : e.tris) {
+                    std::cout << "Tri: " << land->navmesh->triangle_vertices (t, land_to_scene) << std::endl;
+                }
+
                 opts.set (eye3d::options::random_walk, false);
             }
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
