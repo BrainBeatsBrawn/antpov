@@ -321,7 +321,6 @@ int main (int argc, char* argv[])
         }
 
         // Update the view matrix of eye and eye localspace axes
-        v.setContext();
         ep1->setViewMatrix (cam_to_scene);
         cam_cs_ptr->setViewMatrix (cam_to_scene);
     };
@@ -334,11 +333,12 @@ int main (int argc, char* argv[])
 
         // Tell the fps_profiler that we're at the start of a loop
         fps_profiler.at_begin (getCurrentEyeSamplesPerOmmatidium());
-        fps_label->setupText (fps_profiler.fps_txt);
         // The current camera may have changed, this subroutine deals with any changes
         subr_detect_camera_changes();
         // Now render the mathplot window
         v.render();
+        // Change label after render (it needs v's context, not veye's)
+        fps_label->setupText (fps_profiler.fps_txt);
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.waitevents (0.018); }
         // Render the eye-only window
