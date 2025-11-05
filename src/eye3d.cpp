@@ -20,6 +20,7 @@
 #include <mplot/compoundray/EyeVisual.h>
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
+#include <mplot/RodVisual.h>
 
 #include "spline.hpp" // tkspline plus wrapper in sm::algo space
 
@@ -49,6 +50,19 @@ namespace eye3d
         cavm->finalize();
         return thevisual->addVisualModel (cavm);
     }
+
+    void add_tube_vm (mplot::Visual<>* v,
+                      const sm::vec<float>& v0, const sm::vec<float>& v1,
+                      const std::array<float, 3>& clr)
+    {
+        float r = (v1 - v0).length() / 20.0f;
+        auto tvm = std::make_unique<mplot::RodVisual<>> (sm::vec<>{}, v0, v1, r, clr);
+        v->bindmodel (tvm);
+        tvm->finalize();
+        v->addVisualModel (tvm);
+    }
+
+
     // Flags class
     enum class options : uint32_t
     {
@@ -259,7 +273,7 @@ int main (int argc, char* argv[])
     sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
 
     // Get the visual models from the scene
-    mplot::compoundray::scene_to_visualmodels (scene, &v, true); // true for 'make_navmeshes'
+    mplot::compoundray::scene_to_visualmodels (scene, &v, false); // true for 'make_navmeshes'
 
     // Create an EyeVisual 'eye' in our mathplot scene, v.
     mplot::compoundray::EyeVisual<>* ep1 = nullptr;
@@ -290,10 +304,10 @@ int main (int argc, char* argv[])
         v.init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
             // The 'land' is a cube for now
-            if (vmp->name == "Cube.002" && land == nullptr) { land = vmp; }
-            else if (vmp->name == "Cube.001" && land == nullptr) { land = vmp; }
-            else if (vmp->name == "Landscape.003" /* && land == nullptr */) { land = vmp; } // land trumps other objects
-            else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; }
+            if (vmp->name == "Cube.002" && land == nullptr) { land = vmp; land->make_navmesh(); }
+            else if (vmp->name == "Cube.001" && land == nullptr) { land = vmp; land->make_navmesh(); }
+            else if (vmp->name == "Landscape.003" /* && land == nullptr */) { land = vmp; land->make_navmesh(); } // land trumps other objects
+            else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; land->make_navmesh(); }
             else { std::cout << "Model name " << vmp->name << std::endl; }
         }
     }
@@ -301,7 +315,7 @@ int main (int argc, char* argv[])
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
     // FIXME These should be state in navmesh?
-    std::array<uint32_t, 3> ti0 = {}; // Current triangle indices
+    std::array<uint32_t, 4> ti0 = {}; // Current triangle indices
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
     float hoverheight = 0.08f;
@@ -387,16 +401,36 @@ int main (int argc, char* argv[])
             rotateCamerasLocallyAround (rrg.omega, 0.0f, 1.0f, 0.0f);
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
             sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
+            // saves
+            sm::mat44<float> cam_to_scene_sv = cam_to_scene;
+            std::array<uint32_t, 4> ti0_sv = ti0;
             try {
+                // Note that even if the last mesh movement would land on a triangle, a further
+                // rotation might mean that we get a 'no triangle intersection' exception (esp. if
+                // we are on the edge of a landscape)
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
+                if (ti0[3] == 1) {
+                    // After movement we'd be on the edge, so cancel movement
+                    std::cout << "Would be on edge, cancel movement\n";
+                    cam_to_scene = cam_to_scene_sv;
+                    ti0 = ti0_sv;
+                }
+
             } catch (const mplot::NavException& e) {
+
                 std::cout << "Exception navigating mesh: " << e.what() << std::endl;
 
-                // Could make triangle from ti0
-                sm::vec<sm::vec<float>, 3> tv_excp = land->navmesh->triangle_vertices (ti0, land_to_scene);
-                std::cout << "Triangle ti0 for exception: " << tv_excp << std::endl;
+                // Draw triangle tubes
+                bool first = true;
                 for (auto t : e.tris) {
-                    std::cout << "Tri: " << land->navmesh->triangle_vertices (t, land_to_scene) << std::endl;
+                    if (first) {
+                        std::cout << ti0[0] << "-" << ti0[1] << "-" << ti0[2] << " has ti0[3] = " << ti0[3] << std::endl;
+                    }
+                    auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
+                    eye3d::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
+                    eye3d::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
+                    eye3d::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
+                    first = false;
                 }
 
                 opts.set (eye3d::options::random_walk, false);
