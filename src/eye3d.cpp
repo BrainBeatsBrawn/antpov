@@ -424,12 +424,22 @@ int main (int argc, char* argv[])
                 bool first = true;
                 for (auto t : e.tris) {
                     if (first) {
-                        std::cout << ti0[0] << "-" << ti0[1] << "-" << ti0[2] << " has ti0[3] = " << ti0[3] << std::endl;
+                        std::cout << t[0] << "-" << t[1] << "-" << t[2] << " has t[3] = " << t[3] << std::endl;
                     }
                     auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
                     eye3d::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
                     eye3d::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
                     eye3d::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
+
+                    // JSON line to view with triangle_intersect
+                    sm::vec<float> tn0 = land->navmesh->triangle_normal (tv);
+                    std::cout << std::endl;
+                    std::cout << "{ \"t0\" : " << tv[0].str_mat() << ", "
+                              << "\"t1\" : " << tv[1].str_mat() << ", "
+                              << "\"t2\" : " << tv[2].str_mat() << ", "
+                              << "\"l0\" : " << cam_to_scene.translation().str_mat() << ", "
+                              << "\"l\" : " << (-tn0).str_mat() << " }" << std::endl;
+
                     first = false;
                 }
 
