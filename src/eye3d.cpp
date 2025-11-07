@@ -416,7 +416,7 @@ int main (int argc, char* argv[])
                     ti0 = ti0_sv;
                 }
 
-            } catch (const mplot::NavException& e) {
+            } catch (mplot::NavException& e) {
 
                 std::cout << "Exception navigating mesh: " << e.what() << std::endl;
 
