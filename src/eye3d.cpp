@@ -419,7 +419,7 @@ int main (int argc, char* argv[])
             } catch (mplot::NavException& e) {
 
                 std::cout << "Exception navigating mesh: " << e.what() << std::endl;
-
+                opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
                 // Draw triangle tubes
                 bool first = true;
                 for (auto t : e.tris) {
