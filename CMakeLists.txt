@@ -369,7 +369,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMPLOT_FONTS_DIR=\"\\\"${PROJECT_SOURCE
 
 # Find the libraries which will be needed in addition to those required by compound-ray
 find_package(Freetype REQUIRED)
-find_package(HDF5)
+find_package(HDF5 REQUIRED)
 if(HDF5_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${HDF5_DEFINITIONS}")
   include_directories(${HDF5_INCLUDE_DIR})

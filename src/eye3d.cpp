@@ -7,6 +7,7 @@
 #include <sm/flags>
 #include <sm/vvec>
 #include <sm/grid>
+#include <sm/hdfdata>
 
 #include <sampleConfig.h>
 
@@ -70,6 +71,7 @@ namespace eye3d
         keep_moving,      // If true, movements keep moving
         max_fps,          // If true, poll, instead of fps
         random_walk,
+        playback,
         can_exit
     };
     // Parse cmd line to find the path and set options
@@ -94,6 +96,8 @@ namespace eye3d
                 opts |= eye3d::options::max_fps;
             } else if (arg == "-k") {
                 opts |= eye3d::options::keep_moving;
+            } else if (arg == "-p") {
+                opts |= eye3d::options::playback;
             } else if (arg == "-w") {
                 opts |= eye3d::options::random_walk;
             }
@@ -385,8 +389,29 @@ int main (int argc, char* argv[])
         }
     };
 
+    uint64_t move_counter = 0u;
+
+    // A queue of data for saving
+    constexpr uint32_t qlen = 20;
+    std::deque<mplot::NavMeshMovementData> mdq;
+    uint32_t di = 0; // data index (for playback)
+    if (opts.test (eye3d::options::playback)) {
+        // populate mdq from file
+        try {
+            sm::hdfdata hd ("./navmesh_data.h5", std::ios::in);
+            for (uint32_t i = 0; i < qlen; ++i) {
+                mplot::NavMeshMovementData nmd;
+                nmd.load (hd, i);
+                mdq.push_back (nmd);
+            }
+
+        } catch (const std::exception& e) {
+            // No file to open
+        }
+    }
+
     auto subr_key_move_over_land = [&v, &ep1, &cam_cs_ptr, &initial_camera_space, &ti0, &rrg,
-                                    &opts, land, land_to_scene, &hoverheight]()
+                                    &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight]()
     {
         cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -408,17 +433,29 @@ int main (int argc, char* argv[])
                 // Note that even if the last mesh movement would land on a triangle, a further
                 // rotation might mean that we get a 'no triangle intersection' exception (esp. if
                 // we are on the edge of a landscape)
+                mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight });
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
                 if (ti0[3] == 1) {
                     // After movement we'd be on the edge, so cancel movement
                     std::cout << "Would be on edge, cancel movement\n";
                     cam_to_scene = cam_to_scene_sv;
                     ti0 = ti0_sv;
+                    mdq.pop_back();
+                } else {
+                    ++move_counter;
                 }
+                if (mdq.size() > qlen) { mdq.pop_front(); }
 
             } catch (mplot::NavException& e) {
 
-                std::cout << "Exception navigating mesh: " << e.what() << std::endl;
+                std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
+
+                // save data
+                {
+                    sm::hdfdata hd("./navmesh_data.h5", std::ios::out | std::ios::trunc);
+                    for (uint32_t i = 0; i < mdq.size(); ++i) { mdq[i].save (hd, i); }
+                }
+
                 opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
                 // Draw triangle tubes
                 bool first = true;
@@ -444,6 +481,30 @@ int main (int argc, char* argv[])
                 }
 
                 opts.set (eye3d::options::random_walk, false);
+            }
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+
+        } else if (opts.test (eye3d::options::playback)) { // play back deque of movements
+            try {
+                // Note that even if the last mesh movement would land on a triangle, a further
+                // rotation might mean that we get a 'no triangle intersection' exception (esp. if
+                // we are on the edge of a landscape)
+                ti0 = mdq[di].ti0;
+                std::array<uint32_t, 4> ti0_sv = ti0;
+                std::cout << "Playback of saved movement index = " << di << std::endl;
+                sm::mat44<float> cam_to_scene_sv = cam_to_scene;
+                cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, ti0, mdq[di].hoverheight);
+                di++;
+                if (ti0[3] == 1) {
+                    // After movement we'd be on the edge, so cancel movement
+                    std::cout << "(Playback) Would be on edge, cancel movement\n";
+                    cam_to_scene = cam_to_scene_sv;
+                    ti0 = ti0_sv;
+                }
+            } catch (mplot::NavException& e) {
+                std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
+                opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
+                opts.set (eye3d::options::playback, false);
             }
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
