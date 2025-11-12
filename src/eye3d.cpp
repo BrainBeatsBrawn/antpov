@@ -437,7 +437,7 @@ int main (int argc, char* argv[])
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
                 if (ti0[3] == 1) {
                     // After movement we'd be on the edge, so cancel movement
-                    std::cout << "Would be on edge, cancel movement\n";
+                    // std::cout << "Would be on edge, cancel movement\n";
                     cam_to_scene = cam_to_scene_sv;
                     ti0 = ti0_sv;
                     mdq.pop_back();
@@ -558,7 +558,7 @@ int main (int argc, char* argv[])
     /**
      * The main program loop
      */
-
+    std::string m_count_str = {};
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
@@ -568,7 +568,10 @@ int main (int argc, char* argv[])
         // Now render the mathplot window
         v.render();
         // Change label after render (it needs v's context, not veye's)
-        fps_label->setupText (fps_profiler.fps_txt);
+        if (move_counter % 1000 == 0) {
+            m_count_str = std::to_string (move_counter);
+            fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
+        }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (0.018); }
         // Render the eye-only window
