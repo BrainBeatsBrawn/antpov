@@ -312,6 +312,7 @@ int main (int argc, char* argv[])
             else if (vmp->name == "Cube.001" && land == nullptr) { land = vmp; land->make_navmesh(); }
             else if (vmp->name == "Landscape.003" /* && land == nullptr */) { land = vmp; land->make_navmesh(); } // land trumps other objects
             else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; land->make_navmesh(); }
+            else if (vmp->name == "ground_inner_high_res" && land == nullptr) { land = vmp; land->make_navmesh(); }
             else { std::cout << "Model name " << vmp->name << std::endl; }
         }
     }
