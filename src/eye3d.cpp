@@ -345,7 +345,7 @@ int main (int argc, char* argv[])
     }
 
     // Random route generation
-    eye3d::random_outbound<float> rrg(1500, 50, 50);
+    eye3d::random_outbound<float> rrg(1500, 150, 100);
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
@@ -431,22 +431,25 @@ int main (int argc, char* argv[])
             sm::mat44<float> cam_to_scene_sv = cam_to_scene;
             std::array<uint32_t, 4> ti0_sv = ti0;
             try {
-                // Note that even if the last mesh movement would land on a triangle, a further
-                // rotation might mean that we get a 'no triangle intersection' exception (esp. if
-                // we are on the edge of a landscape)
-                mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight });
-                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
-                if (ti0[3] == 1) {
-                    // After movement we'd be on the edge, so cancel movement
-                    // std::cout << "Would be on edge, cancel movement\n";
-                    cam_to_scene = cam_to_scene_sv;
-                    ti0 = ti0_sv;
-                    mdq.pop_back();
-                } else {
+                try {
+                    // Note that even if the last mesh movement would land on a triangle, a further
+                    // rotation might mean that we get a 'no triangle intersection' exception (esp. if
+                    // we are on the edge of a landscape)
+                    mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight });
+                    cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
                     ++move_counter;
-                }
-                if (mdq.size() > qlen) { mdq.pop_front(); }
+                    if (mdq.size() > qlen) { mdq.pop_front(); }
 
+                } catch (mplot::NavException& e) {
+                    if (e.m_type == mplot::NavException::type::off_edge) {
+                        // After movement we'd be near the edge, so cancel movement
+                        cam_to_scene = cam_to_scene_sv;
+                        ti0 = ti0_sv;
+                        mdq.pop_back();
+                    } else {
+                        throw e;
+                    }
+                }
             } catch (mplot::NavException& e) {
 
                 std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
