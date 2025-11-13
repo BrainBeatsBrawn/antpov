@@ -26,6 +26,7 @@
 #include <mplot/ScatterVisual.h>
 #include <mplot/QuiverVisual.h>
 #include <mplot/HexGridVisual.h>
+#include <mplot/LengthscaleVisual.h>
 
 #include "DoubleHexGridVisual.h"
 
@@ -349,6 +350,11 @@ int main()
             v.addVisualModel (vmp);
         }
     }
+
+    auto lsv = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{});
+    v.bindmodel (lsv);
+    lsv->finalize();
+    v.addVisualModel (lsv);
 
     v.keepOpen();
 
