@@ -343,7 +343,7 @@ if (APPLE)
   set(CMAKE_CXX_FLAGS "-Wall -Wfatal-errors -g -O3")
 else()
   # This assumes a gcc compiler (or a gcc mimic like Clang) // -Wfatal-errors
-  set(CMAKE_CXX_FLAGS "-Wall -g -O3 -Wno-unused-result -Wno-unknown-pragmas")
+  set(CMAKE_CXX_FLAGS "-Wall -g -O3 -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors")
 endif()
 
 # Tell clang to be quiet about brace initialisers:
