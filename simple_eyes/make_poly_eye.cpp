@@ -1,6 +1,6 @@
 #include <string>
 #include <iostream>
-#include <sm/geometry>
+#include <sm/geometry_polyhedra>
 
 int main (int argc, char **argv)
 {
