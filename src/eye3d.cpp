@@ -31,6 +31,65 @@ extern MulticamScene* scene;
 // When the program starts, how many samples per ommatidium/element do you want?
 constexpr int samples_per_omm_default = 64;
 
+namespace mplot
+{
+    // The data we pass to NavMesh::compute_mesh_movement, so I can save, say the last 100 movements
+    // in a deque and then save/load and replay
+    struct NavMeshMovementData
+    {
+        sm::vec<float> mv_camframe = {};
+        sm::mat44<float> cam_to_scene = {};
+        sm::mat44<float> model_to_scene = {};
+        std::array<uint32_t, 4> ti0 = {};
+        float hoverheight = 0.0f;
+
+        bool operator== (const NavMeshMovementData& rhs) const noexcept
+        {
+            return (mv_camframe == rhs.mv_camframe
+                    && cam_to_scene == rhs.cam_to_scene
+                    && model_to_scene == rhs.model_to_scene
+                    && ti0 == rhs.ti0
+                    && hoverheight == rhs.hoverheight);
+        }
+
+        bool operator!= (const NavMeshMovementData& rhs) const noexcept { return !(*this == rhs); }
+
+        // Save data into the already-open hdfdata object
+        void save (sm::hdfdata& hd, const uint32_t data_index)
+        {
+            std::stringstream pcom;
+            pcom << "/navmeshmv_" << data_index;
+            std::string s = pcom.str() + std::string("/mv_camframe");
+            hd.add_contained_vals (s.c_str(), mv_camframe);
+            s = pcom.str() + std::string("/cam_to_scene");
+            hd.add_contained_vals (s.c_str(), cam_to_scene.mat);
+            s = pcom.str() + std::string("/model_to_scene");
+            hd.add_contained_vals (s.c_str(), model_to_scene.mat);
+            s = pcom.str() + std::string("/ti0");
+            hd.add_contained_vals (s.c_str(), ti0);
+            s = pcom.str() + std::string("/hoverheight");
+            hd.add_val (s.c_str(), hoverheight);
+        }
+
+        // Load data
+        void load (sm::hdfdata& hd, const uint32_t data_index)
+        {
+            std::stringstream pcom;
+            pcom << "/navmeshmv_" << data_index;
+            std::string s = pcom.str() + std::string("/mv_camframe");
+            hd.read_contained_vals (s.c_str(), mv_camframe);
+            s = pcom.str() + std::string("/cam_to_scene");
+            hd.read_contained_vals (s.c_str(), cam_to_scene.mat);
+            s = pcom.str() + std::string("/model_to_scene");
+            hd.read_contained_vals (s.c_str(), model_to_scene.mat);
+            s = pcom.str() + std::string("/ti0");
+            hd.read_contained_vals (s.c_str(), ti0);
+            s = pcom.str() + std::string("/hoverheight");
+            hd.read_val (s.c_str(), hoverheight);
+        }
+    };
+} // mplot
+
 namespace eye3d
 {
     // Your application-specific help message
@@ -183,9 +242,9 @@ namespace eye3d
         // Parameters
         const T lambda = T{0.4};
         T kappa = T{100};                   // Von Mises concentration parameter
-        sm::vvec<T> a = {};                       // Acceleration values
-        // Uniform RNG range outbound [0, 0.15]
-        const sm::range<T> amm = { T{0}, T{0.02} };
+        sm::vvec<T> a = {};                 // Acceleration values
+        // Uniform RNG range outbound [0, 0.05]
+        const sm::range<T> amm = { T{0}, T{0.005} };
         // how often does the acceleration change?
         uint32_t a_tau = 50;
 
@@ -225,7 +284,7 @@ int main (int argc, char* argv[])
     // Create a mathplot window to render the eye/sensor
     eye3dvisual v (2000, 1200, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
-    v.speed = 0.05f;
+    v.speed = 0.0002f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
     v.lightingEffects (true);
     // Use a non-default zFar as we use large environments
@@ -295,11 +354,21 @@ int main (int argc, char* argv[])
     eyevm2->name = "Big Eye";
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
+    // Scale this model up, so it's not tiny like the one in the scene
+    ep2->scaleViewMatrix (1000);
 
-    // Make CoordArrows axes to show our camera's localspace
-    mplot::CoordArrows<>* cam_cs_ptr = eye3d::plot_axes (&v, 3.0f);
-    cam_cs_ptr->name = "eye frame";
-    cam_cs_ptr->setViewMatrix (initial_camera_space);
+    // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
+    auto ant = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
+    v.bindmodel (ant);
+    ant->em = 0.0f; // labels don't work so well
+    float len = 0.25f;
+    ant->lengths = { len, len, len };
+    ant->thickness = 0.4f;
+    ant->endsphere_size = 1.0f;
+    ant->finalize();
+    auto ant_ptr = v.addVisualModel (ant);
+    ant_ptr->name = "ant";
+    ant_ptr->setViewMatrix (initial_camera_space);
 
     // Get access to the landscape VisualModel by searching for a selection of model names
     mplot::VisualModel<>* land = nullptr;
@@ -323,7 +392,7 @@ int main (int argc, char* argv[])
     std::array<uint32_t, 4> ti0 = {}; // Current triangle indices
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
-    float hoverheight = 0.08f;
+    float hoverheight = 0.01f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
     if (land) {
@@ -369,8 +438,11 @@ int main (int argc, char* argv[])
         }
         // Change the length of the cones?
         if (ep1->get_cone_length() != v.manual_cone_length) {
+            std::cout << "Cone length " << ep1->get_cone_length() << " != requested: " << v.manual_cone_length << std::endl;
             ep1->set_cone_length (v.manual_cone_length);
             ep2->set_cone_length (v.manual_cone_length);
+
+            //ep1->scaleViewMatrix (v.manual_cone_length);
         }
         // Update eyevm model (or just update colours)
         ep1->ommatidia = ommatidia;
@@ -411,10 +483,10 @@ int main (int argc, char* argv[])
         }
     }
 
-    auto subr_key_move_over_land = [&v, &ep1, &cam_cs_ptr, &initial_camera_space, &ti0, &rrg,
+    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &initial_camera_space, &ti0, &rrg,
                                     &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight]()
     {
-        cam_cs_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        ant_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
@@ -556,7 +628,7 @@ int main (int argc, char* argv[])
 
         // Update the view matrix of eye and eye localspace axes
         ep1->setViewMatrix (cam_to_scene);
-        cam_cs_ptr->setViewMatrix (cam_to_scene);
+        ant_ptr->setViewMatrix (cam_to_scene);
     };
 
     /**

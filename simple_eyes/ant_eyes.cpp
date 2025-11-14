@@ -7,6 +7,9 @@
  * vertical height. They have about 421-590 ommatidia which have an acceptance angle of
  * 2.9 degrees avg and an interommatidial angle of 3.7 deg, but the range is from 6 deg
  * at anterior. 5 lateral and 3 posterior.
+ *
+ * This program will output an eye file in metres, because our environment models will be specified
+ * in metres.
  */
 
 #include <iostream>
@@ -22,13 +25,17 @@
 #include <sm/hexgrid>
 #include <sm/hdfdata>
 
-#include <mplot/Visual.h>
-#include <mplot/ScatterVisual.h>
-#include <mplot/QuiverVisual.h>
-#include <mplot/HexGridVisual.h>
-#include <mplot/LengthscaleVisual.h>
+#define DO_PLOTTING
+#ifdef DO_PLOTTING
+# include <mplot/Visual.h>
+# include <mplot/ScatterVisual.h>
+# include <mplot/QuiverVisual.h>
+# include <mplot/HexGridVisual.h>
+# include <mplot/LengthscaleVisual.h>
 
-#include "DoubleHexGridVisual.h"
+# include "DoubleHexGridVisual.h"
+# include "AntVisual.h"
+#endif
 
 enum class spherical_projection
 {
@@ -38,31 +45,14 @@ enum class spherical_projection
     splodge
 };
 
-int main()
+int main (int argc, char** argv)
 {
     constexpr spherical_projection proj =  spherical_projection::splodge;
 
-    // You can hide the RGB arrows and/or the second eye
-    constexpr bool two_eyes = true;
-    constexpr bool show_rgb = true;
-
     using mc = sm::mathconst<float>;
 
-    constexpr bool show_version_stdout = false;
-    mplot::Visual v(1024, 768, "Hexy Eyes", show_version_stdout);
-    v.setSceneTrans (sm::vec<float,3>{0.0f, 0.0f, -1.1f});
-    v.userInfoStdout (false);
-    v.showCoordArrows (true);
-    v.lightingEffects();
-
-    sm::scale<float> clr_scale;
-    clr_scale.setParams (1.0f, 0.0f);
-
-    // radius of sphere
+    // radius of sphere. Compound-ray eye files are in mm.
     constexpr float r_sph = 0.17f; // Meaning 170 um from "Eye radius Lateral" row, Table 1
-
-    // Positions for two 'eyes'. Actually, sepn is coded into hex vertex positions, so position of each eye model is the same.
-    sm::vec<float, 3> eyepos = { 0.0f, 0.0f, 0.0f };
 
     // A spacing between the eyes inserted into abs position so it shows in compound-ray
     float eye_x_loc = 3.0f * r_sph; // 3 is a guess
@@ -125,9 +115,9 @@ int main()
             }
             sm::vec<float> prerotate = { eye_x_loc + z_sph, xy[0], xy[1] };
             sm::mat44<float> m1;
-            m1.rotate (sm::vec<float>{0, 1, 0}, mc::pi_over_6);
+            m1.rotate (sm::vec<float>{0, 1, 0}, mc::pi_over_6 + mc::pi);
             sphere_coords[i] = (m1 * prerotate).less_one_dim();
-            //sphere_coords[i][0] =  eye_x_loc + z_sph;
+
         } else { // it's a serious projection
             float coslat = std::cos (latitude);
             float sinlat = std::sin (latitude);
@@ -195,6 +185,8 @@ int main()
     auto output_coords = [r_sph, hg](const sm::vvec<sm::vec<float, 3>>& coords, sm::vec<float, 3> eyeoffset, std::ofstream& fout) {
         constexpr float focal_offset = r_sph;
         constexpr float radius = r_sph;
+        constexpr float mm_to_metres = 0.001f;
+        constexpr float acceptance_angle_multiplier = 1.1f;
         for (unsigned int i = 0; i < coords.size(); ++i) {
             auto norm = coords[i];
             norm.renormalize();
@@ -202,34 +194,55 @@ int main()
             auto c1 = radius * (coords[i] - eyeoffset);
             if (hg.d_ne[i] != -1) {
                 auto c2 = radius * (coords[hg.d_ne[i]] - eyeoffset);
-                acceptance_angle *= c1.angle(c2);
+                acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } else if (hg.d_nne[i] != -1) {
                 auto c2 = radius * (coords[hg.d_nne[i]] - eyeoffset);
-                acceptance_angle *= c1.angle(c2);
+                acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } else if (hg.d_nnw[i] != -1) {
                 auto c2 = radius * (coords[hg.d_nnw[i]] - eyeoffset);
-                acceptance_angle *= c1.angle(c2);
+                acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } else if (hg.d_nw[i] != -1) {
                 auto c2 = radius * (coords[hg.d_nw[i]] - eyeoffset);
-                acceptance_angle *= c1.angle(c2);
+                acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } else if (hg.d_nsw[i] != -1) {
                 auto c2 = radius * (coords[hg.d_nsw[i]] - eyeoffset);
-                acceptance_angle *= c1.angle(c2);
+                acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } else if (hg.d_nse[i] != -1) {
                 auto c2 = radius * (coords[hg.d_nse[i]] - eyeoffset);
-                acceptance_angle *= c1.angle(c2);
+                acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } // else acceptange angle will be unchanged at 1.0f
 
             std::string ntxt = norm.str_comma_separated(' '); // normals (vertices were already normalized)
-            std::string vtxt = (coords[i] * radius).str_comma_separated(' ');
-            fout << vtxt << " " << ntxt << " " << acceptance_angle << " " << focal_offset << std::endl;
+            std::string vtxt = (coords[i] * mm_to_metres).str_comma_separated(' ');
+            fout << vtxt << " " << ntxt << " " << acceptance_angle << " " << focal_offset * mm_to_metres << std::endl;
         }
     };
     std::ofstream fout ("ant_eyes_dhex.eye", std::ios::out | std::ios::trunc);
     if (fout.is_open()) {
-        output_coords (sphere_coords, sm::vec<float, 3>{eye_x_loc, 0, 0}, fout);
-        output_coords (sphere_coords2, sm::vec<float, 3>{-eye_x_loc, 0, 0}, fout);
+        output_coords (sphere_coords, sm::vec<float, 3>{-eye_x_loc, 0, 0}, fout);
+        output_coords (sphere_coords2, sm::vec<float, 3>{eye_x_loc, 0, 0}, fout);
     }
+
+#ifdef DO_PLOTTING
+
+    // You can hide the RGB arrows and/or the second eye
+    constexpr bool two_eyes = true;
+    constexpr bool show_rgb = false;
+    constexpr bool show_scatter = false;
+    // Positions for two 'eyes'. Actually, sepn is coded into hex vertex positions, so position of each eye model is the same.
+    sm::vec<float, 3> eyepos = { 0.0f, 0.0f, 0.0f };
+
+    constexpr bool show_version_stdout = false;
+    mplot::Visual v(1024, 768, "Desert Anty Eyes", show_version_stdout);
+    v.setSceneTrans (sm::vec<float,3>{0.0f, 0.0f, -1.1f});
+    v.userInfoStdout (false);
+    v.showCoordArrows (true);
+    v.coordArrowsInScene (false);
+    v.lightingEffects();
+
+    sm::scale<float> clr_scale;
+    clr_scale.setParams (1.0f, 0.0f);
+
     sm::vvec<float> data;
     data.linspace (0, 1, hg.num());
     sm::vvec<float> datatwice(data);
@@ -237,19 +250,21 @@ int main()
 
     // First eye
     constexpr float hex_d_prop = 0.2f;
-    auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
-    v.bindmodel (sv);
-    sv->setDataCoords (&sphere_coords);
-    sv->setScalarData (&data);
-    sv->radiusFixed = hex_d * hex_d_prop;
-    sv->colourScale = clr_scale;
-    sv->cm.setType (mplot::ColourMapType::Jet);
-    sv->finalize();
-    v.addVisualModel (sv);
+    if constexpr (show_scatter) {
+        auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
+        v.bindmodel (sv);
+        sv->setDataCoords (&sphere_coords);
+        sv->setScalarData (&data);
+        sv->radiusFixed = hex_d * hex_d_prop;
+        sv->colourScale = clr_scale;
+        sv->cm.setType (mplot::ColourMapType::Jet);
+        sv->finalize();
+        v.addVisualModel (sv);
+    }
 
     // Add a DoubleHexGridVisual view of the eye pair (only works for two_eyes == true)
     if constexpr (two_eyes == true) {
-        sm::vec<float, 3> offset = { 0.0f, 2.0f * r_sph, 0.0f };
+        sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
         auto hgv = std::make_unique<mplot::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
         v.bindmodel (hgv);
         hgv->setDataCoords (&eye_coords); // pass combined coords
@@ -261,8 +276,8 @@ int main()
     }
 
     // Second eye
-    if constexpr (two_eyes) {
-        sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
+    if constexpr (two_eyes && show_scatter) {
+        auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
         v.bindmodel (sv);
         sv->setDataCoords (&sphere_coords2);
         sv->setScalarData (&data);
@@ -350,13 +365,23 @@ int main()
             v.addVisualModel (vmp);
         }
     }
-
-    auto lsv = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{});
+#if 1
+    // This will be a 1 mm bar
+    auto lsv = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{-0.5f, -0.5f, 0});
     v.bindmodel (lsv);
+    lsv->label = "1 mm";
     lsv->finalize();
     v.addVisualModel (lsv);
 
+    auto av = std::make_unique<biosim::AntVisual<>>();
+    v.bindmodel (av);
+    av->finalize();
+    auto avp = v.addVisualModel (av);
+    avp->scaleViewMatrix (1000);
+#endif
     v.keepOpen();
+
+#endif // PLOTTING
 
     return 0;
 }

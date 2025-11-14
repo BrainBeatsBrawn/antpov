@@ -35,7 +35,7 @@ struct eye3dvisual final : public mplot::Visual<>
     static constexpr sm::vec<float, 3> ux = { 1.0f, 0.0f, 0.0f }; // right
     static constexpr sm::vec<float, 3> uy = { 0.0f, 1.0f, 0.0f }; // up
     static constexpr sm::vec<float, 3> uz = { 0.0f, 0.0f, 1.0f }; // fwd
-    // Speed of translations
+    // Speed of translations (in scene units)
     float speed = 0.04;
     // Speed of rotations
     float angularSpeed = mc::two_pi / 360.0f;
@@ -224,7 +224,7 @@ protected:
             } else if (key == mplot::key::i) {
                 // Increase manual disc size
                 if (this->manual_cone_length < 0.0f) {
-                    this->manual_cone_length = 0.05f;
+                    this->manual_cone_length = 0.001f;
                 } else {
                     this->manual_cone_length *= 2.0f;
                 }
