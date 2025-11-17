@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sm/config>
+
 #include <mplot/colour.h>
 #include <mplot/VisualModel.h>
 
@@ -11,31 +13,31 @@ namespace biosim
     public:
         AntVisual() {}
 
-
-        // Head 1 mm
-        static constexpr float head_radius = 0.0005f;
-        static constexpr sm::vec<> head_loc = {0, 0, -0.0001f};
-
-        static constexpr sm::vec<> thor_s = {0, -0.0002f, -0.0005f};
-        static constexpr sm::vec<> thor_e = {0, -0.0003f, -0.002f};
         void initializeVertices()
         {
+            sm::config conf ("./ant.json");
+            if (!conf.ready) { conf.parse ("{}"); }
+
             // Head
-            this->computeSphere (head_loc, mplot::colour::firebrick4, head_radius);
+            sm::mat44<float> head_tr;
+            head_tr.rotate (sm::vec<>::ux(), conf.get<float>("head_rotn_angle", 0.0f));
+            this->computeEllipsoid (conf.getvec<float, 3>("head_loc"),
+                                    mplot::colour::firebrick4,
+                                    mplot::colour::sepia,
+                                    conf.getvec<float, 3>("head_abc"), 30, 30, head_tr);
 
-            // thorax, etc
-            sm::vec<> thorax_uy = {1,0,0};
-            sm::vec<> thorax_uz = {0,1,0};
-
-/*
-  this->computeTube (thor_s, thor_e,
-  thorax_uy, thorax_uz,
-  mplot::colour::firebrick4, mplot::colour::firebrick4,
-  head_radius/3, 18);
-*/
-            this->computeCone (thor_s, thor_e, 0.0001f,
+            this->computeCone (conf.getvec<float, 3>("thor_s"),
+                               conf.getvec<float, 3>("thor_e"),
+                               0.0001f,
                                mplot::colour::firebrick4,
-                               head_radius/3, 18);
+                               conf.get<float>("head_radius", 0.0005f)/3, 18);
+
+            sm::mat44<float> abdomen_tr;
+            abdomen_tr.rotate (sm::vec<>::ux(), conf.get<float>("abdomen_rotn_angle", 0.0f));
+            this->computeEllipsoid (conf.getvec<float, 3>("abdomen_loc"),
+                                    mplot::colour::brown4,
+                                    mplot::colour::sepia,
+                                    conf.getvec<float, 3>("abdomen_abc"), 30, 30, abdomen_tr);
         }
     };
 }

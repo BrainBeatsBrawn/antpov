@@ -15,6 +15,7 @@
 #include "libEyeRenderer.h"
 
 #include "eye3dvisual.h"
+#include "AntVisual.h"
 #include <mplotext/fpsprofiler.h>
 #include <mplot/compoundray/interop.h> // mathplot <--> compoundray interoperability
 
@@ -357,18 +358,26 @@ int main (int argc, char* argv[])
     // Scale this model up, so it's not tiny like the one in the scene
     ep2->scaleViewMatrix (1000);
 
-    // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
-    auto ant = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
-    v.bindmodel (ant);
-    ant->em = 0.0f; // labels don't work so well
-    float len = 0.25f;
-    ant->lengths = { len, len, len };
-    ant->thickness = 0.4f;
-    ant->endsphere_size = 1.0f;
-    ant->finalize();
-    auto ant_ptr = v.addVisualModel (ant);
+
+    auto av = std::make_unique<biosim::AntVisual<>>();
+    v.bindmodel (av);
+    av->finalize();
+    auto ant_ptr = v.addVisualModel (av);
     ant_ptr->name = "ant";
     ant_ptr->setViewMatrix (initial_camera_space);
+
+    // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
+    auto antca = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
+    v.bindmodel (antca);
+    antca->em = 0.0f; // labels don't work so well
+    float len = 2.0f;
+    antca->lengths = { len, len, len };
+    antca->thickness = 1.0f;
+    antca->endsphere_size = 1.2f;
+    antca->finalize();
+    auto antca_ptr = v.addVisualModel (antca);
+    antca_ptr->name = "ant";
+    antca_ptr->setViewMatrix (initial_camera_space);
 
     // Get access to the landscape VisualModel by searching for a selection of model names
     mplot::VisualModel<>* land = nullptr;
@@ -483,10 +492,10 @@ int main (int argc, char* argv[])
         }
     }
 
-    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &initial_camera_space, &ti0, &rrg,
+    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &ti0, &rrg,
                                     &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight]()
     {
-        ant_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
@@ -629,6 +638,7 @@ int main (int argc, char* argv[])
         // Update the view matrix of eye and eye localspace axes
         ep1->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
+        antca_ptr->setViewMatrix (cam_to_scene);
     };
 
     /**

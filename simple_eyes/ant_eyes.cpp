@@ -378,6 +378,7 @@ int main (int argc, char** argv)
     av->finalize();
     auto avp = v.addVisualModel (av);
     avp->scaleViewMatrix (1000);
+
 #endif
     v.keepOpen();
 
