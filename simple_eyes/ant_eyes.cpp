@@ -45,6 +45,180 @@ enum class spherical_projection
     splodge
 };
 
+#ifdef DO_PLOTTING
+// You can hide the RGB arrows and/or the second eye
+constexpr bool two_eyes = true;
+constexpr bool show_rgb = false;
+constexpr bool show_scatter = false;
+
+void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
+                 sm::vvec<sm::vec<float, 3>>& sphere_coords,
+                 sm::vvec<sm::vec<float, 3>>& sphere_coords2,
+                 sm::vvec<sm::vec<float, 3>>& eye_coords,
+                 sm::vvec<sm::vec<float, 3>>& neighb_r,
+                 sm::vvec<sm::vec<float, 3>>& neighb_g,
+                 sm::vvec<sm::vec<float, 3>>& neighb_b,
+                 sm::vvec<sm::vec<float, 3>>& neighb_r2,
+                 sm::vvec<sm::vec<float, 3>>& neighb_g2,
+                 sm::vvec<sm::vec<float, 3>>& neighb_b2)
+{
+    v.clear();
+
+    // Positions for two 'eyes'. Actually, sepn is coded into hex vertex positions, so position of each eye model is the same.
+    sm::vec<float, 3> eyepos = { 0.0f, 0.0f, 0.0f };
+
+    sm::scale<float> clr_scale;
+    clr_scale.setParams (1.0f, 0.0f);
+
+    sm::vvec<float> data;
+    data.linspace (0, 1, hg.num());
+    sm::vvec<float> datatwice(data);
+    datatwice.insert (datatwice.end(), data.begin(), data.end());
+
+    // First eye
+    constexpr float hex_d_prop = 0.2f;
+    if constexpr (show_scatter) {
+        auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
+        v.bindmodel (sv);
+        sv->setDataCoords (&sphere_coords);
+        sv->setScalarData (&data);
+        sv->radiusFixed = hg.getd() * hex_d_prop;
+        sv->colourScale = clr_scale;
+        sv->cm.setType (mplot::ColourMapType::Jet);
+        sv->finalize();
+        v.addVisualModel (sv);
+    }
+
+    // Add a DoubleHexGridVisual view of the eye pair (only works for two_eyes == true)
+    if constexpr (two_eyes == true) {
+        sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
+        auto hgv = std::make_unique<mplot::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
+        v.bindmodel (hgv);
+        hgv->setDataCoords (&eye_coords); // pass combined coords
+        hgv->setScalarData (&datatwice);          // pass combined data
+        hgv->hexVisMode = mplot::HexVisMode::HexInterp; // HexInterp or mplot::HexVisMode::Triangles for a smoother surface plot
+        hgv->cm.setType (mplot::ColourMapType::Jet);
+        hgv->finalize();
+        v.addVisualModel (hgv);
+    }
+
+    // Second eye
+    if constexpr (two_eyes && show_scatter) {
+        auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
+        v.bindmodel (sv);
+        sv->setDataCoords (&sphere_coords2);
+        sv->setScalarData (&data);
+        sv->radiusFixed = hg.getd() * hex_d_prop;
+        sv->colourScale = clr_scale;
+        sv->cm.setType (mplot::ColourMapType::Jet);
+        sv->finalize();
+        v.addVisualModel (sv);
+    }
+
+    if constexpr (show_rgb) {
+        // Eye 1 RGB directions
+        sm::vvec<float> clrs (neighb_r.size(), 0.0f); // red
+        auto vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_r,
+                                                                mplot::ColourMapType::Rainbow);
+        v.bindmodel (vmp);
+        vmp->scalarData = &clrs;
+        vmp->colourScale.compute_scaling (0, 1);
+        vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
+        vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
+        vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
+        vmp->finalize();
+        v.addVisualModel (vmp);
+
+        clrs.set_from (0.33333f); // green
+        vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_g,
+                                                           mplot::ColourMapType::Rainbow);
+        v.bindmodel (vmp);
+        vmp->scalarData = &clrs;
+        vmp->colourScale.compute_scaling (0, 1);
+        vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
+        vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
+        vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
+        vmp->finalize();
+        v.addVisualModel (vmp);
+
+        clrs.set_from (0.66667f); // blue
+        vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_b,
+                                                           mplot::ColourMapType::Rainbow);
+        v.bindmodel (vmp);
+        vmp->scalarData = &clrs;
+        vmp->colourScale.compute_scaling (0, 1);
+        vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
+        vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
+        vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
+        vmp->finalize();
+        v.addVisualModel (vmp);
+
+        if constexpr (two_eyes) {
+            // Eye 2 RGB directions
+            clrs.set_from (0.0f); // red
+            vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_r2,
+                                                               mplot::ColourMapType::Rainbow);
+            v.bindmodel (vmp);
+            vmp->scalarData = &clrs;
+            vmp->colourScale.compute_scaling (0, 1);
+            vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
+            vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
+            vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
+            vmp->finalize();
+            v.addVisualModel (vmp);
+
+            clrs.set_from (0.33333f); // green
+            vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_g2,
+                                                               mplot::ColourMapType::Rainbow);
+            v.bindmodel (vmp);
+            vmp->scalarData = &clrs;
+            vmp->colourScale.compute_scaling (0, 1);
+            vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
+            vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
+            vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
+            vmp->finalize();
+            v.addVisualModel (vmp);
+
+            clrs.set_from (0.66667f); // blue
+            vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_b2,
+                                                               mplot::ColourMapType::Rainbow);
+            v.bindmodel (vmp);
+            vmp->scalarData = &clrs;
+            vmp->colourScale.compute_scaling (0, 1);
+            vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
+            vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
+            vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
+            vmp->finalize();
+            v.addVisualModel (vmp);
+        }
+    }
+
+    // This will be a 1 mm bar
+    auto lsv = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{-0.5f, -2.0f, 0});
+    v.bindmodel (lsv);
+    lsv->label = "1 mm";
+    lsv->finalize();
+    v.addVisualModel (lsv);
+
+    auto lsv2 = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{0.0f, -3.0f, 0});
+    v.bindmodel (lsv2);
+    lsv2->label = "10 mm";
+    lsv2->represented_distance = 10.0f;
+    lsv2->finalize();
+    [[maybe_unused]] auto lsv2p = v.addVisualModel (lsv2);
+/*
+    sm::quaternion<float> rq (sm::vec<>::uy(),
+                              -sm::mathconst<float>::pi_over_2);
+    lsv2p->setViewRotation (rq);
+*/
+    auto av = std::make_unique<biosim::AntVisual<>>();
+    v.bindmodel (av);
+    av->finalize();
+    auto avp = v.addVisualModel (av);
+    avp->scaleViewMatrix (1000);
+}
+#endif
+
 int main (int argc, char** argv)
 {
     constexpr spherical_projection proj =  spherical_projection::splodge;
@@ -225,162 +399,26 @@ int main (int argc, char** argv)
 
 #ifdef DO_PLOTTING
 
-    // You can hide the RGB arrows and/or the second eye
-    constexpr bool two_eyes = true;
-    constexpr bool show_rgb = false;
-    constexpr bool show_scatter = false;
-    // Positions for two 'eyes'. Actually, sepn is coded into hex vertex positions, so position of each eye model is the same.
-    sm::vec<float, 3> eyepos = { 0.0f, 0.0f, 0.0f };
-
     constexpr bool show_version_stdout = false;
     mplot::Visual v(1024, 768, "Desert Anty Eyes", show_version_stdout);
-    v.setSceneTrans (sm::vec<float,3>{0.0f, 0.0f, -1.1f});
+    v.setSceneTrans (sm::vec<float,3>{ float{-1.91057}, float{1.07071}, float{-23.0144} });
+    v.setSceneRotation (sm::quaternion<float>{ float{0.743712}, float{-0.0381476}, float{-0.666242}, float{0.0394651} });
+
     v.userInfoStdout (false);
     v.showCoordArrows (true);
     v.coordArrowsInScene (false);
     v.lightingEffects();
 
-    sm::scale<float> clr_scale;
-    clr_scale.setParams (1.0f, 0.0f);
+    buildModel (v, hg, sphere_coords, sphere_coords2, eye_coords,
+                neighb_r, neighb_g, neighb_b, neighb_r2, neighb_g2, neighb_b2);
 
-    sm::vvec<float> data;
-    data.linspace (0, 1, hg.num());
-    sm::vvec<float> datatwice(data);
-    datatwice.insert (datatwice.end(), data.begin(), data.end());
-
-    // First eye
-    constexpr float hex_d_prop = 0.2f;
-    if constexpr (show_scatter) {
-        auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
-        v.bindmodel (sv);
-        sv->setDataCoords (&sphere_coords);
-        sv->setScalarData (&data);
-        sv->radiusFixed = hex_d * hex_d_prop;
-        sv->colourScale = clr_scale;
-        sv->cm.setType (mplot::ColourMapType::Jet);
-        sv->finalize();
-        v.addVisualModel (sv);
+    int fcount = 0;
+    while (!v.readyToFinish()) {
+        v.waitevents (0.018);
+        if (fcount % 60 == 0) { buildModel (v, hg, sphere_coords, sphere_coords2, eye_coords,
+                                            neighb_r, neighb_g, neighb_b, neighb_r2, neighb_g2, neighb_b2); }
+        v.render();
     }
-
-    // Add a DoubleHexGridVisual view of the eye pair (only works for two_eyes == true)
-    if constexpr (two_eyes == true) {
-        sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
-        auto hgv = std::make_unique<mplot::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
-        v.bindmodel (hgv);
-        hgv->setDataCoords (&eye_coords); // pass combined coords
-        hgv->setScalarData (&datatwice);          // pass combined data
-        hgv->hexVisMode = mplot::HexVisMode::HexInterp; // HexInterp or mplot::HexVisMode::Triangles for a smoother surface plot
-        hgv->cm.setType (mplot::ColourMapType::Jet);
-        hgv->finalize();
-        v.addVisualModel (hgv);
-    }
-
-    // Second eye
-    if constexpr (two_eyes && show_scatter) {
-        auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
-        v.bindmodel (sv);
-        sv->setDataCoords (&sphere_coords2);
-        sv->setScalarData (&data);
-        sv->radiusFixed = hex_d * hex_d_prop;
-        sv->colourScale = clr_scale;
-        sv->cm.setType (mplot::ColourMapType::Jet);
-        sv->finalize();
-        v.addVisualModel (sv);
-    }
-
-    if constexpr (show_rgb) {
-        // Eye 1 RGB directions
-        sm::vvec<float> clrs (neighb_r.size(), 0.0f); // red
-        auto vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_r,
-                                                                mplot::ColourMapType::Rainbow);
-        v.bindmodel (vmp);
-        vmp->scalarData = &clrs;
-        vmp->colourScale.compute_scaling (0, 1);
-        vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
-        vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
-        vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
-        vmp->finalize();
-        v.addVisualModel (vmp);
-
-        clrs.set_from (0.33333f); // green
-        vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_g,
-                                                           mplot::ColourMapType::Rainbow);
-        v.bindmodel (vmp);
-        vmp->scalarData = &clrs;
-        vmp->colourScale.compute_scaling (0, 1);
-        vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
-        vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
-        vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
-        vmp->finalize();
-        v.addVisualModel (vmp);
-
-        clrs.set_from (0.66667f); // blue
-        vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_b,
-                                                           mplot::ColourMapType::Rainbow);
-        v.bindmodel (vmp);
-        vmp->scalarData = &clrs;
-        vmp->colourScale.compute_scaling (0, 1);
-        vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
-        vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
-        vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
-        vmp->finalize();
-        v.addVisualModel (vmp);
-
-        if constexpr (two_eyes) {
-            // Eye 2 RGB directions
-            clrs.set_from (0.0f); // red
-            vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_r2,
-                                                               mplot::ColourMapType::Rainbow);
-            v.bindmodel (vmp);
-            vmp->scalarData = &clrs;
-            vmp->colourScale.compute_scaling (0, 1);
-            vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
-            vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
-            vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
-            vmp->finalize();
-            v.addVisualModel (vmp);
-
-            clrs.set_from (0.33333f); // green
-            vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_g2,
-                                                               mplot::ColourMapType::Rainbow);
-            v.bindmodel (vmp);
-            vmp->scalarData = &clrs;
-            vmp->colourScale.compute_scaling (0, 1);
-            vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
-            vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
-            vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
-            vmp->finalize();
-            v.addVisualModel (vmp);
-
-            clrs.set_from (0.66667f); // blue
-            vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_b2,
-                                                               mplot::ColourMapType::Rainbow);
-            v.bindmodel (vmp);
-            vmp->scalarData = &clrs;
-            vmp->colourScale.compute_scaling (0, 1);
-            vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
-            vmp->quiver_length_gain = 0.5f;        // Apply a fixed gain to the length of the quivers on screen
-            vmp->fixed_quiver_thickness = 0.01f/5; // Fixed quiver thickness
-            vmp->finalize();
-            v.addVisualModel (vmp);
-        }
-    }
-#if 1
-    // This will be a 1 mm bar
-    auto lsv = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{-0.5f, -0.5f, 0});
-    v.bindmodel (lsv);
-    lsv->label = "1 mm";
-    lsv->finalize();
-    v.addVisualModel (lsv);
-
-    auto av = std::make_unique<biosim::AntVisual<>>();
-    v.bindmodel (av);
-    av->finalize();
-    auto avp = v.addVisualModel (av);
-    avp->scaleViewMatrix (1000);
-
-#endif
-    v.keepOpen();
 
 #endif // PLOTTING
 
