@@ -285,7 +285,7 @@ int main (int argc, char* argv[])
     // Create a mathplot window to render the eye/sensor
     eye3dvisual v (2000, 1200, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
-    v.speed = 0.0002f;
+    v.speed = 0.002f;
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
     v.lightingEffects (true);
     // Use a non-default zFar as we use large environments
@@ -293,7 +293,7 @@ int main (int argc, char* argv[])
     // Rotate about the nearest VisualModel
     v.rotateAboutNearest (true);
     // Rotate about a scene vertical axis? true for landscapes, false for cubes/objects (Ctrl-k changes I think, at runtime)
-    v.rotateAboutVertical (false);
+    v.rotateAboutVertical (true);
     if (opts.test(eye3d::options::blender_axes)) {
         v.switch_scene_vertical_axis(); // to uz up
     }
@@ -401,7 +401,7 @@ int main (int argc, char* argv[])
     std::array<uint32_t, 4> ti0 = {}; // Current triangle indices
     sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
 
-    float hoverheight = 0.01f;
+    float hoverheight = 0.005f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
     if (land) {
@@ -608,9 +608,9 @@ int main (int argc, char* argv[])
             } else if (v.isActivelyMoving()) { // translating
 
                 if (v.move_state.test (eye3dvisual::move_sense::up)) {
-                    hoverheight += 0.002f;
+                    hoverheight += 0.001f;
                 } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
-                    hoverheight -= 0.002f;
+                    hoverheight -= 0.001f;
                     if (hoverheight < 0.0f) { hoverheight = 0.0f; }
                 }
 
