@@ -597,15 +597,17 @@ int main (int argc, char* argv[])
 
             if (v.isActivelyRotating()) {
                 // Up-down (pitch) is rotation about local camera frame axis x
-                rotateCamerasLocallyAround (v.getVerticalRotationAngle (opts.test(eye3d::options::keep_moving)), 1.0f, 0.0f, 0.0f);
+                rotateCamerasLocallyAround (v.getVerticalRotationAngle(), 1.0f, 0.0f, 0.0f);
                 // Left-and-right (yaw) is rotation about local camera frame axis y
-                rotateCamerasLocallyAround (v.getHorizontalRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 1.0f, 0.0f);
+                rotateCamerasLocallyAround (v.getHorizontalRotationAngle(), 0.0f, 1.0f, 0.0f);
                 // Roll
-                rotateCamerasLocallyAround (v.getRollRotationAngle (opts.test(eye3d::options::keep_moving)), 0.0f, 0.0f, 1.0f);
+                rotateCamerasLocallyAround (v.getRollRotationAngle(), 0.0f, 0.0f, 1.0f);
 
                 cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
 
-            } else if (v.isActivelyMoving()) { // translating
+            }
+
+            if (v.isActivelyMoving()) { // translating
 
                 if (v.move_state.test (eye3dvisual::move_sense::up)) {
                     hoverheight += 0.001f;
@@ -615,11 +617,11 @@ int main (int argc, char* argv[])
                 }
 
                 // Obtain the commanded movement vector and turn this into a translation matrix
-                sm::vec<float> mv_camframe = v.getMovementVector (opts.test(eye3d::options::keep_moving));
+                sm::vec<float> mv_camframe = v.getMovementVector();
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
-            } // else not actively moving or rotating
+            }
         }
 
         // reset to initial camera space if requested

@@ -27,17 +27,17 @@ struct eye3dvisual final : public mplot::Visual<>
     }
 
     // Movement state (class and bitset) (flags?)
-    enum class move_sense : uint32_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };
+    enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };
     sm::flags<move_sense> move_state;
 
     // Speed of translations (in scene units)
-    float speed = 0.04;
+    float speed = 0.04f;
     // Speed of rotations
     float angularSpeed = mc::two_pi / 360.0f;
     // Parameter for EyeVisual. If focal offset is 0, then user has to choose how long the cones should be
     float manual_cone_length = 0.2f;
 
-    enum class state : uint32_t {
+    enum class state : uint8_t {
         show_cones,            // Parameter for EyeVisual. Draw simple flared tubes in mathplot window
         campose_reset_request, // A request to reset the pose of the camera
         show_camframe,         // Show camera axes?
@@ -54,78 +54,42 @@ struct eye3dvisual final : public mplot::Visual<>
     }
 
     // Get the camera's movement vector.
-    sm::vec<float, 3> getMovementVector (const bool retain_move_state = false)
+    sm::vec<float, 3> getMovementVector()
     {
-        sm::vec<float, 3> output = { 0.0f, 0.0f, 0.0f };
-        if (this->move_state.test (move_sense::up)) {
-            output += 0.2f * speed * sm::vec<>::uy(); // uy is up
-            this->move_state.set (move_sense::up, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::down)) {
-            output += 0.2f * speed * -sm::vec<>::uy();
-            this->move_state.set (move_sense::down, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::left)) {
-            output += speed * -sm::vec<>::ux();
-            this->move_state.set (move_sense::left, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::right)) {
-            output += speed * sm::vec<>::ux(); // right is in x dirn
-            this->move_state.set (move_sense::right, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::forward)) {
-            output += speed * sm::vec<>::uz(); // fwd is in uz dirn
-            this->move_state.set (move_sense::forward, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::backward)) {
-            output += speed * -sm::vec<>::uz();
-            this->move_state.set (move_sense::backward, retain_move_state);
-        }
+        sm::vec<float, 3> output = {};
+        if (this->move_state.test (move_sense::up)) { output += 0.2f * speed * sm::vec<>::uy(); }    // uy is up
+        if (this->move_state.test (move_sense::down)) { output += 0.2f * speed * -sm::vec<>::uy(); }
+        if (this->move_state.test (move_sense::left)) { output += speed * -sm::vec<>::ux(); }
+        if (this->move_state.test (move_sense::right)) { output += speed * sm::vec<>::ux(); }        // right is in x dirn
+        if (this->move_state.test (move_sense::forward)) { output += speed * sm::vec<>::uz(); }      // fwd is in uz dirn
+        if (this->move_state.test (move_sense::backward)) { output += speed * -sm::vec<>::uz(); }
         return output;
     }
 
     // Get the camera's vertical rotation angle (pitch).
-    float getVerticalRotationAngle (const bool retain_move_state = false)
+    float getVerticalRotationAngle()
     {
         float out = 0.0f;
-        if (this->move_state.test (move_sense::rotUp)) {
-            out += angularSpeed;
-            this->move_state.set (move_sense::rotUp, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::rotDown)) {
-            out -= angularSpeed;
-            this->move_state.set (move_sense::rotDown, retain_move_state);
-        }
+        if (this->move_state.test (move_sense::rotUp)) { out += angularSpeed; }
+        if (this->move_state.test (move_sense::rotDown)) { out -= angularSpeed; }
         return out;
     }
 
     // Get the camera's horizontal rotation angle (yaw). Rightward is positive.
-    float getHorizontalRotationAngle (const bool retain_move_state = false)
+    float getHorizontalRotationAngle()
     {
         float out = 0.0f;
-        if (this->move_state.test (move_sense::rotLeft)) {
-            out += angularSpeed;
-            this->move_state.set (move_sense::rotLeft, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::rotRight)) {
-            out -= angularSpeed;
-            this->move_state.set (move_sense::rotRight, retain_move_state);
-        }
+        if (this->move_state.test (move_sense::rotLeft)) { out += angularSpeed; }
+        if (this->move_state.test (move_sense::rotRight)) { out -= angularSpeed; }
         return out;
     }
 
     // Get the camera's roll
-    float getRollRotationAngle (const bool retain_move_state = false)
+    float getRollRotationAngle()
     {
         float out = 0.0f;
-        if (this->move_state.test (move_sense::rotRollLeft)) {
-            out -= angularSpeed;
-            this->move_state.set (move_sense::rotRollLeft, retain_move_state);
-        }
-        if (this->move_state.test (move_sense::rotRollRight)) {
-            out += angularSpeed;
-            this->move_state.set (move_sense::rotRollRight, retain_move_state);
-        }
+        if (this->move_state.test (move_sense::rotRollLeft)) { out -= angularSpeed; }
+        if (this->move_state.test (move_sense::rotRollRight)) { out += angularSpeed; }
         return out;
     }
 
@@ -157,55 +121,43 @@ protected:
         if (this->vstate.test (state::freeze)) { return; } // Don't respond to movement keys
 
         // Process press/repeat key actions (none will work with Ctrl or Shift)
-        if ((action == mplot::keyaction::press || action == mplot::keyaction::repeat) && !(mods & keymod::shift)) {
+        if (action == mplot::keyaction::press && !(mods & keymod::shift)) {
             if (key == mplot::key::w) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::forward);
-                this->move_state.reset (move_sense::backward);
             } else if (key == mplot::key::a && !mods) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::left);
-                this->move_state.reset (move_sense::right);
             } else if (key == mplot::key::d) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::right);
-                this->move_state.reset (move_sense::left);
             } else if (key == mplot::key::s) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::backward);
-                this->move_state.reset (move_sense::forward);
             } else if (key == mplot::key::p) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::up);
-                this->move_state.reset (move_sense::down);
             } else if (key == mplot::key::l) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::down);
-                this->move_state.reset (move_sense::up);
             } else if (key == mplot::key::up) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::rotUp);
-                this->move_state.reset (move_sense::rotDown);
             } else if (key == mplot::key::down) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::rotDown);
-                this->move_state.reset (move_sense::rotUp);
             } else if (key == mplot::key::left) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::rotLeft);
-                this->move_state.reset (move_sense::rotRight);
             } else if (key == mplot::key::right) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::rotRight);
-                this->move_state.reset (move_sense::rotLeft);
             } else if (key == mplot::key::comma) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::rotRollLeft);
-                this->move_state.reset (move_sense::rotRollRight);
             } else if (key == mplot::key::period) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::rotRollRight);
-                this->move_state.reset (move_sense::rotRollLeft);
             } else if (key == mplot::key::end) {
                 this->speed = this->speed * 0.5f;
                 this->angularSpeed = this->angularSpeed * 0.5f;
@@ -220,7 +172,34 @@ protected:
                 this->stop();
                 this->vstate.set (state::campose_reset_request);
             }
-            std::cout << "move_state: " << std::hex << move_state.get() << std::dec << std::endl;
+
+        } else if (action == mplot::keyaction::release && !(mods & keymod::shift)) {
+
+            if (key == mplot::key::w) {
+                this->move_state.reset (move_sense::forward);
+            } else if (key == mplot::key::a && !mods) {
+                this->move_state.reset (move_sense::left);
+            } else if (key == mplot::key::d) {
+                this->move_state.reset (move_sense::right);
+            } else if (key == mplot::key::s) {
+                this->move_state.reset (move_sense::backward);
+            } else if (key == mplot::key::p) {
+                this->move_state.reset (move_sense::up);
+            } else if (key == mplot::key::l) {
+                this->move_state.reset (move_sense::down);
+            } else if (key == mplot::key::up) {
+                this->move_state.reset (move_sense::rotUp);
+            } else if (key == mplot::key::down) {
+                this->move_state.reset (move_sense::rotDown);
+            } else if (key == mplot::key::left) {
+                this->move_state.reset (move_sense::rotLeft);
+            } else if (key == mplot::key::right) {
+                this->move_state.reset (move_sense::rotRight);
+            } else if (key == mplot::key::comma) {
+                this->move_state.reset (move_sense::rotRollLeft);
+            } else if (key == mplot::key::period) {
+                this->move_state.reset (move_sense::rotRollRight);
+            }
         }
 
         if (action == mplot::keyaction::press) {
