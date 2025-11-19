@@ -125,12 +125,10 @@ namespace eye3d
 
 
     // Flags class
-    enum class options : uint32_t
+    enum class options : uint8_t
     {
         blender_axes,     // Set true to transform glTF into Blender's z-up axes
-        keep_moving,      // If true, movements keep moving
         max_fps,          // If true, poll, instead of fps
-        random_walk,
         playback,
         can_exit
     };
@@ -154,12 +152,8 @@ namespace eye3d
                 opts |= eye3d::options::blender_axes;
             } else if (arg == "-x") {
                 opts |= eye3d::options::max_fps;
-            } else if (arg == "-k") {
-                opts |= eye3d::options::keep_moving;
             } else if (arg == "-p") {
                 opts |= eye3d::options::playback;
-            } else if (arg == "-w") {
-                opts |= eye3d::options::random_walk;
             }
         }
         if (path.empty()) {
@@ -285,7 +279,7 @@ int main (int argc, char* argv[])
     // Create a mathplot window to render the eye/sensor
     eye3dvisual v (2000, 1200, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
-    v.speed = 0.002f;
+    v.speed = 1.0f; // m/s
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
     v.lightingEffects (true);
     // Use a non-default zFar as we use large environments
@@ -493,14 +487,14 @@ int main (int argc, char* argv[])
     }
 
     auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &ti0, &rrg,
-                                    &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight]()
+                                    &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         // A random walk mode
-        if (opts.test (eye3d::options::random_walk)) {
+        if (v.vstate.test (eye3dvisual::state::walk)) {
             // set rotation and step length according to the Stone paper
             rrg.step();
             // rrg.omega is the angular speed rrg.speed is the linear speed
@@ -565,7 +559,7 @@ int main (int argc, char* argv[])
                     first = false;
                 }
 
-                opts.set (eye3d::options::random_walk, false);
+                v.vstate.set (eye3dvisual::state::walk, false);
             }
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
@@ -617,7 +611,7 @@ int main (int argc, char* argv[])
                 }
 
                 // Obtain the commanded movement vector and turn this into a translation matrix
-                sm::vec<float> mv_camframe = v.getMovementVector();
+                sm::vec<float> mv_camframe = v.getMovementVector (fps);
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
@@ -665,7 +659,7 @@ int main (int argc, char* argv[])
         // Render the eye-only window
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
-        subr_key_move_over_land();
+        subr_key_move_over_land (fps_profiler.fps_mean);
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed

@@ -30,8 +30,9 @@ struct eye3dvisual final : public mplot::Visual<>
     enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };
     sm::flags<move_sense> move_state;
 
-    // Speed of translations (in scene units)
-    float speed = 0.04f;
+    // Speed of translations (in scene units per second). From this determine distance for one
+    // movement step based on current FPS/seconds per frame
+    float speed = 1.0f;
     // Speed of rotations
     float angularSpeed = mc::two_pi / 360.0f;
     // Parameter for EyeVisual. If focal offset is 0, then user has to choose how long the cones should be
@@ -43,6 +44,7 @@ struct eye3dvisual final : public mplot::Visual<>
         show_camframe,         // Show camera axes?
         paused,                // Pause sim (i.e. pause time)?
         stepfwd,               // If true and if paused is true, step forward one timestep in the camera input
+        walk,                  // If true, do a random walk
         freeze                 // Freeze movement
     };
     sm::flags<state> vstate;
@@ -53,16 +55,16 @@ struct eye3dvisual final : public mplot::Visual<>
         this->stop();
     }
 
-    // Get the camera's movement vector.
-    sm::vec<float, 3> getMovementVector()
+    // Get the camera's movement vector to give speed in model world at the current FPS
+    sm::vec<float, 3> getMovementVector (const float fps)
     {
         sm::vec<float, 3> output = {};
-        if (this->move_state.test (move_sense::up)) { output += 0.2f * speed * sm::vec<>::uy(); }    // uy is up
-        if (this->move_state.test (move_sense::down)) { output += 0.2f * speed * -sm::vec<>::uy(); }
-        if (this->move_state.test (move_sense::left)) { output += speed * -sm::vec<>::ux(); }
-        if (this->move_state.test (move_sense::right)) { output += speed * sm::vec<>::ux(); }        // right is in x dirn
-        if (this->move_state.test (move_sense::forward)) { output += speed * sm::vec<>::uz(); }      // fwd is in uz dirn
-        if (this->move_state.test (move_sense::backward)) { output += speed * -sm::vec<>::uz(); }
+        if (this->move_state.test (move_sense::up)) { output += 0.1f * speed / fps * sm::vec<>::uy(); } // uy is up
+        if (this->move_state.test (move_sense::down)) { output += 0.1f * speed / fps * -sm::vec<>::uy(); }
+        if (this->move_state.test (move_sense::left)) { output += speed / fps * sm::vec<>::ux(); }
+        if (this->move_state.test (move_sense::right)) { output += speed / fps * -sm::vec<>::ux(); }    // right is in -x dirn
+        if (this->move_state.test (move_sense::forward)) { output += speed / fps * sm::vec<>::uz(); }   // fwd is in uz dirn
+        if (this->move_state.test (move_sense::backward)) { output += speed / fps * -sm::vec<>::uz(); }
         return output;
     }
 
@@ -160,14 +162,10 @@ protected:
                 this->move_state.set (move_sense::rotRollRight);
             } else if (key == mplot::key::end) {
                 this->speed = this->speed * 0.5f;
-                this->angularSpeed = this->angularSpeed * 0.5f;
-                std::cout << "Speed reduced to " << this->speed << ", angularSpeed to "
-                          << this->angularSpeed * mc::rad2deg  << "deg/s" << std::endl;
+                std::cout << "Speed reduced to " << this->speed  << "m/s" << std::endl;
             } else if (key == mplot::key::home) {
                 this->speed = this->speed * 2.0f;
-                this->angularSpeed = this->angularSpeed * 2.0f;
-                std::cout << "Speed increased to " << this->speed  << ", angularSpeed to "
-                          << this->angularSpeed * mc::rad2deg << "deg/s" << std::endl;
+                std::cout << "Speed increased to " << this->speed  << "m/s" << std::endl;
             } else if (key == mplot::key::r) {
                 this->stop();
                 this->vstate.set (state::campose_reset_request);
@@ -206,6 +204,10 @@ protected:
             if (key == mplot::key::t) {
                 // Toggle the morph view
                 this->vstate.flip (state::show_cones);
+            } else if (key == mplot::key::w && (mods & keymod::control)) {
+                // walk
+                std::cout << "Flip walk\n";
+                this->vstate.flip (state::walk);
             } else if (key == mplot::key::c) {
                 this->vstate.flip (state::show_camframe);
             } else if (key == mplot::key::i) {
