@@ -279,7 +279,7 @@ int main (int argc, char* argv[])
     // Create a mathplot window to render the eye/sensor
     eye3dvisual v (2000, 1200, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
-    v.speed = 1.0f; // m/s
+    v.speed = 0.5f; // 0.5 m/s max speed for our Cataglyphis Velox
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
     v.lightingEffects (true);
     // Use a non-default zFar as we use large environments
