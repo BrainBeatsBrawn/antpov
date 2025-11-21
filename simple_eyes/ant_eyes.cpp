@@ -50,6 +50,7 @@ enum class spherical_projection
 constexpr bool two_eyes = true;
 constexpr bool show_rgb = false;
 constexpr bool show_scatter = false;
+constexpr bool show_antoinette = true;
 
 void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
                  sm::vvec<sm::vec<float, 3>>& sphere_coords,
@@ -200,22 +201,13 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     lsv->finalize();
     v.addVisualModel (lsv);
 
-    auto lsv2 = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{0.0f, -3.0f, 0});
-    v.bindmodel (lsv2);
-    lsv2->label = "10 mm";
-    lsv2->represented_distance = 10.0f;
-    lsv2->finalize();
-    [[maybe_unused]] auto lsv2p = v.addVisualModel (lsv2);
-/*
-    sm::quaternion<float> rq (sm::vec<>::uy(),
-                              -sm::mathconst<float>::pi_over_2);
-    lsv2p->setViewRotation (rq);
-*/
-    auto av = std::make_unique<biosim::AntVisual<>>();
-    v.bindmodel (av);
-    av->finalize();
-    auto avp = v.addVisualModel (av);
-    avp->scaleViewMatrix (1000);
+    if constexpr (show_antoinette) {
+        auto av = std::make_unique<biosim::AntVisual<>>();
+        v.bindmodel (av);
+        av->finalize();
+        auto avp = v.addVisualModel (av);
+        avp->scaleViewMatrix (1000);
+    }
 }
 #endif
 
