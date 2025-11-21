@@ -335,7 +335,8 @@ int main (int argc, char* argv[])
 
     // Create an EyeVisual 'eye' in our mathplot scene, v.
     mplot::compoundray::EyeVisual<>* ep1 = nullptr;
-    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData, ommatidia);
+    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
+                                                                    reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia));
     v.bindmodel (eyevm);
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
@@ -344,9 +345,13 @@ int main (int argc, char* argv[])
 
     // A second eye goes in the 'eye only' window
     mplot::compoundray::EyeVisual<>* ep2 = nullptr;
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData, ommatidia);
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
+                                                                     reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia));
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
+    eyevm2->proj_sphere_centre = { 0, 0, 0 };
+    eyevm2->proj_sphere_radius = 0.0005f;
+    eyevm2->show_sphere = false;
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     // Scale this model up, so it's not tiny like the one in the scene
@@ -448,8 +453,8 @@ int main (int argc, char* argv[])
             //ep1->scaleViewMatrix (v.manual_cone_length);
         }
         // Update eyevm model (or just update colours)
-        ep1->ommatidia = ommatidia;
-        ep2->ommatidia = ommatidia;
+        ep1->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
+        ep2->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
 
         if (ommatidia != nullptr) {
             curr_eye_size = ommatidia->size();
