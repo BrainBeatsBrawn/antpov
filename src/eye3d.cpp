@@ -349,11 +349,11 @@ int main (int argc, char* argv[])
                                                                      reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia));
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
-    eyevm2->proj_sphere_centre = { 0, 0, 0 };
-    eyevm2->proj_sphere_radius = 0.0005f;
-    eyevm2->show_2d = true;
-    eyevm2->show_sphere = true;
-    eyevm2->show_rays = true;
+    //eyevm2->proj_sphere_centre = { 0, 0, 0 };
+    //eyevm2->proj_sphere_radius = 0.0005f;
+    //eyevm2->show_2d = true;
+    //eyevm2->show_sphere = true;
+    //eyevm2->show_rays = true;
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     // Scale this model up, so it's not tiny like the one in the scene
