@@ -344,21 +344,46 @@ int main (int argc, char* argv[])
     ep1 = v.addVisualModel (eyevm);
 
     // A second eye goes in the 'eye only' window
+    auto ptype = mplot::compoundray::EyeVisual<>::projection_type::mercator;
     mplot::compoundray::EyeVisual<>* ep2 = nullptr;
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
                                                                      reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia));
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
-    //eyevm2->proj_sphere_centre = { 0, 0, 0 };
-    //eyevm2->proj_sphere_radius = 0.0005f;
-    //eyevm2->show_2d = true;
-    //eyevm2->show_sphere = true;
-    //eyevm2->show_rays = true;
+
+    // First eye of eye pair (one spherical projection)
+    float ps_rad = 0.0001f;                  // projection sphere radius
+    sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
+    sm::mat44<float> twod_tr;                // twod projection transformation
+    float twod_scale = 14.0f;                // twod projection scaling
+    sm::vec<> twod_offset = { -0.00021f, 0.0f, 0.0f }; // twod projection translation to move to centre
+    sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
+    float rotn = 0.0f;//-sm::mathconst<float>::pi_over_8;
+    twod_tr.translate (twod_offset2);
+    twod_tr.scale (twod_scale);
+    twod_tr.rotate (sm::vec<>::uy(), rotn);
+    twod_tr.translate (twod_offset);
+    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, 0, 512);
+
+    // Second of eye pair (another spherical projection)
+    centre[0] = -centre[0];
+    twod_tr.setToIdentity();
+    twod_offset[0] = -twod_offset[0];
+    twod_offset2[0] = -twod_offset2[0];
+    twod_tr.translate (twod_offset2);
+    twod_tr.scale (twod_scale);
+    twod_tr.rotate (sm::vec<>::uy(), -rotn);
+    twod_tr.translate (twod_offset);
+    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, 512, 1024);
+
+    // Visualization options
+    eyevm2->show_3d = true;
+    eyevm2->show_sphere = false;
+    eyevm2->show_rays = false;
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     // Scale this model up, so it's not tiny like the one in the scene
     ep2->scaleViewMatrix (1000);
-
 
     auto av = std::make_unique<biosim::AntVisual<>>();
     v.bindmodel (av);
