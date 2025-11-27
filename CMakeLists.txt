@@ -316,7 +316,7 @@ function(OPTIX_add_sample_executable target_name_base target_name_var)
   endif()
 
   add_executable(${target_name} ${source_files} ${generated_files} ${cmake_options})
-  target_link_libraries(${target_name} Threads::Threads ${GLFW_LIB_NAME} imgui sutil_7_sdk)
+  target_link_libraries(${target_name} Threads::Threads ${GLFW_LIB_NAME} sutil_7_sdk)
   set_target_properties(${target_name} PROPERTIES COMPILE_DEFINITIONS OPTIX_SAMPLE_NAME_DEFINE=${target_name})
 
   if(UNIX AND NOT APPLE)
