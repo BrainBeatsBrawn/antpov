@@ -356,9 +356,9 @@ int main (int argc, char* argv[])
     sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
     sm::mat44<float> twod_tr;                // twod projection transformation
     float twod_scale = 14.0f;                // twod projection scaling
-    sm::vec<> twod_offset = { -0.00021f, 0.0f, 0.0f }; // twod projection translation to move to centre
+    sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f }; // twod projection translation to move to centre
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
-    float rotn = 0.0f;//-sm::mathconst<float>::pi_over_8;
+    float rotn = -sm::mathconst<float>::pi_over_8;
     twod_tr.translate (twod_offset2);
     twod_tr.scale (twod_scale);
     twod_tr.rotate (sm::vec<>::uy(), rotn);
