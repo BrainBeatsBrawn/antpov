@@ -423,10 +423,6 @@ int main (int argc, char* argv[])
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
-    // FIXME These should be state in navmesh?
-    std::array<uint32_t, 4> ti0 = {}; // Current triangle indices
-    sm::vec<> tn0_land = {}; // Current triangle normal (in landframe) that our agent/camera is 'next to'
-
     float hoverheight = 0.005f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
@@ -436,12 +432,11 @@ int main (int argc, char* argv[])
         land_to_scene = land->getViewMatrix();
 
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
-        sm::vec<float> hp_scene = {};
-        std::tie(hp_scene, tn0_land, ti0) = land->navmesh->find_triangle_hit (camspace, land_to_scene);
+        auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
 
         // Set up our camera using the data obtained from find_triangle_hit()
-        sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, hoverheight);
-        std::cout << "Compare cam_to_scene " << (cam_to_scene * sm::vec<>{}).less_one_dim() <<" with hp_scene: " << hp_scene << std::endl;
+        sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
+
         sm::mat44<float> ident;
         if (cam_to_scene != ident) {
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -518,7 +513,7 @@ int main (int argc, char* argv[])
         }
     }
 
-    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &ti0, &rrg,
+    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                     &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
@@ -536,14 +531,14 @@ int main (int argc, char* argv[])
             sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
             // saves
             sm::mat44<float> cam_to_scene_sv = cam_to_scene;
-            std::array<uint32_t, 4> ti0_sv = ti0;
+            //std::array<uint32_t, 4> ti0_sv = ti0;
             try {
                 try {
                     // Note that even if the last mesh movement would land on a triangle, a further
                     // rotation might mean that we get a 'no triangle intersection' exception (esp. if
                     // we are on the edge of a landscape)
-                    mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight });
-                    cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
+                    mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, land->navmesh->ti0, hoverheight });
+                    cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
                     ++move_counter;
                     if (mdq.size() > qlen) { mdq.pop_front(); }
 
@@ -551,7 +546,7 @@ int main (int argc, char* argv[])
                     if (e.m_type == mplot::NavException::type::off_edge) {
                         // After movement we'd be near the edge, so cancel movement
                         cam_to_scene = cam_to_scene_sv;
-                        ti0 = ti0_sv;
+                        //ti0 = ti0_sv;
                         mdq.pop_back();
                     } else {
                         throw e;
@@ -600,17 +595,17 @@ int main (int argc, char* argv[])
                 // Note that even if the last mesh movement would land on a triangle, a further
                 // rotation might mean that we get a 'no triangle intersection' exception (esp. if
                 // we are on the edge of a landscape)
-                ti0 = mdq[di].ti0;
-                std::array<uint32_t, 4> ti0_sv = ti0;
+                land->navmesh->ti0 = mdq[di].ti0;
+                //std::array<uint32_t, 4> ti0_sv = ti0;
                 std::cout << "Playback of saved movement index = " << di << std::endl;
                 sm::mat44<float> cam_to_scene_sv = cam_to_scene;
-                cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, ti0, mdq[di].hoverheight);
+                cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, /*ti0,*/ mdq[di].hoverheight);
                 di++;
-                if (ti0[3] == 1) {
+                if (land->navmesh->ti0[3] == 1) {
                     // After movement we'd be on the edge, so cancel movement
                     std::cout << "(Playback) Would be on edge, cancel movement\n";
                     cam_to_scene = cam_to_scene_sv;
-                    ti0 = ti0_sv;
+                    //ti0 = ti0_sv;
                 }
             } catch (mplot::NavException& e) {
                 std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
@@ -644,7 +639,7 @@ int main (int argc, char* argv[])
 
                 // Obtain the commanded movement vector and turn this into a translation matrix
                 sm::vec<float> mv_camframe = v.getMovementVector (fps);
-                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, ti0, hoverheight);
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
             }
@@ -655,10 +650,8 @@ int main (int argc, char* argv[])
             v.stop(); // cancel any active movements
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
             sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
-            sm::vec<float> hp_scene = {};
-            sm::vec<float> tn0_land = {};
-            std::tie(hp_scene, tn0_land, ti0) = land->navmesh->find_triangle_hit (camspace, land_to_scene); // sets tn0_land and ti0
-            cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, tn0_land, hoverheight);
+            auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
+            cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
         }
