@@ -1,0 +1,249 @@
+{
+	"asset":{
+		"version":"2.0"
+	},
+	"scene":0,
+	"scenes":[
+		{
+			"name":"Scene",
+			"nodes":[
+				0
+			]
+		}
+	],
+	"nodes":[
+		{
+			"name":"head",
+			"mesh":0,
+			"children": [1],
+                        "rotation":[
+				0,1,0,0
+			],
+			"scale":[
+                                0.001,0.001,0.001
+			],
+			"translation":[
+				0,0,0
+			],
+			"extensions":{
+				"OCES_eyes":{
+					"head":true
+				}
+			}
+		},
+		{
+			"name":"left-eye",
+			"extensions":{
+				"OCES_eyes":{
+					"eye":0,
+					"mirrorPlanes": [0]
+				}
+			}
+		}
+	],
+	"materials":[
+		{
+			"doubleSided":true,
+			"name":"Material",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0
+			}
+		}
+	],
+	"meshes":[
+		{
+			"name":"head-mask-mesh",
+			"primitives":[
+				{
+					"attributes":{
+						"POSITION":0,
+						"NORMAL":1,
+						"TEXCOORD_0":2
+					},
+					"indices":3,
+					"material":0
+				}
+			]
+		}
+	],
+	"extensionsUsed": [
+		"OCES_eyes"
+	],
+	"extensions": {
+		"OCES_eyes": {
+			"generator": {"program": "Test-OCES-Eye-Exporter", "version": "0.1.0"},
+			"creationDatetime": "2024-09-12 07:54:27.4",
+			"version": "0.4.0",
+			"mirrorPlanes":[
+				{"normal": "FRONTAL"}
+			],
+			"eyes": [
+				{
+					"name": "velox-eye",
+					"type": "POINT_OMMATIDIAL",
+					"ommatidialProperties": {
+						"POSITION": 0,
+						"ORIENTATION": 1,
+						"FOCAL_OFFSET": 2,
+						"DIAMETER": 3
+					}
+				}
+			],
+			"ommatidialProperties": [
+				{
+					"type": "ACCESSOR",
+					"value": 4
+				},
+				{
+					"type": "ACCESSOR",
+					"value": 5
+				},
+				{
+					"type": "ACCESSOR",
+					"value": 6
+				},
+				{
+					"type": "ACCESSOR",
+					"value": 7
+				}
+			]
+		}
+	},
+	"accessors":[
+		{
+			"bufferView":0,
+			"componentType":5126,
+			"count":904,
+			"max":[
+				0.7967593669891357,
+				0.5862120389938354,
+				0.7219393849372864
+			],
+			"min":[
+				-0.7967593669891357,
+				-0.8584848046302795,
+				-0.6421745419502258
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":1,
+			"componentType":5126,
+			"count":904,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":2,
+			"componentType":5126,
+			"count":904,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":3,
+			"componentType":5123,
+			"count":972,
+			"type":"SCALAR"
+		},
+
+		{
+			"bufferView": 4,
+			"componentType": 5126,
+			"count": 909,
+			"max":[
+				-0.0006188873667270,
+				0.0003067766083404,
+				0.0001649156765779
+			],
+			"min":[
+				-0.0008225132478401,
+				-0.0000965966974036,
+				-0.0001807601365726
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView": 5,
+			"componentType": 5126,
+			"count": 909,
+			"type":"VEC3"
+		},
+		{
+			"bufferView": 6,
+			"componentType": 5126,
+			"count": 909,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView": 7,
+			"componentType": 5126,
+			"count": 909,
+			"type":"SCALAR"
+		}
+	],
+	"bufferViews":[
+		{
+			"buffer":0,
+			"byteLength":10848,
+			"byteOffset":0,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":10848,
+			"byteOffset":10848,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":7232,
+			"byteOffset":21696,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1944,
+			"byteOffset":28928,
+			"target":34963
+		},
+		{
+			"buffer":1,
+			"byteLength":10908,
+			"byteOffset":0,
+			"target":34962
+		},
+		{
+			"buffer":1,
+			"byteLength":10908,
+			"byteOffset":10908,
+			"target":34962
+		},
+		{
+			"buffer":1,
+			"byteLength":3636,
+			"byteOffset":21816,
+			"target":34962
+		},
+		{
+			"buffer":1,
+			"byteLength":3636,
+			"byteOffset":25452,
+			"target":34962
+		}
+	],
+	"buffers":[
+		{
+			"byteLength":30872,
+			"uri":"velox-mesh-data.bin"
+		},
+		{
+			"byteLength":29088,
+			"uri":"velox-eye-data.bin"
+		}
+	]
+}
