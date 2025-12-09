@@ -1,4 +1,6 @@
 include_directories (BEFORE "${PROJECT_SOURCE_DIR}/mplotext")
+include_directories (BEFORE "${PROJECT_SOURCE_DIR}/oces_viewer")
+
 # The OptiX way to create an executable
 OPTIX_add_sample_executable (eye3d target_name eye3d.cpp OPTIONS -rdc true)
 

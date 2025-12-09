@@ -26,6 +26,8 @@
 
 #include "spline.hpp" // tkspline plus wrapper in sm::algo space
 
+#include <oces/reader>
+
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
 
@@ -333,10 +335,25 @@ int main (int argc, char* argv[])
     // Get the visual models from the scene
     mplot::compoundray::scene_to_visualmodels (scene, &v, false); // true for 'make_navmeshes'
 
+    // Use oces_reader to read in our eye data, esp. for the head
+    std::string oces_path = efpath;
+    mplot::tools::stripFileSuffix (oces_path);
+    oces_path += ".gltf";
+    // Now try to open oces_path
+    std::cout << "Attempt to load OCES file " << oces_path << "\n";
+    oces::reader oces_reader (oces_path);
+    if (oces_reader.read_success == false) {
+        std::cout << "No associated OCES file for a head\n";
+    } else {
+        // Read the head and make a VisualModel
+        oces_reader.head_mesh.single_colour = {0.345f, 0.122f, 0.082f};
+    }
+
     // Create an EyeVisual 'eye' in our mathplot scene, v.
     mplot::compoundray::EyeVisual<>* ep1 = nullptr;
     auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
-                                                                    reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia));
+                                                                    reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
+                                                                    oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     v.bindmodel (eyevm);
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
@@ -347,7 +364,8 @@ int main (int argc, char* argv[])
     auto ptype = mplot::compoundray::EyeVisual<>::projection_type::mercator;
     mplot::compoundray::EyeVisual<>* ep2 = nullptr;
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
-                                                                     reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia));
+                                                                     reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
+                                                                     oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
 
@@ -480,14 +498,15 @@ int main (int argc, char* argv[])
         ep1->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
         ep2->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
 
+        static constexpr uint32_t render_every = 1u; // set to 1 for max update, 60 to reduce compute
         if (ommatidia != nullptr) {
             curr_eye_size = ommatidia->size();
             if (curr_eye_size != last_eye_size) {
-                if (render_counter % 60u == 0u) { ep1->reinit(); }
+                if (render_counter % render_every == 0u) { ep1->reinit(); }
                 ep2->reinit();
                 last_eye_size = curr_eye_size;
             } else {
-                if (render_counter % 60u == 0u) { ep1->reinitColours(); }
+                if (render_counter % render_every == 0u) { ep1->reinitColours(); }
                 ep2->reinitColours(); // 4x faster to just reinitColours
             }
             ++render_counter;

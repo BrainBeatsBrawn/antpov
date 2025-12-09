@@ -46,10 +46,11 @@ namespace biosim
     "}\n";
 
     template <int glver = mplot::gl::version_4_1>
-    class AntVisual : public mplot::VisualModel<glver>
+    struct AntVisual : public mplot::VisualModel<glver>
     {
-    public:
         AntVisual() {}
+
+        bool draw_head = false;
 
         void initializeVertices()
         {
@@ -62,12 +63,15 @@ namespace biosim
             constexpr int nring = 12;
 
             // Head
-            sm::mat44<float> head_tr;
-            head_tr.rotate (sm::vec<>::ux(), conf.get<float>("head_rotn_angle", 0.0f));
-            this->computeEllipsoid (conf.getvec<float, 3>("head_loc"),
-                                    mplot::colour::firebrick4,
-                                    mplot::colour::sepia,
-                                    conf.getvec<float, 3>("head_abc"), nring, nseg, head_tr);
+            if (this->draw_head) { // Head may be drawn with eyes from OCES file
+                sm::mat44<float> head_tr;
+                head_tr.rotate (sm::vec<>::ux(), conf.get<float>("head_rotn_angle", 0.0f));
+                this->computeEllipsoid (conf.getvec<float, 3>("head_loc"),
+                                        mplot::colour::firebrick4,
+                                        mplot::colour::sepia,
+                                        conf.getvec<float, 3>("head_abc"), nring, nseg, head_tr);
+            }
+
             // Two ellipsoids per antenna
             sm::mat44<float> a_tr;
             a_tr.rotate (conf.getvec<float, 3>("a1_axis"), conf.get<float>("a1_rotn_angle", 0.0f));
