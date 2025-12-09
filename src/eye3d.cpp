@@ -432,14 +432,16 @@ int main (int argc, char* argv[])
         land_to_scene = land->getViewMatrix();
 
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
-        auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
+        auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
+        if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
+            // Set up our camera using the data obtained from find_triangle_hit()
+            sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
 
-        // Set up our camera using the data obtained from find_triangle_hit()
-        sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
-
-        sm::mat44<float> ident;
-        if (cam_to_scene != ident) {
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+            if (cam_to_scene != sm::mat44<float>::identity()) {
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+            }
+        } else {
+            std::cout << "Failed to find the landscape; Camera position unchanged from glTF\n";
         }
     }
 
