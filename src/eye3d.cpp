@@ -368,31 +368,50 @@ int main (int argc, char* argv[])
                                                                      oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
-
     // First eye of eye pair (one spherical projection)
+    uint32_t sz = 1024;
     float ps_rad = 0.0001f;                  // projection sphere radius
     sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
+
+    if (oces_reader.read_success == true) {
+        sz = oces_reader.position.size();
+        ps_rad = 0.0002f;
+        centre = { -0.00056, 0, -0.00005 };
+    }
+
     sm::mat44<float> twod_tr;                // twod projection transformation
     float twod_scale = 14.0f;                // twod projection scaling
     sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f }; // twod projection translation to move to centre
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
     float rotn = -sm::mathconst<float>::pi_over_8;
-    twod_tr.translate (twod_offset2);
-    twod_tr.scale (twod_scale);
-    twod_tr.rotate (sm::vec<>::uy(), rotn);
-    twod_tr.translate (twod_offset);
-    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, 0, 512);
+    if (oces_reader.read_success == true) {
+        ptype = mplot::compoundray::EyeVisual<>::projection_type::equirectangular;
+        twod_tr.scale (sm::vec<>{4, 1, 1});
+    } else {
+        twod_tr.translate (twod_offset2);
+        twod_tr.scale (twod_scale);
+        twod_tr.rotate (sm::vec<>::uy(), rotn);
+        twod_tr.translate (twod_offset);
+    }
+    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, 0, sz/2);
 
     // Second of eye pair (another spherical projection)
-    centre[0] = -centre[0];
-    twod_tr.setToIdentity();
-    twod_offset[0] = -twod_offset[0];
-    twod_offset2[0] = -twod_offset2[0];
-    twod_tr.translate (twod_offset2);
-    twod_tr.scale (twod_scale);
-    twod_tr.rotate (sm::vec<>::uy(), -rotn);
-    twod_tr.translate (twod_offset);
-    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, 512, 1024);
+    if (oces_reader.read_success == true) {
+        if (oces_reader.mirrors.empty() == false) {
+            centre = (oces_reader.mirrors[0] * centre).less_one_dim();
+            eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, sz/2, sz);
+        }
+    } else {
+        centre[0] = -centre[0];
+        twod_tr.setToIdentity();
+        twod_offset[0] = -twod_offset[0];
+        twod_offset2[0] = -twod_offset2[0];
+        twod_tr.translate (twod_offset2);
+        twod_tr.scale (twod_scale);
+        twod_tr.rotate (sm::vec<>::uy(), -rotn);
+        twod_tr.translate (twod_offset);
+        eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, sz/2, sz);
+    }
 
     // Visualization options
     eyevm2->show_3d = true;

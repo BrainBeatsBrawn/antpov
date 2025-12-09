@@ -21,6 +21,9 @@ cd c_ray_eye3d
 git clone git@github.com:sebsjames/maths
 git clone git@github.com:sebsjames/mathplot
 git clone git@github.com:Opteran/mplotext
+# Now also OCES viewer code and supporting tinygltf:
+git clone git@github.com:sebsjames/oces_viewer
+git clone git@github.com:syoyo/tinygltf
 ```
 
 then do a cmake build, passing the cmake variable OptiX_INSTALL_DIR
