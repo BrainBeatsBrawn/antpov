@@ -360,6 +360,11 @@ int main (int argc, char* argv[])
     eyevm->finalize();
     ep1 = v.addVisualModel (eyevm);
 
+    // We follow the eyevisual as it moves
+    v.options.set (mplot::visual_options::viewFollowsVMTranslations);
+    //v.options.set (mplot::visual_options::viewFollowsVMRotations);
+    v.setFollowedVM (ep1);
+
     // A second eye goes in the 'eye only' window
     auto ptype = mplot::compoundray::EyeVisual<>::projection_type::mercator;
     mplot::compoundray::EyeVisual<>* ep2 = nullptr;
