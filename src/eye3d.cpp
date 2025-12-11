@@ -705,6 +705,8 @@ int main (int argc, char* argv[])
         ep1->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
+
+        // This should be the right place to update breadcrumbs
     };
 
     /**
