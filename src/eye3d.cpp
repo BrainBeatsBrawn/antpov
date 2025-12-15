@@ -438,12 +438,16 @@ int main (int argc, char* argv[])
     ant_ptr->name = "ant";
     ant_ptr->setViewMatrix (initial_camera_space);
 
+#if 1
     // Breadcrumb trail
     auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
     v.bindmodel (isv);
     isv->radiusFixed = 0.03f;
     isv->finalize();
-    auto isvp = v.addVisualModel (isv);
+    mplot::InstancedScatterVisual<glver>* isvp = v.addVisualModel (isv);
+#else
+    mplot::InstancedScatterVisual<glver>* isvp = nullptr;
+#endif
 
     // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
     auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
@@ -701,6 +705,20 @@ int main (int argc, char* argv[])
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
+                move_counter++;
+
+                // This should be the right place to update breadcrumbs
+                std::cout << "move_counter = " << move_counter << std::endl;
+                if (breadcrumb_coords.size() < max_bc) {
+                    breadcrumb_coords.push_back (cam_to_scene.translation());
+                    breadcrumb_data.push_back (0.0f); // dummy for now
+                } else {
+                    breadcrumb_coords[move_counter % max_bc] = cam_to_scene.translation();
+                    // breadcrumb_data.push_back (0.0f); // dummy for now
+                }
+                if (isvp != nullptr) {
+                    isvp->set_data (breadcrumb_coords, breadcrumb_data);
+                }
             }
         }
 
@@ -719,17 +737,6 @@ int main (int argc, char* argv[])
         ep1->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
-
-        // This should be the right place to update breadcrumbs
-        std::cout << "move_counter = " << move_counter << std::endl;
-        if (breadcrumb_coords.size() < max_bc) {
-            breadcrumb_coords.push_back (cam_to_scene.translation());
-            breadcrumb_data.push_back (0.0f); // dummy for now
-        } else {
-            breadcrumb_coords[move_counter % max_bc] = cam_to_scene.translation();
-            // breadcrumb_data.push_back (0.0f); // dummy for now
-        }
-        isvp->set_data (breadcrumb_coords, breadcrumb_data);
     };
 
     /**
