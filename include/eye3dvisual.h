@@ -8,13 +8,13 @@
 #include <mplot/Visual.h>
 
 // Reproduce controller functions for the mplot window for ease of use
-struct eye3dvisual final : public mplot::Visual<>
+struct eye3dvisual final : public mplot::Visual<glver>
 {
     using mc = sm::mathconst<float>;
 
     // Boilerplate constructor (just copy this):
     eye3dvisual (int width, int height, const std::string& title, const bool blender_axes)
-        : mplot::Visual<> (width, height, title)
+        : mplot::Visual<glver> (width, height, title)
     {
         // State defaults
         //this->vstate |= state::show_cones;

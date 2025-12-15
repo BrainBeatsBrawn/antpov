@@ -14,6 +14,9 @@
 #include "MulticamScene.h"
 #include "libEyeRenderer.h"
 
+#include <mplot/gl/version.h>
+constexpr int glver = mplot::gl::version_4_3;
+
 #include "eye3dvisual.h"
 #include "AntVisual.h"
 #include <mplotext/fpsprofiler.h>
@@ -23,6 +26,7 @@
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
 #include <mplot/RodVisual.h>
+#include <mplot/InstancedScatterVisual.h>
 
 #include "spline.hpp" // tkspline plus wrapper in sm::algo space
 
@@ -104,9 +108,9 @@ namespace eye3d
                   << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
     }
     // Helper to plot coords
-    mplot::CoordArrows<>* plot_axes (mplot::Visual<>* thevisual, const float len = 1.0f)
+    mplot::CoordArrows<glver>* plot_axes (mplot::Visual<glver>* thevisual, const float len = 1.0f)
     {
-        auto cavm = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
+        auto cavm = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
         thevisual->bindmodel (cavm);
         cavm->em = 0.0f; // labels don't work so well
         cavm->lengths = { len, len, len };
@@ -114,12 +118,12 @@ namespace eye3d
         return thevisual->addVisualModel (cavm);
     }
 
-    void add_tube_vm (mplot::Visual<>* v,
+    void add_tube_vm (mplot::Visual<glver>* v,
                       const sm::vec<float>& v0, const sm::vec<float>& v1,
                       const std::array<float, 3>& clr)
     {
         float r = (v1 - v0).length() / 20.0f;
-        auto tvm = std::make_unique<mplot::RodVisual<>> (sm::vec<>{}, v0, v1, r, clr);
+        auto tvm = std::make_unique<mplot::RodVisual<glver>> (sm::vec<>{}, v0, v1, r, clr);
         v->bindmodel (tvm);
         tvm->finalize();
         v->addVisualModel (tvm);
@@ -296,13 +300,13 @@ int main (int argc, char* argv[])
     v.vstate.flip (eye3dvisual::state::show_camframe);
 
     // A window for the eye view
-    mplot::Visual<> veye (512, 512, "Eye view");
+    mplot::Visual<glver> veye (512, 512, "Eye view");
     veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
     veye.setSceneRotation (sm::quaternion<float>{ float{0.658107}, float{0.752674}, float{0.0157197}, float{0.0114156} });
 
     // Use a FPS profiling with a text object on screen
     mplotext::fps::profiler fps_profiler;
-    mplot::VisualTextModel<>* fps_label;
+    mplot::VisualTextModel<glver>* fps_label;
     v.addLabel ("0 FPS", {0.63f, -0.43f, 0.0f}, fps_label);
 
     // We get the eye data path from the glTF file
@@ -333,7 +337,7 @@ int main (int argc, char* argv[])
     sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
 
     // Get the visual models from the scene
-    mplot::compoundray::scene_to_visualmodels (scene, &v, false); // true for 'make_navmeshes'
+    mplot::compoundray::scene_to_visualmodels<glver> (scene, &v, false); // true for 'make_navmeshes'
 
     // Use oces_reader to read in our eye data, esp. for the head
     std::string oces_path = efpath;
@@ -350,10 +354,10 @@ int main (int argc, char* argv[])
     }
 
     // Create an EyeVisual 'eye' in our mathplot scene, v.
-    mplot::compoundray::EyeVisual<>* ep1 = nullptr;
-    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
-                                                                    reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                    oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+    mplot::compoundray::EyeVisual<glver>* ep1 = nullptr;
+    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
+                                                                         reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
+                                                                         oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     v.bindmodel (eyevm);
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
@@ -366,11 +370,11 @@ int main (int argc, char* argv[])
     v.setFollowedVM (ep1);
 
     // A second eye goes in the 'eye only' window
-    auto ptype = mplot::compoundray::EyeVisual<>::projection_type::mercator;
-    mplot::compoundray::EyeVisual<>* ep2 = nullptr;
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<>> (sm::vec<>{}, &ommatidiaData,
-                                                                     reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                     oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+    auto ptype = mplot::compoundray::EyeVisual<glver>::projection_type::mercator;
+    mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
+                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
+                                                                          oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
     // First eye of eye pair (one spherical projection)
@@ -390,7 +394,7 @@ int main (int argc, char* argv[])
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
     float rotn = -sm::mathconst<float>::pi_over_8;
     if (oces_reader.read_success == true) {
-        ptype = mplot::compoundray::EyeVisual<>::projection_type::equirectangular;
+        ptype = mplot::compoundray::EyeVisual<glver>::projection_type::equirectangular;
         twod_tr.scale (sm::vec<>{4, 1, 1});
     } else {
         twod_tr.translate (twod_offset2);
@@ -427,15 +431,22 @@ int main (int argc, char* argv[])
     // Scale this model up, so it's not tiny like the one in the scene
     ep2->scaleViewMatrix (1000);
 
-    auto av = std::make_unique<biosim::AntVisual<>>();
+    auto av = std::make_unique<biosim::AntVisual<glver>>();
     v.bindmodel (av);
     av->finalize();
     auto ant_ptr = v.addVisualModel (av);
     ant_ptr->name = "ant";
     ant_ptr->setViewMatrix (initial_camera_space);
 
+    // Breadcrumb trail
+    auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
+    v.bindmodel (isv);
+    isv->radiusFixed = 0.03f;
+    isv->finalize();
+    auto isvp = v.addVisualModel (isv);
+
     // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
-    auto antca = std::make_unique<mplot::CoordArrows<>> (sm::vec<>{});
+    auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
     v.bindmodel (antca);
     antca->em = 0.0f; // labels don't work so well
     float len = 2.0f;
@@ -448,9 +459,9 @@ int main (int argc, char* argv[])
     antca_ptr->setViewMatrix (initial_camera_space);
 
     // Get access to the landscape VisualModel by searching for a selection of model names
-    mplot::VisualModel<>* land = nullptr;
+    mplot::VisualModel<glver>* land = nullptr;
     {
-        mplot::VisualModel<>* vmp = nullptr;
+        mplot::VisualModel<glver>* vmp = nullptr;
         v.init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
             // The 'land' is a cube for now
@@ -538,6 +549,9 @@ int main (int argc, char* argv[])
     };
 
     uint64_t move_counter = 0u;
+    uint64_t max_bc = 100;
+    sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
+    sm::vvec<float> breadcrumb_data = {};
 
     // A queue of data for saving
     constexpr uint32_t qlen = 20;
@@ -559,7 +573,7 @@ int main (int argc, char* argv[])
     }
 
     auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
-                                    &opts, &move_counter, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
+                                    &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -707,11 +721,21 @@ int main (int argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
 
         // This should be the right place to update breadcrumbs
+        std::cout << "move_counter = " << move_counter << std::endl;
+        if (breadcrumb_coords.size() < max_bc) {
+            breadcrumb_coords.push_back (cam_to_scene.translation());
+            breadcrumb_data.push_back (0.0f); // dummy for now
+        } else {
+            breadcrumb_coords[move_counter % max_bc] = cam_to_scene.translation();
+            // breadcrumb_data.push_back (0.0f); // dummy for now
+        }
+        isvp->set_data (breadcrumb_coords, breadcrumb_data);
     };
 
     /**
      * The main program loop
      */
+    v.render();
     std::string m_count_str = {};
     while (!v.readyToFinish()) {
 
