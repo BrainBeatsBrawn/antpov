@@ -365,7 +365,7 @@ int main (int argc, char* argv[])
     ep1 = v.addVisualModel (eyevm);
 
     // We follow the eyevisual as it moves
-    // v.options.set (mplot::visual_options::viewFollowsVMTranslations);
+    v.options.set (mplot::visual_options::viewFollowsVMTranslations);
 
     //v.options.set (mplot::visual_options::viewFollowsVMRotations);
     v.setFollowedVM (ep1);
@@ -603,6 +603,15 @@ int main (int argc, char* argv[])
                     ++move_counter;
                     if (mdq.size() > qlen) { mdq.pop_front(); }
 
+                    if (breadcrumb_coords.size() < max_bc) {
+                        breadcrumb_coords.push_back (cam_to_scene_sv.translation());
+                        breadcrumb_data.push_back (0.0f); // dummy for now
+                    } else {
+                        breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
+                        // breadcrumb_data.push_back (0.0f); // dummy for now
+                    }
+                    isvp->set_data (breadcrumb_coords, breadcrumb_data);
+
                 } catch (mplot::NavException& e) {
                     if (e.m_type == mplot::NavException::type::off_edge) {
                         // After movement we'd be near the edge, so cancel movement
@@ -689,7 +698,7 @@ int main (int argc, char* argv[])
 
             }
 
-            if (v.isActivelyMoving()) { // translating
+            if (v.isActivelyTranslating()) { // translating
 
                 if (v.move_state.test (eye3dvisual::move_sense::up)) {
                     hoverheight += 0.001f;

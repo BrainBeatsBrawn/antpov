@@ -105,6 +105,16 @@ struct eye3dvisual final : public mplot::Visual<glver>
                 || this->move_state.test (move_sense::rotRollRight));
     }
 
+    bool isActivelyTranslating()
+    {
+        return (this->move_state.test (move_sense::up)
+                || this->move_state.test (move_sense::down)
+                || this->move_state.test (move_sense::left)
+                || this->move_state.test (move_sense::right)
+                || this->move_state.test (move_sense::forward)
+                || this->move_state.test (move_sense::backward));
+    }
+
     // Is the camera 'actively moving'?
     bool isActivelyMoving() { return this->move_state.any(); }
 
