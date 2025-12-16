@@ -365,7 +365,8 @@ int main (int argc, char* argv[])
     ep1 = v.addVisualModel (eyevm);
 
     // We follow the eyevisual as it moves
-    v.options.set (mplot::visual_options::viewFollowsVMTranslations);
+    // v.options.set (mplot::visual_options::viewFollowsVMTranslations);
+
     //v.options.set (mplot::visual_options::viewFollowsVMRotations);
     v.setFollowedVM (ep1);
 
@@ -438,16 +439,12 @@ int main (int argc, char* argv[])
     ant_ptr->name = "ant";
     ant_ptr->setViewMatrix (initial_camera_space);
 
-#if 1
     // Breadcrumb trail
     auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
     v.bindmodel (isv);
-    isv->radiusFixed = 0.03f;
+    isv->radiusFixed = 0.002f;
     isv->finalize();
     mplot::InstancedScatterVisual<glver>* isvp = v.addVisualModel (isv);
-#else
-    mplot::InstancedScatterVisual<glver>* isvp = nullptr;
-#endif
 
     // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
     auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
@@ -577,7 +574,8 @@ int main (int argc, char* argv[])
     }
 
     auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
-                                    &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
+                                    &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
+                                    &isvp, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -702,23 +700,22 @@ int main (int argc, char* argv[])
 
                 // Obtain the commanded movement vector and turn this into a translation matrix
                 sm::vec<float> mv_camframe = v.getMovementVector (fps);
-                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
+                sm::vec<float> lastloc = cam_to_scene.translation();
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
                 move_counter++;
 
                 // This should be the right place to update breadcrumbs
-                std::cout << "move_counter = " << move_counter << std::endl;
+                // std::cout << "move_counter = " << move_counter << std::endl;
                 if (breadcrumb_coords.size() < max_bc) {
-                    breadcrumb_coords.push_back (cam_to_scene.translation());
+                    breadcrumb_coords.push_back (lastloc);
                     breadcrumb_data.push_back (0.0f); // dummy for now
                 } else {
-                    breadcrumb_coords[move_counter % max_bc] = cam_to_scene.translation();
+                    breadcrumb_coords[move_counter % max_bc] = lastloc;
                     // breadcrumb_data.push_back (0.0f); // dummy for now
                 }
-                if (isvp != nullptr) {
-                    isvp->set_data (breadcrumb_coords, breadcrumb_data);
-                }
+                isvp->set_data (breadcrumb_coords, breadcrumb_data);
             }
         }
 
@@ -762,7 +759,10 @@ int main (int argc, char* argv[])
         // Render the eye-only window
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
+
+        v.setContext(); // right now key move over land needs v's context
         subr_key_move_over_land (fps_profiler.fps_mean);
+
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed
