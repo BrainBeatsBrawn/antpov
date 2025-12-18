@@ -440,9 +440,15 @@ int main (int argc, char* argv[])
     ant_ptr->setViewMatrix (initial_camera_space);
 
     // Breadcrumb trail
+    uint64_t move_counter = 0u;
+    uint64_t max_bc = 8000;
+    sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
+    sm::vvec<float> breadcrumb_data = {};
+
     auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
     v.bindmodel (isv);
-    isv->radiusFixed = 0.002f;
+    isv->max_instances = max_bc;
+    isv->radiusFixed = 0.004f;
     isv->finalize();
     mplot::InstancedScatterVisual<glver>* isvp = v.addVisualModel (isv);
 
@@ -549,11 +555,6 @@ int main (int argc, char* argv[])
         }
     };
 
-    uint64_t move_counter = 0u;
-    uint64_t max_bc = 100;
-    sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
-    sm::vvec<float> breadcrumb_data = {};
-
     // A queue of data for saving
     constexpr uint32_t qlen = 20;
     std::deque<mplot::NavMeshMovementData> mdq;
@@ -610,7 +611,7 @@ int main (int argc, char* argv[])
                         breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
                         // breadcrumb_data.push_back (0.0f); // dummy for now
                     }
-                    isvp->set_data (breadcrumb_coords, breadcrumb_data);
+                    isvp->set_instance_data (breadcrumb_coords);
 
                 } catch (mplot::NavException& e) {
                     if (e.m_type == mplot::NavException::type::off_edge) {
@@ -724,7 +725,7 @@ int main (int argc, char* argv[])
                     breadcrumb_coords[move_counter % max_bc] = lastloc;
                     // breadcrumb_data.push_back (0.0f); // dummy for now
                 }
-                isvp->set_data (breadcrumb_coords, breadcrumb_data);
+                isvp->set_instance_data (breadcrumb_coords);
             }
         }
 
