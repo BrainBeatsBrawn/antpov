@@ -505,6 +505,32 @@ int main (int argc, char* argv[])
         }
     }
 
+    // Load data from h5 or csv file for pre-defined paths
+    constexpr uint32_t qlen = 20;
+    std::deque<mplot::NavMeshMovementData> mdq;
+    uint32_t di = 0; // data index (for playback)
+    // A file to be read from csv with 2D coordinates
+    sm::vvec<sm::vec<float, 2>> csv_positions;
+
+    if (opts.test (eye3d::options::playback)) {
+        // populate mdq from file
+        try {
+            // Make this a cmd line arg, and open either .h5 or .csv
+            sm::hdfdata hd ("./navmesh_data.h5", std::ios::in);
+            for (uint32_t i = 0; i < qlen; ++i) {
+                mplot::NavMeshMovementData nmd;
+                nmd.load (hd, i);
+                mdq.push_back (nmd);
+            }
+        } catch (const std::exception& e) { /* No file to open */ }
+    } else if (opts.test (eye3d::options::path_from_csv)) {
+        if (eye3d::read_csv (csv_path, csv_positions) == false) {
+            throw std::runtime_error ("Failed to read CSV file");
+        } else {
+            std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
+        }
+    }
+
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
     float hoverheight = 0.005f;
@@ -516,11 +542,24 @@ int main (int argc, char* argv[])
         land_to_scene = land->getViewMatrix();
 
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
+
+        if (opts.test (eye3d::options::path_from_csv) && !csv_positions.empty()) {
+            // Initial position from first entry in the csv
+            sm::vec<float> ipos = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
+            // Change camspace based on ipos. ipos in landscape coords, so cam_ipos = landscape.location + ipos;
+            sm::vec<float> ltstr = land_to_scene.translation();
+            sm::vec<float> cam_ipos = ipos;
+            cam_ipos[0] += ltstr[0];
+            cam_ipos[2] += ltstr[2]; // update only x and z
+            std::cout << "cam_ipos = land locn (" << land_to_scene.translation() << ") + ipos xz (" << ipos << ") = " << cam_ipos << std::endl;
+            std::cout << "cf from-gltf camera location: " << camspace.translation() << std::endl;
+            ++move_counter;
+        }
+
         auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
         if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
             // Set up our camera using the data obtained from find_triangle_hit()
             sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
-
             if (cam_to_scene != sm::mat44<float>::identity()) {
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             }
@@ -577,32 +616,6 @@ int main (int argc, char* argv[])
         }
     };
 
-    // A queue of data for saving
-    constexpr uint32_t qlen = 20;
-    std::deque<mplot::NavMeshMovementData> mdq;
-    uint32_t di = 0; // data index (for playback)
-    // A file to be read from csv with 2D coordinates
-    sm::vvec<sm::vec<float, 2>> csv_positions;
-
-    if (opts.test (eye3d::options::playback)) {
-        // populate mdq from file
-        try {
-            // Make this a cmd line arg, and open either .h5 or .csv
-            sm::hdfdata hd ("./navmesh_data.h5", std::ios::in);
-            for (uint32_t i = 0; i < qlen; ++i) {
-                mplot::NavMeshMovementData nmd;
-                nmd.load (hd, i);
-                mdq.push_back (nmd);
-            }
-        } catch (const std::exception& e) { /* No file to open */ }
-    } else if (opts.test (eye3d::options::path_from_csv)) {
-        if (eye3d::read_csv (csv_path, csv_positions) == false) {
-            throw std::runtime_error ("Failed to read CSV file");
-        } else {
-            std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
-        }
-    }
-
     auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                     &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
                                     &isvp, &mdq, csv_positions, &di, land, land_to_scene, &hoverheight](const float fps)
@@ -610,6 +623,11 @@ int main (int argc, char* argv[])
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+
+        mplot::ColourMap cm (mplot::ColourMapType::Plasma);
+        sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.0f), cm.convert(0.3f), cm.convert(0.6f), cm.convert(0.9f) };
+        sm::vvec<float> bc_alpha = { 1, 1, 1, 1 };
+        //sm::vvec<float> bc_scale = { 1, 1, 1, 1 };
 
         // A random walk mode
         if (v.vstate.test (eye3dvisual::state::walk)) {
@@ -715,7 +733,24 @@ int main (int argc, char* argv[])
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
         } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
-            throw std::runtime_error ("Implement me");
+            // CSV positions are relative to the landscape model.
+            if (csv_positions.size() > move_counter) {
+                sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][2] };
+                sm::vec<float> lastloc = cam_to_scene.translation();
+                sm::vec<float> mv_sceneframe = nextloc - lastloc;
+                sm::vec<float> mv_camframe = (cam_to_scene.inverse() * mv_sceneframe).less_one_dim();
+                // FIXME: Will have to rotate the ant
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+                move_counter++;
+                if (breadcrumb_coords.size() < max_bc) {
+                    breadcrumb_coords.push_back (lastloc);
+                } else {
+                    breadcrumb_coords[move_counter % max_bc] = lastloc;
+                }
+                isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_alpha);
+            } // else no more movements
+
         } else {
 
             if (v.isActivelyRotating()) {
@@ -746,15 +781,11 @@ int main (int argc, char* argv[])
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
                 move_counter++;
-
                 // This should be the right place to update breadcrumbs
-                // std::cout << "move_counter = " << move_counter << std::endl;
                 if (breadcrumb_coords.size() < max_bc) {
                     breadcrumb_coords.push_back (lastloc);
-                    breadcrumb_data.push_back (0.0f); // dummy for now
                 } else {
                     breadcrumb_coords[move_counter % max_bc] = lastloc;
-                    // breadcrumb_data.push_back (0.0f); // dummy for now
                 }
                 isvp->set_instance_data (breadcrumb_coords);
             }
@@ -796,7 +827,7 @@ int main (int argc, char* argv[])
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
-        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (0.018); }
+        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (2.0); }
         // Render the eye-only window
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
