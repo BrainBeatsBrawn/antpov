@@ -18,12 +18,14 @@ extensions into the base of this repo:
 
 ```bash
 cd c_ray_eye3d
-git clone git@github.com:sebsjames/maths
-git clone git@github.com:sebsjames/mathplot
+mkdir extern
+cd extern
+git clone git@github.com:sebsjames/mathplot --recurse-submodules
 git clone git@github.com:Opteran/mplotext
 # Now also OCES viewer code and supporting tinygltf:
-git clone git@github.com:sebsjames/oces_viewer
-git clone git@github.com:syoyo/tinygltf
+git clone git@github.com:sebsjames/oces_viewer --recurse-submodules
+# git clone git@github.com:syoyo/tinygltf
+cd ..
 ```
 
 then do a cmake build, passing the cmake variable OptiX_INSTALL_DIR
