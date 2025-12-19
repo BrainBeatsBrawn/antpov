@@ -283,7 +283,7 @@ int main (int argc, char* argv[])
                                   ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
 
     // Create a mathplot window to render the eye/sensor
-    eye3dvisual v (2000, 1200, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
+    eye3dvisual v (2000, 2000, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.5f; // 0.5 m/s max speed for our Cataglyphis Velox
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
@@ -298,6 +298,10 @@ int main (int argc, char* argv[])
         v.switch_scene_vertical_axis(); // to uz up
     }
     v.vstate.flip (eye3dvisual::state::show_camframe);
+
+    // We start rotated into a drone view initial orientation for taking pictures of the world
+    sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
+    v.setSceneRotation (def_q);
 
     // A window for the eye view
     mplot::Visual<glver> veye (512, 512, "Eye view");
