@@ -364,9 +364,6 @@ if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGL_SILENCE_DEPRECATION")
 endif()
 
-# Tell the program where the morph fonts are, to compile them into the binary
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMPLOT_FONTS_DIR=\"\\\"${PROJECT_SOURCE_DIR}/mathplot/fonts\\\"\"")
-
 # Find the libraries which will be needed in addition to those required by compound-ray
 find_package(Freetype REQUIRED)
 find_package(HDF5 REQUIRED)
@@ -379,8 +376,10 @@ endif()
 set(MPLOT_INC_GL ${OPENGL_INCLUDE_DIR} ${FREETYPE_INCLUDE_DIRS})
 include_directories(${MPLOT_INC_GL})
 # Assuming that you installed mathplot in-tree (i.e. 'next to' schnakenberg.cpp).
-set(MPLOT_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/mathplot" CACHE PATH "The path to mathplot")
-set(SM_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/maths" CACHE PATH "The path to maths/sm")
+set(MPLOT_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot" CACHE PATH "The path to mathplot")
+# Tell the program where the morph fonts are, to compile them into the binary
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMPLOT_FONTS_DIR=\"\\\"${MPLOT_INCLUDE_PATH}/fonts\\\"\"")
+set(SM_INCLUDE_PATH "${MPLOT_INCLUDE_PATH}/maths" CACHE PATH "The path to maths/sm")
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH}/include) # Allows GL3/gl3.h to be found
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH} ${SM_INCLUDE_PATH}) # Allows mplot/Header.h to be found
 
