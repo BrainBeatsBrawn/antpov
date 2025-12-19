@@ -135,15 +135,17 @@ namespace eye3d
     {
         blender_axes,     // Set true to transform glTF into Blender's z-up axes
         max_fps,          // If true, poll, instead of fps
-        playback,
+        playback,         // Play back saved sequence of poses from a crash data file (.h5 format)
+        path_from_csv,    // Move the ant from a sequence of 2D coordinates that give it a path
         can_exit
     };
     // Parse cmd line to find the path and set options
-    std::tuple<std::string, std::string> parse_inputs (int argc, char* argv[], sm::flags<eye3d::options>& opts)
+    std::tuple<std::string, std::string, std::string> parse_inputs (int argc, char* argv[], sm::flags<eye3d::options>& opts)
     {
         std::string path = "";
+        std::string csvpath = "";
         std::string hovh = "";
-        for (int i=0; i<argc; i++) {
+        for (int i = 0; i < argc; i++) {
             std::string arg = std::string(argv[i]);
             if (arg == "-h") {
                 eye3d::printHelp();
@@ -160,13 +162,17 @@ namespace eye3d
                 opts |= eye3d::options::max_fps;
             } else if (arg == "-p") {
                 opts |= eye3d::options::playback;
+            } else if (arg == "-c") {
+                opts |= eye3d::options::path_from_csv;
+                i++;
+                csvpath = std::string(argv[i]);
             }
         }
         if (path.empty()) {
             eye3d::printHelp();
             opts |= eye3d::options::can_exit;
         }
-        return {path, hovh};
+        return {path, hovh, csvpath};
     }
 
     // Make a randomized path to follow
@@ -257,6 +263,19 @@ namespace eye3d
         std::unique_ptr<sm::rand_vonmises<T>> rVM;
     };
 
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions)
+    {
+        std::ifstream f (path.c_str(), std::ios::in);
+        if (f.is_open() == false) { return false; }
+        std::string line;
+        while (std::getline (f, line)) {
+            sm::vec<float, 2> twodpos;
+            twodpos.set_from_str (line, ",");
+            positions.push_back (twodpos);
+        }
+        return true;
+    }
+
 } // namespace eye3d
 
 int main (int argc, char* argv[])
@@ -265,7 +284,7 @@ int main (int argc, char* argv[])
 
     // Program options and boolean state
     sm::flags<eye3d::options> opts;
-    auto[path, hovh] = eye3d::parse_inputs (argc, argv, opts);
+    auto[path, hovh, csv_path] = eye3d::parse_inputs (argc, argv, opts);
     if (opts.test (eye3d::options::can_exit)) { return 1; }
 
     // Boilerplate memory alloc for compound-ray
@@ -436,6 +455,7 @@ int main (int argc, char* argv[])
     // Scale this model up, so it's not tiny like the one in the scene
     ep2->scaleViewMatrix (1000);
 
+    // The ant body
     auto av = std::make_unique<biosim::AntVisual<glver>>();
     v.bindmodel (av);
     av->finalize();
@@ -456,7 +476,7 @@ int main (int argc, char* argv[])
     isv->finalize();
     mplot::InstancedScatterVisual<glver>* isvp = v.addVisualModel (isv);
 
-    // Make CoordArrows axes to show our camera's localspace or AntVisual here :)
+    // Make CoordArrows axes to show our camera's localspace (and to help find our tiny ant)
     auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
     v.bindmodel (antca);
     antca->em = 0.0f; // labels don't work so well
@@ -537,8 +557,6 @@ int main (int argc, char* argv[])
             std::cout << "Cone length " << ep1->get_cone_length() << " != requested: " << v.manual_cone_length << std::endl;
             ep1->set_cone_length (v.manual_cone_length);
             ep2->set_cone_length (v.manual_cone_length);
-
-            //ep1->scaleViewMatrix (v.manual_cone_length);
         }
         // Update eyevm model (or just update colours)
         ep1->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
@@ -563,24 +581,31 @@ int main (int argc, char* argv[])
     constexpr uint32_t qlen = 20;
     std::deque<mplot::NavMeshMovementData> mdq;
     uint32_t di = 0; // data index (for playback)
+    // A file to be read from csv with 2D coordinates
+    sm::vvec<sm::vec<float, 2>> csv_positions;
+
     if (opts.test (eye3d::options::playback)) {
         // populate mdq from file
         try {
+            // Make this a cmd line arg, and open either .h5 or .csv
             sm::hdfdata hd ("./navmesh_data.h5", std::ios::in);
             for (uint32_t i = 0; i < qlen; ++i) {
                 mplot::NavMeshMovementData nmd;
                 nmd.load (hd, i);
                 mdq.push_back (nmd);
             }
-
-        } catch (const std::exception& e) {
-            // No file to open
+        } catch (const std::exception& e) { /* No file to open */ }
+    } else if (opts.test (eye3d::options::path_from_csv)) {
+        if (eye3d::read_csv (csv_path, csv_positions) == false) {
+            throw std::runtime_error ("Failed to read CSV file");
+        } else {
+            std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
         }
     }
 
     auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                     &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
-                                    &isvp, &mdq, &di, land, land_to_scene, &hoverheight](const float fps)
+                                    &isvp, &mdq, csv_positions, &di, land, land_to_scene, &hoverheight](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
@@ -689,6 +714,8 @@ int main (int argc, char* argv[])
             }
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
+        } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
+            throw std::runtime_error ("Implement me");
         } else {
 
             if (v.isActivelyRotating()) {
