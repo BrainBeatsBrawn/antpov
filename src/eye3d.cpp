@@ -263,6 +263,7 @@ namespace eye3d
         std::unique_ptr<sm::rand_vonmises<T>> rVM;
     };
 
+    // Read a simple csv with 2D coordinates.
     bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions)
     {
         std::ifstream f (path.c_str(), std::ios::in);
@@ -281,6 +282,8 @@ namespace eye3d
 int main (int argc, char* argv[])
 {
     using mc = sm::mathconst<float>;
+
+    double waittime = 0.0167; // for debug, so I can make playback slow in a simple way
 
     // Program options and boolean state
     sm::flags<eye3d::options> opts;
@@ -522,8 +525,13 @@ int main (int argc, char* argv[])
                 nmd.load (hd, i);
                 mdq.push_back (nmd);
             }
-        } catch (const std::exception& e) { /* No file to open */ }
+            std::cout << "Loaded navigation data from navmesh_data.h5 (hardcoded)\n";
+        } catch (const std::exception& e) {
+            /* No file to open */
+            std::cout << "Playback mode, but there's no file to open\n";
+        }
     } else if (opts.test (eye3d::options::path_from_csv)) {
+        //waittime = 0.25; // make it slow
         if (eye3d::read_csv (csv_path, csv_positions) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else {
@@ -533,7 +541,7 @@ int main (int argc, char* argv[])
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
-    float hoverheight = 0.005f;
+    float hoverheight = 0.01f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
     if (land) {
@@ -545,14 +553,21 @@ int main (int argc, char* argv[])
 
         if (opts.test (eye3d::options::path_from_csv) && !csv_positions.empty()) {
             // Initial position from first entry in the csv
-            sm::vec<float> ipos = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
-            // Change camspace based on ipos. ipos in landscape coords, so cam_ipos = landscape.location + ipos;
+            std::cout << "Set initial position from csv\n";
+            sm::vec<float> nextloc = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
+            std::cout << "Initial position is " << nextloc << std::endl;
+            // Change camspace based on nextloc. nextloc in landscape coords, so cam_nextloc = landscape.location + nextloc;
             sm::vec<float> ltstr = land_to_scene.translation();
-            sm::vec<float> cam_ipos = ipos;
-            cam_ipos[0] += ltstr[0];
-            cam_ipos[2] += ltstr[2]; // update only x and z
-            std::cout << "cam_ipos = land locn (" << land_to_scene.translation() << ") + ipos xz (" << ipos << ") = " << cam_ipos << std::endl;
+            sm::vec<float> cam_nextloc = nextloc;
+            cam_nextloc[0] += ltstr[0];
+            cam_nextloc[2] += ltstr[2]; // update only x and z
+            std::cout << "cam_nextloc = land locn (" << ltstr << ") + nextloc [xz ONLY] (" << nextloc << ") = " << cam_nextloc << std::endl;
             std::cout << "cf from-gltf camera location: " << camspace.translation() << std::endl;
+
+            sm::mat44<float> cnl;
+            cnl.translate (cam_nextloc);
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
+
             ++move_counter;
         }
 
@@ -561,12 +576,21 @@ int main (int argc, char* argv[])
             // Set up our camera using the data obtained from find_triangle_hit()
             sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             if (cam_to_scene != sm::mat44<float>::identity()) {
+                std::cout << "Set camera pose matrix from\n" << cam_to_scene << std::endl;
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+            } else {
+                std::cout << "cam_to_scene is identity??\n";
             }
         } else {
             std::cout << "Failed to find the landscape; Camera position unchanged from glTF\n";
         }
+
+        sm::mat44<float> _cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        std::cout << "Got camera pose matrix from scene:\n" << _cam_to_scene << std::endl;
+        sm::vec<float> _lastloc = _cam_to_scene.translation();
+        std::cout << "lastloc = " << _lastloc << " [this is cam_to_scene.translation()]" << std::endl;
     }
+    std::cout << "*****\n";
 
     // Random route generation
     eye3d::random_outbound<float> rrg(1500, 150, 100);
@@ -733,22 +757,52 @@ int main (int argc, char* argv[])
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
         } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
-            // CSV positions are relative to the landscape model.
+
             if (csv_positions.size() > move_counter) {
-                sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][2] };
-                sm::vec<float> lastloc = cam_to_scene.translation();
-                sm::vec<float> mv_sceneframe = nextloc - lastloc;
-                sm::vec<float> mv_camframe = (cam_to_scene.inverse() * mv_sceneframe).less_one_dim();
-                // FIXME: Will have to rotate the ant
-                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
-                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+
+                /*
+                 * With a csv path, teleport between each location (and then estimate the heading of
+                 * the ant). CSV positions are relative to the landscape model.
+                 */
+                sm::vec<float> lastcamloc = cam_to_scene.translation();
+
+                sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
+                sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
+
+                sm::vec<float> ltstr = land_to_scene.translation(); // always the same
+                sm::vec<float> cam_nextloc = nextloc;
+                cam_nextloc[0] += ltstr[0];
+                cam_nextloc[2] += ltstr[2]; // update only x and z
+
+                sm::mat44<float> cnl;
+                cnl.translate (cam_nextloc);
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
+                cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+
+                sm::vec<float> fwds = nextloc - lastloc;
+
+                auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (cam_to_scene, land_to_scene, 100.0f);
+                if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
+                    // Set up our camera using the data obtained from find_triangle_hit()
+                    cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
+                    if (cam_to_scene != sm::mat44<float>::identity()) {
+                        std::cout << "Set teleported camera pose matrix from\n" << cam_to_scene << std::endl;
+                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+                    } else {
+                        std::cout << "cam_to_scene is identity??\n";
+                    }
+                } else {
+                    throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
+                }
+
                 move_counter++;
                 if (breadcrumb_coords.size() < max_bc) {
-                    breadcrumb_coords.push_back (lastloc);
+                    breadcrumb_coords.push_back (lastcamloc);
                 } else {
-                    breadcrumb_coords[move_counter % max_bc] = lastloc;
+                    breadcrumb_coords[move_counter % max_bc] = lastcamloc;
                 }
                 isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_alpha);
+
             } // else no more movements
 
         } else {
@@ -827,7 +881,7 @@ int main (int argc, char* argv[])
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
-        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (2.0); }
+        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
         // Render the eye-only window
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
