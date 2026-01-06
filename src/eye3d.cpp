@@ -288,6 +288,10 @@ int main (int argc, char* argv[])
     // Program options and boolean state
     sm::flags<eye3d::options> opts;
     auto[path, hovh, csv_path] = eye3d::parse_inputs (argc, argv, opts);
+    std::string h5_path = csv_path;
+    mplot::tools::stripFileSuffix (h5_path);
+    if (h5_path.empty()) { h5_path = "trail"; }
+    h5_path += ".h5";
     if (opts.test (eye3d::options::can_exit)) { return 1; }
 
     // Boilerplate memory alloc for compound-ray
@@ -651,8 +655,8 @@ int main (int argc, char* argv[])
         mplot::ColourMap cm (mplot::ColourMapType::Plasma);
         //sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.0f), cm.convert(0.3f), cm.convert(0.6f), cm.convert(0.9f) };
         sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
-        sm::vvec<float> bc_alpha = { 1, 1, 1, 1 };
-        sm::vvec<float> bc_scale = { 4, 6, 8, 10 };
+        sm::vvec<float> bc_alpha = { 1, 0.5, 0.5, 1 };
+        sm::vvec<float> bc_scale = { 10, 10, 10, 10 };
 
         // A random walk mode
         if (v.vstate.test (eye3dvisual::state::walk)) {
@@ -869,6 +873,8 @@ int main (int argc, char* argv[])
      */
     v.render();
     std::string m_count_str = {};
+
+    sm::hdfdata record (h5_path, std::ios::out | std::ios::trunc);
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
@@ -897,6 +903,17 @@ int main (int argc, char* argv[])
         if (isCompoundEyeActive()) {
             getCameraData (ommatidiaData);
             ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
+
+            // if csv mode, then save the data
+            if (opts.test (eye3d::options::path_from_csv)) {
+                std::string ommframe = "/ommatidiaData_" + std::to_string (move_counter);
+                try {
+                    record.add_contained_vals (ommframe.c_str(), ommatidiaData);
+                } catch (const std::exception& e) {
+                    // Probably didn't move this time.
+                }
+            }
+
         }
         // Mark that we got to the end of the loop
         fps_profiler.at_end();
