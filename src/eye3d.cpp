@@ -649,9 +649,10 @@ int main (int argc, char* argv[])
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         mplot::ColourMap cm (mplot::ColourMapType::Plasma);
-        sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.0f), cm.convert(0.3f), cm.convert(0.6f), cm.convert(0.9f) };
+        //sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.0f), cm.convert(0.3f), cm.convert(0.6f), cm.convert(0.9f) };
+        sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
         sm::vvec<float> bc_alpha = { 1, 1, 1, 1 };
-        //sm::vvec<float> bc_scale = { 1, 1, 1, 1 };
+        sm::vvec<float> bc_scale = { 4, 6, 8, 10 };
 
         // A random walk mode
         if (v.vstate.test (eye3dvisual::state::walk)) {
@@ -779,18 +780,19 @@ int main (int argc, char* argv[])
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
                 cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
-                sm::vec<float> fwds = nextloc - lastloc;
+                // Find triangle hits using the scene's 'up' direction.
+                sm::vec<float> camloc_mf = (land_to_scene.inverse() * cam_to_scene).translation();
+                sm::vec<float> vnrm = v.scene_up;
+                vnrm *= 4.0f;
+                auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm);
 
-                auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (cam_to_scene, land_to_scene, 100.0f);
                 if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
+                    sm::vec<float> fwds = nextloc - lastloc;
                     // Set up our camera using the data obtained from find_triangle_hit()
                     cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
                     if (cam_to_scene != sm::mat44<float>::identity()) {
-                        std::cout << "Set teleported camera pose matrix from\n" << cam_to_scene << std::endl;
                         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-                    } else {
-                        std::cout << "cam_to_scene is identity??\n";
-                    }
+                    } // else what to do if cam_to_scene is identity?
                 } else {
                     throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
                 }
@@ -801,7 +803,7 @@ int main (int argc, char* argv[])
                 } else {
                     breadcrumb_coords[move_counter % max_bc] = lastcamloc;
                 }
-                isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_alpha);
+                isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_scale);
 
             } // else no more movements
 
