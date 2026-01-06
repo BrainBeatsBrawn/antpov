@@ -297,7 +297,6 @@ int main (int argc, char* argv[])
     // Boilerplate memory alloc for compound-ray
     multicamAlloc();
 
-    std::vector<sm::vec<>> ommatidiaPositions;
     std::vector<std::array<float, 3>> ommatidiaData;
     std::vector<Ommatidium>* ommatidia = nullptr;
 
@@ -603,7 +602,7 @@ int main (int argc, char* argv[])
     size_t last_eye_size = 0u;
 
     uint32_t render_counter = 0u;
-    auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData, &ommatidiaPositions,
+    auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData,
                                        &last_eye_size, &ep1, &ep2, &render_counter, opts] ()
     {
         size_t curr_eye_size = last_eye_size;
@@ -906,7 +905,7 @@ int main (int argc, char* argv[])
 
             // if csv mode, then save the data
             if (opts.test (eye3d::options::path_from_csv)) {
-                std::string ommframe = "/ommatidiaData_" + std::to_string (move_counter);
+                std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
                 try {
                     record.add_contained_vals (ommframe.c_str(), ommatidiaData);
                 } catch (const std::exception& e) {
@@ -917,6 +916,29 @@ int main (int argc, char* argv[])
         }
         // Mark that we got to the end of the loop
         fps_profiler.at_end();
+    }
+
+    if (opts.test (eye3d::options::path_from_csv)) {
+        // convert std::vector<Ommatidium>* ommatidia into vvecs that can be h5 saved
+        auto ommat = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
+        sm::vvec<sm::vec<float, 3>> o_pos;
+        sm::vvec<sm::vec<float, 3>> o_dir;
+        sm::vvec<float> o_aa;
+        sm::vvec<float> o_fo;
+        for (auto o : *ommat) {
+            o_pos.push_back (o.relativePosition);
+            o_dir.push_back (o.relativeDirection);
+            o_aa.push_back (o.acceptanceAngleRadians);
+            o_fo.push_back (o.focalPointOffset);
+        }
+        std::cout << "Pos\n";
+        record.add_contained_vals ("/ommatidia/relativePosition", o_pos);
+        std::cout << "Dir\n";
+        record.add_contained_vals ("/ommatidia/relativeDirection", o_dir);
+        std::cout << "AA\n";
+        record.add_contained_vals ("/ommatidia/acceptanceAngleRadians", o_aa);
+        std::cout << "FO\n";
+        record.add_contained_vals ("/ommatidia/focalPointOffset", o_fo);
     }
 
     stop(); // stop compound-ray from running
