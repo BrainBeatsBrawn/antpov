@@ -201,7 +201,6 @@ namespace eye3d
             this->a.randomize();
             this->a *= (amm.span());
             this->a += amm.min;
-            // pass this to cubic_spline to make a
             sm::algo::cubic_spline (this->a, this->a_tau);
         }
 
