@@ -1,27 +1,23 @@
-# eye3D (with compound-ray)
+# Ant POV sim (made with mathplot, compound-ray and oces_viewer)
 
-This is a template repository for building a program that uses compound-ray
+A program to show an ant's point of view in a model environment
 
-This simple repository builds one program, **eye3d**, which opens a
-glTF-encoded 3D environment containing a compound eye camera and
-renders the view both in a 2D representation (from compound-ray) and a
-3D view, using a morphologica VisualModel called
-comray::CompoundEyeVisual.
+**antpov** opens a
+glTF-encoded 3D environment containing an ant-form compound eye camera and
+renders the ant's view.
 
-Before compiling c_ray_eye3d, obtain and compile NVidia Optix 8.0 and obtain,
+Before compiling antpov, obtain and compile NVidia Optix 8.0 and obtain,
 compile and `make install` compound-ray from:
 
-https://github.com/optseb/compound-ray (branch **brain_render** for now)
+https://github.com/sebsjames/compound-ray
 
-To compile eye3d, first clone sebsjames/mathplot, sebsjames/maths and Opteran's mathplot
-extensions into the base of this repo:
+To compile antpov, first recursively clone sebsjames/mathplot and syoyo/tinygltf into the extern folder of this repo:
 
 ```bash
-cd c_ray_eye3d
+cd antpov
 mkdir extern
 cd extern
 git clone git@github.com:sebsjames/mathplot --recurse-submodules
-git clone git@github.com:Opteran/mplotext
 # Now also OCES viewer code and supporting tinygltf:
 git clone git@github.com:sebsjames/oces_viewer --recurse-submodules
 # git clone git@github.com:syoyo/tinygltf
@@ -41,13 +37,8 @@ make
 Now you can run the program
 
 ```bash
-./build/bin/eye3d -f ./data/natural_env.gltf
+./build/bin/antpov -f ./data/natural_env.gltf
 ```
 
-## To use this repo as a template
-
-Simply make a copy of the repo (or use it as a template on github) and
-then replace the source file src/eye3d.cpp with your program.
-
 Author: Seb James
-Date: May 2024
+Date: Jan 2026

@@ -19,7 +19,7 @@ constexpr int glver = mplot::gl::version_4_3;
 
 #include "eye3dvisual.h"
 #include "AntVisual.h"
-#include <mplotext/fpsprofiler.h>
+#include <mplot/fps/profiler.h>
 #include <mplot/compoundray/interop.h> // mathplot <--> compoundray interoperability
 
 #include <mplot/compoundray/EyeVisual.h>
@@ -334,7 +334,7 @@ int main (int argc, char* argv[])
     veye.setSceneRotation (sm::quaternion<float>{ float{0.658107}, float{0.752674}, float{0.0157197}, float{0.0114156} });
 
     // Use a FPS profiling with a text object on screen
-    mplotext::fps::profiler fps_profiler;
+    mplot::fps::profiler fps_profiler;
     mplot::VisualTextModel<glver>* fps_label;
     v.addLabel ("0 FPS", {0.63f, -0.43f, 0.0f}, fps_label);
 
