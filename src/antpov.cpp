@@ -276,6 +276,52 @@ namespace eye3d
         return true;
     }
 
+    // For a given samples per omm, return a sensible number of loops over which to average fps, so
+    // that fps takes around 1 sec to stabilize.
+    static constexpr unsigned int best_n_samples (int samples_per_omm)
+    {
+        unsigned int best_n = 0;
+        switch (samples_per_omm) {
+        case 1:
+        case 2:
+        {
+            best_n = 1024; // about a seconds worth
+            break;
+        }
+        case 4:
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        {
+            best_n = 512;
+            break;
+        }
+        case 128:
+        case 256:
+        {
+            best_n = 256;
+            break;
+        }
+        case 512:
+        {
+            best_n = 128;
+            break;
+        }
+        case 1024:
+        case 2048:
+        {
+            best_n = 64;
+            break;
+        }
+        default:
+        {
+            best_n = 32;
+        }
+        }
+        return best_n;
+    }
+
 } // namespace eye3d
 
 int main (int argc, char* argv[])
@@ -876,7 +922,7 @@ int main (int argc, char* argv[])
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
-        fps_profiler.at_begin (getCurrentEyeSamplesPerOmmatidium());
+        fps_profiler.at_begin (eye3d::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // The current camera may have changed, this subroutine deals with any changes
         subr_detect_camera_changes();
         // Now render the mathplot window
