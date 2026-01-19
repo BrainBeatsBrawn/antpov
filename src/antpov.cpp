@@ -447,9 +447,13 @@ int main (int argc, char* argv[])
     // A second eye goes in the 'eye only' window
     auto ptype = mplot::compoundray::EyeVisual<glver>::projection_type::mercator;
     mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
+
+    // Show or hide the head and compound ray eyes in the 'big eye window'
+    bool hidehead = true;
+
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                          oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+                                                                          (!hidehead && oces_reader.read_success) ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
     // First eye of eye pair (one spherical projection)
@@ -460,30 +464,42 @@ int main (int argc, char* argv[])
     if (oces_reader.read_success == true) {
         sz = oces_reader.position.size();
         ps_rad = 0.0002f;
-        centre = { -0.00056, 0, -0.00005 };
+        centre = { -0.00056, 0.00005, -0.00005 };
     }
 
-    sm::mat44<float> twod_tr;                // twod projection transformation
-    float twod_scale = 14.0f;                // twod projection scaling
-    sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f }; // twod projection translation to move to centre
+    sm::mat44<float> twod_tr;                             // twod projection transformation
+    float twod_scale = 1.0f;                              // twod projection scaling
+    sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f };      // twod projection translation to move to centre
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
+    sm::vec<> twod_shift = {0,0.0006,0};
     float rotn = -sm::mathconst<float>::pi_over_8;
     if (oces_reader.read_success == true) {
+        std::cout << "Read from oces file!!\n";
         ptype = mplot::compoundray::EyeVisual<glver>::projection_type::equirectangular;
-        twod_tr.scale (sm::vec<>{4, 1, 1});
+        twod_tr.translate (twod_shift);
     } else {
         twod_tr.translate (twod_offset2);
         twod_tr.scale (twod_scale);
         twod_tr.rotate (sm::vec<>::uy(), rotn);
         twod_tr.translate (twod_offset);
     }
-    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, 0, sz/2);
+
+    // Projection sphere rotation about x axis by 0.2 radians. Numbers determined using oces_viewer
+    sm::quaternion<float> psrotn (sm::vec<>::ux(), 0.2f);
+
+    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, 0, sz/2);
+
+    //eyevm->add_spherical_projection (ptype, twod_tr, pscentre, psrad, psrotn, 0, oces_reader.position.size() / 2);
 
     // Second of eye pair (another spherical projection)
     if (oces_reader.read_success == true) {
         if (oces_reader.mirrors.empty() == false) {
             centre = (oces_reader.mirrors[0] * centre).less_one_dim();
-            eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, sz/2, sz);
+            sm::vec<> twod_shift_left = twod_shift;
+            twod_shift_left[0] *= -1.0f;
+            twod_tr.setToIdentity();
+            twod_tr.translate (twod_shift_left);
+            eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn.invert(), sz/2, sz);
         }
     } else {
         centre[0] = -centre[0];
@@ -494,11 +510,12 @@ int main (int argc, char* argv[])
         twod_tr.scale (twod_scale);
         twod_tr.rotate (sm::vec<>::uy(), -rotn);
         twod_tr.translate (twod_offset);
-        eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, sz/2, sz);
+        eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, sz/2, sz);
     }
 
     // Visualization options
-    eyevm2->show_3d = true;
+    eyevm2->show_3d = !hidehead;
+    eyevm2->twodimensional (hidehead);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
     eyevm2->finalize();
