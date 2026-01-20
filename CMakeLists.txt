@@ -383,7 +383,7 @@ set(SM_INCLUDE_PATH "${MPLOT_INCLUDE_PATH}/maths" CACHE PATH "The path to maths/
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH}/include) # Allows GL3/gl3.h to be found
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH} ${SM_INCLUDE_PATH}) # Allows mplot/Header.h to be found
 
-set(MPLOT_LIBS_CORE ${ARMADILLO_LIBRARY} ${ARMADILLO_LIBRARIES} ${HDF5_C_LIBRARIES})
+set(MPLOT_LIBS_CORE ${HDF5_C_LIBRARIES})
 set(MPLOT_LIBS_GL Freetype::Freetype) # NOT glfw, compound ray already includes. OpenGL::GL should be dynamically loaded by glad in libEyeRenderer3.so
 #
 # mathplot incantations complete
