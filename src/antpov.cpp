@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdint>
 #include <vector>
 #include <array>
 #include <deque>
@@ -15,7 +16,7 @@
 #include "libEyeRenderer.h"
 
 #include <mplot/gl/version.h>
-constexpr int glver = mplot::gl::version_4_3;
+constexpr int32_t glver = mplot::gl::version_4_3;
 
 #include "eye3dvisual.h"
 #include "AntVisual.h"
@@ -36,7 +37,7 @@ constexpr int glver = mplot::gl::version_4_3;
 extern MulticamScene* scene;
 
 // When the program starts, how many samples per ommatidium/element do you want?
-constexpr int samples_per_omm_default = 64;
+constexpr int32_t samples_per_omm_default = 64;
 
 namespace mplot
 {
@@ -278,9 +279,9 @@ namespace eye3d
 
     // For a given samples per omm, return a sensible number of loops over which to average fps, so
     // that fps takes around 1 sec to stabilize.
-    static constexpr unsigned int best_n_samples (int samples_per_omm)
+    static constexpr uint32_t best_n_samples (int32_t samples_per_omm)
     {
-        unsigned int best_n = 0;
+        uint32_t best_n = 0;
         switch (samples_per_omm) {
         case 1:
         case 2:
@@ -324,7 +325,7 @@ namespace eye3d
 
 } // namespace eye3d
 
-int main (int argc, char* argv[])
+int32_t main (int32_t argc, char* argv[])
 {
     using mc = sm::mathconst<float>;
 
@@ -385,10 +386,10 @@ int main (int argc, char* argv[])
 
     // We get the eye data path from the glTF file
     std::string efpath("");
-    int ncam = static_cast<int>(getCameraCount());
-    int num_compound_cameras = 0;
-    int my_compound_camera = -1;
-    for (int ci = 0; ci < ncam; ++ci) {
+    int32_t ncam = static_cast<int32_t>(getCameraCount());
+    int32_t num_compound_cameras = 0;
+    int32_t my_compound_camera = -1;
+    for (int32_t ci = 0; ci < ncam; ++ci) {
         gotoCamera (ci);
         efpath = getEyeDataPath();
         if (!efpath.empty()) {
@@ -402,7 +403,7 @@ int main (int argc, char* argv[])
     // Now switch to our compound ray camera and set the samples per ommatidium/element
     if (my_compound_camera != -1) {
         gotoCamera (my_compound_camera);
-        int csamp = getCurrentEyeSamplesPerOmmatidium();
+        int32_t csamp = getCurrentEyeSamplesPerOmmatidium();
         std::cout << "Current eye samples per ommatidium is " << csamp << std::endl;
         if (csamp < 32000) { changeCurrentEyeSamplesPerOmmatidiumBy (samples_per_omm_default - csamp); }
     }
@@ -515,7 +516,7 @@ int main (int argc, char* argv[])
 
     // Visualization options
     eyevm2->show_3d = !hidehead;
-    eyevm2->twodimensional (hidehead);
+    // eyevm2->twodimensional (hidehead);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
     eyevm2->finalize();
@@ -606,6 +607,8 @@ int main (int argc, char* argv[])
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
+    constexpr float csv_multiplier = 10.0f;
+
     float hoverheight = 0.01f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
@@ -620,6 +623,7 @@ int main (int argc, char* argv[])
             // Initial position from first entry in the csv
             std::cout << "Set initial position from csv\n";
             sm::vec<float> nextloc = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
+            nextloc *= csv_multiplier;
             std::cout << "Initial position is " << nextloc << std::endl;
             // Change camspace based on nextloc. nextloc in landscape coords, so cam_nextloc = landscape.location + nextloc;
             sm::vec<float> ltstr = land_to_scene.translation();
@@ -709,6 +713,7 @@ int main (int argc, char* argv[])
                                     &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
                                     &isvp, &mdq, csv_positions, &di, land, land_to_scene, &hoverheight](const float fps)
     {
+        constexpr float csv_multiplier = 100.0f;
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
 
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -833,12 +838,16 @@ int main (int argc, char* argv[])
                 sm::vec<float> lastcamloc = cam_to_scene.translation();
 
                 sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
+                nextloc *= csv_multiplier; // hack
                 sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
+                lastloc *= csv_multiplier;
+                std::cout << "Teleport from " << lastloc << " to " << nextloc << std::endl;
 
                 sm::vec<float> ltstr = land_to_scene.translation(); // always the same
                 sm::vec<float> cam_nextloc = nextloc;
                 cam_nextloc[0] += ltstr[0];
                 cam_nextloc[2] += ltstr[2]; // update only x and z
+                std::cout << "--> cam_nextloc: " << cam_nextloc << std::endl;
 
                 sm::mat44<float> cnl;
                 cnl.translate (cam_nextloc);
@@ -850,6 +859,7 @@ int main (int argc, char* argv[])
                 sm::vec<float> vnrm = v.scene_up;
                 vnrm *= 4.0f;
                 auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm);
+                std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
 
                 if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
                     sm::vec<float> fwds = nextloc - lastloc;
@@ -897,6 +907,7 @@ int main (int argc, char* argv[])
 
                 // Obtain the commanded movement vector and turn this into a translation matrix
                 sm::vec<float> mv_camframe = v.getMovementVector (fps);
+                std::cout << "mv_camframe = " << mv_camframe << std::endl;
                 sm::vec<float> lastloc = cam_to_scene.translation();
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
