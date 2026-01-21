@@ -577,7 +577,7 @@ int32_t main (int32_t argc, char* argv[])
     // Load data from h5 or csv file for pre-defined paths
     constexpr uint32_t qlen = 20;
     std::deque<mplot::NavMeshMovementData> mdq;
-    uint32_t di = 0; // data index (for playback)
+    [[maybe_unused]] uint32_t di = 0; // data index (for playback)
     // A file to be read from csv with 2D coordinates
     sm::vvec<sm::vec<float, 2>> csv_positions;
 
@@ -607,8 +607,7 @@ int32_t main (int32_t argc, char* argv[])
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
-    constexpr float csv_multiplier = 10.0f;
-
+    constexpr float csv_multiplier = 50.0f;
     float hoverheight = 0.01f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
@@ -623,6 +622,7 @@ int32_t main (int32_t argc, char* argv[])
             // Initial position from first entry in the csv
             std::cout << "Set initial position from csv\n";
             sm::vec<float> nextloc = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
+            nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
             nextloc *= csv_multiplier;
             std::cout << "Initial position is " << nextloc << std::endl;
             // Change camspace based on nextloc. nextloc in landscape coords, so cam_nextloc = landscape.location + nextloc;
@@ -709,220 +709,9 @@ int32_t main (int32_t argc, char* argv[])
         }
     };
 
-    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
-                                    &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
-                                    &isvp, &mdq, csv_positions, &di, land, land_to_scene, &hoverheight](const float fps)
+    // Helper subroutine used by all the movement subroutines
+    auto subr_reset_camspace = [&v, &initial_camera_space, &hoverheight, land, land_to_scene] (sm::mat44<float>& cam_to_scene)
     {
-        constexpr float csv_multiplier = 100.0f;
-        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
-
-        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-
-        mplot::ColourMap cm (mplot::ColourMapType::Plasma);
-        //sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.0f), cm.convert(0.3f), cm.convert(0.6f), cm.convert(0.9f) };
-        sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
-        sm::vvec<float> bc_alpha = { 1, 0.5, 0.5, 1 };
-        sm::vvec<float> bc_scale = { 10, 10, 10, 10 };
-
-        // A random walk mode
-        if (v.vstate.test (eye3dvisual::state::walk)) {
-            // set rotation and step length according to the Stone paper
-            rrg.step();
-            // rrg.omega is the angular speed rrg.speed is the linear speed
-            //std::cout << "rotating in this step by " << rrg.omega << " and moving forward by " << rrg.speed << std::endl;
-            rotateCamerasLocallyAround (rrg.omega, 0.0f, 1.0f, 0.0f);
-            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-            sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
-            // saves
-            sm::mat44<float> cam_to_scene_sv = cam_to_scene;
-            //std::array<uint32_t, 4> ti0_sv = ti0;
-            try {
-                try {
-                    // Note that even if the last mesh movement would land on a triangle, a further
-                    // rotation might mean that we get a 'no triangle intersection' exception (esp. if
-                    // we are on the edge of a landscape)
-                    mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, land->navmesh->ti0, hoverheight });
-                    cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
-                    ++move_counter;
-                    if (mdq.size() > qlen) { mdq.pop_front(); }
-
-                    if (breadcrumb_coords.size() < max_bc) {
-                        breadcrumb_coords.push_back (cam_to_scene_sv.translation());
-                        breadcrumb_data.push_back (0.0f); // dummy for now
-                    } else {
-                        breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
-                        // breadcrumb_data.push_back (0.0f); // dummy for now
-                    }
-                    isvp->set_instance_data (breadcrumb_coords);
-
-                } catch (mplot::NavException& e) {
-                    if (e.m_type == mplot::NavException::type::off_edge) {
-                        // After movement we'd be near the edge, so cancel movement
-                        cam_to_scene = cam_to_scene_sv;
-                        //ti0 = ti0_sv;
-                        mdq.pop_back();
-                    } else {
-                        throw e;
-                    }
-                }
-            } catch (mplot::NavException& e) {
-
-                std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
-
-                // save data
-                {
-                    sm::hdfdata hd("./navmesh_data.h5", std::ios::out | std::ios::trunc);
-                    for (uint32_t i = 0; i < mdq.size(); ++i) { mdq[i].save (hd, i); }
-                }
-
-                opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
-                // Draw triangle tubes
-                bool first = true;
-                for (auto t : e.tris) {
-                    if (first) {
-                        std::cout << t[0] << "-" << t[1] << "-" << t[2] << " has t[3] = " << t[3] << std::endl;
-                    }
-                    auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
-                    eye3d::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
-                    eye3d::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
-                    eye3d::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
-
-                    // JSON line to view with triangle_intersect
-                    sm::vec<float> tn0 = land->navmesh->triangle_normal (tv);
-                    std::cout << std::endl;
-                    std::cout << "{ \"t0\" : " << tv[0].str_mat() << ", "
-                              << "\"t1\" : " << tv[1].str_mat() << ", "
-                              << "\"t2\" : " << tv[2].str_mat() << ", "
-                              << "\"l0\" : " << cam_to_scene.translation().str_mat() << ", "
-                              << "\"l\" : " << (-tn0).str_mat() << " }" << std::endl;
-
-                    first = false;
-                }
-
-                v.vstate.set (eye3dvisual::state::walk, false);
-            }
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-
-        } else if (opts.test (eye3d::options::playback)) { // play back deque of movements
-            try {
-                // Note that even if the last mesh movement would land on a triangle, a further
-                // rotation might mean that we get a 'no triangle intersection' exception (esp. if
-                // we are on the edge of a landscape)
-                land->navmesh->ti0 = mdq[di].ti0;
-                //std::array<uint32_t, 4> ti0_sv = ti0;
-                std::cout << "Playback of saved movement index = " << di << std::endl;
-                sm::mat44<float> cam_to_scene_sv = cam_to_scene;
-                cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, /*ti0,*/ mdq[di].hoverheight);
-                di++;
-                if (land->navmesh->ti0[3] == 1) {
-                    // After movement we'd be on the edge, so cancel movement
-                    std::cout << "(Playback) Would be on edge, cancel movement\n";
-                    cam_to_scene = cam_to_scene_sv;
-                    //ti0 = ti0_sv;
-                }
-            } catch (mplot::NavException& e) {
-                std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
-                opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
-                opts.set (eye3d::options::playback, false);
-            }
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-
-        } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
-
-            if (csv_positions.size() > move_counter) {
-
-                /*
-                 * With a csv path, teleport between each location (and then estimate the heading of
-                 * the ant). CSV positions are relative to the landscape model.
-                 */
-                sm::vec<float> lastcamloc = cam_to_scene.translation();
-
-                sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
-                nextloc *= csv_multiplier; // hack
-                sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
-                lastloc *= csv_multiplier;
-                std::cout << "Teleport from " << lastloc << " to " << nextloc << std::endl;
-
-                sm::vec<float> ltstr = land_to_scene.translation(); // always the same
-                sm::vec<float> cam_nextloc = nextloc;
-                cam_nextloc[0] += ltstr[0];
-                cam_nextloc[2] += ltstr[2]; // update only x and z
-                std::cout << "--> cam_nextloc: " << cam_nextloc << std::endl;
-
-                sm::mat44<float> cnl;
-                cnl.translate (cam_nextloc);
-                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
-                cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-
-                // Find triangle hits using the scene's 'up' direction.
-                sm::vec<float> camloc_mf = (land_to_scene.inverse() * cam_to_scene).translation();
-                sm::vec<float> vnrm = v.scene_up;
-                vnrm *= 4.0f;
-                auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm);
-                std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
-
-                if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
-                    sm::vec<float> fwds = nextloc - lastloc;
-                    // Set up our camera using the data obtained from find_triangle_hit()
-                    cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
-                    if (cam_to_scene != sm::mat44<float>::identity()) {
-                        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-                    } // else what to do if cam_to_scene is identity?
-                } else {
-                    throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
-                }
-
-                move_counter++;
-                if (breadcrumb_coords.size() < max_bc) {
-                    breadcrumb_coords.push_back (lastcamloc);
-                } else {
-                    breadcrumb_coords[move_counter % max_bc] = lastcamloc;
-                }
-                isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_scale);
-
-            } // else no more movements
-
-        } else {
-
-            if (v.isActivelyRotating()) {
-                // Up-down (pitch) is rotation about local camera frame axis x
-                rotateCamerasLocallyAround (v.getVerticalRotationAngle(), 1.0f, 0.0f, 0.0f);
-                // Left-and-right (yaw) is rotation about local camera frame axis y
-                rotateCamerasLocallyAround (v.getHorizontalRotationAngle(), 0.0f, 1.0f, 0.0f);
-                // Roll
-                rotateCamerasLocallyAround (v.getRollRotationAngle(), 0.0f, 0.0f, 1.0f);
-
-                cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
-
-            }
-
-            if (v.isActivelyTranslating()) { // translating
-
-                if (v.move_state.test (eye3dvisual::move_sense::up)) {
-                    hoverheight += 0.001f;
-                } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
-                    hoverheight -= 0.001f;
-                    if (hoverheight < 0.0f) { hoverheight = 0.0f; }
-                }
-
-                // Obtain the commanded movement vector and turn this into a translation matrix
-                sm::vec<float> mv_camframe = v.getMovementVector (fps);
-                std::cout << "mv_camframe = " << mv_camframe << std::endl;
-                sm::vec<float> lastloc = cam_to_scene.translation();
-                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
-                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-
-                move_counter++;
-                // This should be the right place to update breadcrumbs
-                if (breadcrumb_coords.size() < max_bc) {
-                    breadcrumb_coords.push_back (lastloc);
-                } else {
-                    breadcrumb_coords[move_counter % max_bc] = lastloc;
-                }
-                isvp->set_instance_data (breadcrumb_coords);
-            }
-        }
-
         // reset to initial camera space if requested
         if (v.vstate.test (eye3dvisual::state::campose_reset_request) == true) {
             v.stop(); // cancel any active movements
@@ -933,7 +722,249 @@ int32_t main (int32_t argc, char* argv[])
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             v.vstate.reset (eye3dvisual::state::campose_reset_request);
         }
+    };
 
+    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &move_counter,
+                                    &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight,
+                                    max_bc, land, land_to_scene, subr_reset_camspace](const float fps)
+    {
+        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        if (v.isActivelyRotating()) {
+            // Up-down (pitch) is rotation about local camera frame axis x
+            rotateCamerasLocallyAround (v.getVerticalRotationAngle(), 1.0f, 0.0f, 0.0f);
+            // Left-and-right (yaw) is rotation about local camera frame axis y
+            rotateCamerasLocallyAround (v.getHorizontalRotationAngle(), 0.0f, 1.0f, 0.0f);
+            // Roll
+            rotateCamerasLocallyAround (v.getRollRotationAngle(), 0.0f, 0.0f, 1.0f);
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
+        }
+        if (v.isActivelyTranslating()) {
+            if (v.move_state.test (eye3dvisual::move_sense::up)) {
+                hoverheight += 0.001f;
+            } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
+                hoverheight -= 0.001f;
+                if (hoverheight < 0.0f) { hoverheight = 0.0f; }
+            }
+            // Obtain the commanded movement vector and turn this into a translation matrix
+            sm::vec<float> mv_camframe = v.getMovementVector (fps);
+            sm::vec<float> lastloc = cam_to_scene.translation();
+            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+            move_counter++;
+            // This should be the right place to update breadcrumbs
+            if (breadcrumb_coords.size() < max_bc) {
+                breadcrumb_coords.push_back (lastloc);
+            } else {
+                breadcrumb_coords[move_counter % max_bc] = lastloc;
+            }
+            isvp->set_instance_data (breadcrumb_coords);
+        }
+        subr_reset_camspace (cam_to_scene); // if requested
+        // Update the view matrix of eye and eye localspace axes
+        ep1->setViewMatrix (cam_to_scene);
+        ant_ptr->setViewMatrix (cam_to_scene);
+        antca_ptr->setViewMatrix (cam_to_scene);
+    };
+
+    auto subr_deque_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
+                                &opts, &move_counter, &mdq, &di, &hoverheight,
+                                land, land_to_scene, subr_reset_camspace](const float fps)
+    {
+        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        // play back deque of movements
+        if (opts.test (eye3d::options::playback) == false) { /* Uh oh */ }
+
+        try {
+            // Note that even if the last mesh movement would land on a triangle, a further
+            // rotation might mean that we get a 'no triangle intersection' exception (esp. if
+            // we are on the edge of a landscape)
+            land->navmesh->ti0 = mdq[di].ti0;
+            std::cout << "Playback of saved movement index = " << di << std::endl;
+            sm::mat44<float> cam_to_scene_sv = cam_to_scene;
+            cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, /*ti0,*/ mdq[di].hoverheight);
+            di++;
+            if (land->navmesh->ti0[3] == 1) {
+                // After movement we'd be on the edge, so cancel movement
+                std::cout << "(Playback) Would be on edge, cancel movement\n";
+                cam_to_scene = cam_to_scene_sv;
+            }
+        } catch (mplot::NavException& e) {
+            std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
+            opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
+            opts.set (eye3d::options::playback, false);
+        }
+        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+        // reset to initial camera space if requested
+        subr_reset_camspace (cam_to_scene);
+        // Update the view matrix of eye and eye localspace axes
+        ep1->setViewMatrix (cam_to_scene);
+        ant_ptr->setViewMatrix (cam_to_scene);
+        antca_ptr->setViewMatrix (cam_to_scene);
+    };
+
+    auto subr_walk_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
+                                &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
+                                &isvp, &mdq, land, land_to_scene,
+                                &hoverheight, subr_reset_camspace](const float fps)
+    {
+        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+
+        // A random walk mode
+        if (v.vstate.test (eye3dvisual::state::walk) == false) { return; }
+
+        // set rotation and step length according to the Stone paper
+        rrg.step();
+        // rrg.omega is the angular speed rrg.speed is the linear speed
+        //std::cout << "rotating in this step by " << rrg.omega << " and moving forward by " << rrg.speed << std::endl;
+        rotateCamerasLocallyAround (rrg.omega, 0.0f, 1.0f, 0.0f);
+        cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
+        // saves
+        sm::mat44<float> cam_to_scene_sv = cam_to_scene;
+        //std::array<uint32_t, 4> ti0_sv = ti0;
+        try {
+            try {
+                // Note that even if the last mesh movement would land on a triangle, a further
+                // rotation might mean that we get a 'no triangle intersection' exception (esp. if
+                // we are on the edge of a landscape)
+                mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, land->navmesh->ti0, hoverheight });
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
+                ++move_counter;
+                if (mdq.size() > qlen) { mdq.pop_front(); }
+
+                if (breadcrumb_coords.size() < max_bc) {
+                    breadcrumb_coords.push_back (cam_to_scene_sv.translation());
+                    breadcrumb_data.push_back (0.0f); // dummy for now
+                } else {
+                    breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
+                    // breadcrumb_data.push_back (0.0f); // dummy for now
+                }
+                isvp->set_instance_data (breadcrumb_coords);
+
+            } catch (mplot::NavException& e) {
+                if (e.m_type == mplot::NavException::type::off_edge) {
+                    // After movement we'd be near the edge, so cancel movement
+                    cam_to_scene = cam_to_scene_sv;
+                    //ti0 = ti0_sv;
+                    mdq.pop_back();
+                } else {
+                    throw e;
+                }
+            }
+        } catch (mplot::NavException& e) {
+
+            std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
+
+            // save data
+            {
+                sm::hdfdata hd("./navmesh_data.h5", std::ios::out | std::ios::trunc);
+                for (uint32_t i = 0; i < mdq.size(); ++i) { mdq[i].save (hd, i); }
+            }
+
+            opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
+            // Draw triangle tubes
+            bool first = true;
+            for (auto t : e.tris) {
+                if (first) {
+                    std::cout << t[0] << "-" << t[1] << "-" << t[2] << " has t[3] = " << t[3] << std::endl;
+                }
+                auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
+                eye3d::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
+                eye3d::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
+                eye3d::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
+
+                // JSON line to view with triangle_intersect
+                sm::vec<float> tn0 = land->navmesh->triangle_normal (tv);
+                std::cout << std::endl;
+                std::cout << "{ \"t0\" : " << tv[0].str_mat() << ", "
+                          << "\"t1\" : " << tv[1].str_mat() << ", "
+                          << "\"t2\" : " << tv[2].str_mat() << ", "
+                          << "\"l0\" : " << cam_to_scene.translation().str_mat() << ", "
+                          << "\"l\" : " << (-tn0).str_mat() << " }" << std::endl;
+
+                first = false;
+            }
+
+            v.vstate.set (eye3dvisual::state::walk, false);
+        }
+        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+        subr_reset_camspace (cam_to_scene); // if requested
+        // Update the view matrix of eye and eye localspace axes
+        ep1->setViewMatrix (cam_to_scene);
+        ant_ptr->setViewMatrix (cam_to_scene);
+        antca_ptr->setViewMatrix (cam_to_scene);
+    };
+
+    auto subr_csv_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
+                              &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight,
+                              max_bc, csv_positions, csv_multiplier, land, land_to_scene, subr_reset_camspace](const float fps)
+    {
+        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        // Extra options for breadcrumbs in csv playback
+        mplot::ColourMap cm (mplot::ColourMapType::Plasma);
+        sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
+        sm::vvec<float> bc_alpha = { 1, 0.5, 0.5, 1 };
+        sm::vvec<float> bc_scale = { 0.5, 0.5, 0.5, 1 };
+
+        if (csv_positions.size() > move_counter) {
+            /*
+             * With a csv path, teleport between each location (and then estimate the heading of
+             * the ant). CSV positions are relative to the landscape model.
+             */
+            sm::vec<float> lastcamloc = cam_to_scene.translation();
+
+            sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
+            nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
+            nextloc *= csv_multiplier; // hack
+            sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
+            lastloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
+            lastloc *= csv_multiplier;
+            std::cout << "Teleport from " << lastloc << " to " << nextloc << std::endl;
+
+            sm::vec<float> ltstr = land_to_scene.translation(); // always the same
+            sm::vec<float> cam_nextloc = nextloc;
+            cam_nextloc[0] += ltstr[0];
+            cam_nextloc[2] += ltstr[2]; // update only x and z
+            std::cout << "--> cam_nextloc: " << cam_nextloc << std::endl;
+
+            sm::mat44<float> cnl;
+            cnl.translate (cam_nextloc);
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
+            cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+
+            // Find triangle hits using the scene's 'up' direction.
+            sm::vec<float> camloc_mf = (land_to_scene.inverse() * cam_to_scene).translation();
+            sm::vec<float> vnrm = v.scene_up;
+            vnrm *= 4.0f;
+            auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm);
+            std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
+
+            if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
+                sm::vec<float> fwds = nextloc - lastloc;
+                // Set up our camera using the data obtained from find_triangle_hit()
+                cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
+                if (cam_to_scene != sm::mat44<float>::identity()) {
+                    setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+                } // else what to do if cam_to_scene is identity?
+            } else {
+                // Rather than throwing, could just move on to next in csv?
+                throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
+            }
+
+            move_counter++;
+            if (breadcrumb_coords.size() < max_bc) {
+                breadcrumb_coords.push_back (lastcamloc);
+            } else {
+                breadcrumb_coords[move_counter % max_bc] = lastcamloc;
+            }
+            isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_scale);
+
+        } // else no more movements
+        subr_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
         ep1->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
@@ -967,7 +998,16 @@ int32_t main (int32_t argc, char* argv[])
         // Deal with any movements commanded by key press events (including reset)
 
         v.setContext(); // right now key move over land needs v's context
-        subr_key_move_over_land (fps_profiler.fps_mean);
+
+        if (v.vstate.test (eye3dvisual::state::walk)) {
+            subr_walk_over_land (fps_profiler.fps_mean);
+        } else if (opts.test (eye3d::options::playback)) { // play back deque of movements
+            subr_deque_playback (fps_profiler.fps_mean);
+        } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
+            subr_csv_playback (fps_profiler.fps_mean);
+        } else {
+            subr_key_move_over_land (fps_profiler.fps_mean);
+        }
 
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
