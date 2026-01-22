@@ -138,6 +138,7 @@ namespace eye3d
         max_fps,          // If true, poll, instead of fps
         playback,         // Play back saved sequence of poses from a crash data file (.h5 format)
         path_from_csv,    // Move the ant from a sequence of 2D coordinates that give it a path
+        save_hdf5,        // If true, then same output data (path_from_csv mode only at present)
         can_exit
     };
     // Parse cmd line to find the path and set options
@@ -167,6 +168,8 @@ namespace eye3d
                 opts |= eye3d::options::path_from_csv;
                 i++;
                 csvpath = std::string(argv[i]);
+            } else if (arg == "-d") {
+                opts |= eye3d::options::save_hdf5;
             }
         }
         if (path.empty()) {
@@ -580,6 +583,9 @@ int32_t main (int32_t argc, char* argv[])
     [[maybe_unused]] uint32_t di = 0; // data index (for playback)
     // A file to be read from csv with 2D coordinates
     sm::vvec<sm::vec<float, 2>> csv_positions;
+    // When reproducing csv paths, it's useful to keep a record of the last triangle, because the
+    // most likely next triangle is the last triangle.
+    std::array<uint32_t, 4> last_ti = {std::numeric_limits<uint32_t>::max()};
 
     if (opts.test (eye3d::options::playback)) {
         // populate mdq from file
@@ -900,7 +906,8 @@ int32_t main (int32_t argc, char* argv[])
 
     auto subr_csv_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
                               &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight,
-                              max_bc, csv_positions, csv_multiplier, land, land_to_scene, subr_reset_camspace](const float fps)
+                              max_bc, csv_positions, csv_multiplier, land, land_to_scene, subr_reset_camspace]
+    (const float fps, std::array<uint32_t, 4>& _last_ti)
     {
         antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -923,13 +930,13 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
             lastloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
             lastloc *= csv_multiplier;
-            std::cout << "Teleport from " << lastloc << " to " << nextloc << std::endl;
+            //std::cout << "Teleport from " << lastloc << " to " << nextloc << std::endl;
 
             sm::vec<float> ltstr = land_to_scene.translation(); // always the same
             sm::vec<float> cam_nextloc = nextloc;
             cam_nextloc[0] += ltstr[0];
             cam_nextloc[2] += ltstr[2]; // update only x and z
-            std::cout << "--> cam_nextloc: " << cam_nextloc << std::endl;
+            //std::cout << "--> cam_nextloc: " << cam_nextloc << std::endl;
 
             sm::mat44<float> cnl;
             cnl.translate (cam_nextloc);
@@ -940,8 +947,9 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> camloc_mf = (land_to_scene.inverse() * cam_to_scene).translation();
             sm::vec<float> vnrm = v.scene_up;
             vnrm *= 4.0f;
-            auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm);
-            std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
+            auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm, _last_ti);
+            _last_ti = _ti0;
+            //std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
 
             if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
                 sm::vec<float> fwds = nextloc - lastloc;
@@ -952,7 +960,10 @@ int32_t main (int32_t argc, char* argv[])
                 } // else what to do if cam_to_scene is identity?
             } else {
                 // Rather than throwing, could just move on to next in csv?
-                throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
+                // throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
+                cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+                std::cout << "Omit csv_positions[move_counter] = csv_positions[" << move_counter << "] = "
+                          << csv_positions[move_counter] << " (failed to find triangle hit)\n";
             }
 
             move_counter++;
@@ -1004,7 +1015,7 @@ int32_t main (int32_t argc, char* argv[])
         } else if (opts.test (eye3d::options::playback)) { // play back deque of movements
             subr_deque_playback (fps_profiler.fps_mean);
         } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
-            subr_csv_playback (fps_profiler.fps_mean);
+            subr_csv_playback (fps_profiler.fps_mean, last_ti);
         } else {
             subr_key_move_over_land (fps_profiler.fps_mean);
         }
@@ -1017,7 +1028,7 @@ int32_t main (int32_t argc, char* argv[])
             ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
 
             // if csv mode, then save the data
-            if (opts.test (eye3d::options::path_from_csv)) {
+            if (opts.test (eye3d::options::path_from_csv) && opts.test (eye3d::options::save_hdf5)) {
                 std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
                 try {
                     record.add_contained_vals (ommframe.c_str(), ommatidiaData);
