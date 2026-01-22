@@ -613,7 +613,7 @@ int32_t main (int32_t argc, char* argv[])
 
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
-    constexpr float csv_multiplier = 50.0f;
+    constexpr float csv_multiplier = 10.0f;
     float hoverheight = 0.01f;
     if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
 
@@ -905,7 +905,7 @@ int32_t main (int32_t argc, char* argv[])
     };
 
     auto subr_csv_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
-                              &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight,
+                              &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight, &opts,
                               max_bc, csv_positions, csv_multiplier, land, land_to_scene, subr_reset_camspace]
     (const float fps, std::array<uint32_t, 4>& _last_ti)
     {
@@ -925,8 +925,8 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> lastcamloc = cam_to_scene.translation();
 
             sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
-            nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
-            nextloc *= csv_multiplier; // hack
+            nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f }; // hack for normalized positions
+            nextloc *= csv_multiplier;                // hack for size of environment
             sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
             lastloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
             lastloc *= csv_multiplier;
@@ -974,7 +974,11 @@ int32_t main (int32_t argc, char* argv[])
             }
             isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_scale);
 
-        } // else no more movements
+        } else {
+            // else no more movements, so switch off path_from_csv mode
+            opts.set (eye3d::options::path_from_csv, false);
+        }
+
         subr_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
         ep1->setViewMatrix (cam_to_scene);
