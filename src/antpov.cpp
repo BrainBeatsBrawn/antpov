@@ -633,7 +633,10 @@ int32_t main (int32_t argc, char* argv[])
 
     constexpr float csv_multiplier = 10.0f;
     float hoverheight = 0.01f;
-    if (!hovh.empty()) { hoverheight = std::atof (hovh.c_str()); }
+    if (!hovh.empty()) {
+        hoverheight = std::atof (hovh.c_str());
+        std::cout << "Set user-supplied hoverheight to " << hoverheight << std::endl;
+    }
 
     if (land) {
         std::cout << "Landscape name: " << land->name << " was found [" << (land->vpos_size() / 3) << " vertices]\n";
@@ -948,7 +951,7 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
             lastloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
             lastloc *= csv_multiplier;
-            //std::cout << "Teleport from " << lastloc << " to " << nextloc << std::endl;
+            //std::cout << "Teleport a distance " << (lastloc - nextloc).length() << std::endl;
 
             sm::vec<float> ltstr = land_to_scene.translation(); // always the same
             sm::vec<float> cam_nextloc = nextloc;
