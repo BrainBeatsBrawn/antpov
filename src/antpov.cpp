@@ -27,6 +27,7 @@ constexpr int32_t glver = mplot::gl::version_4_3;
 #include <mplot/CoordArrows.h>
 #include <mplot/GridVisual.h>
 #include <mplot/RodVisual.h>
+#include <mplot/VectorVisual.h>
 #include <mplot/InstancedScatterVisual.h>
 
 #include "spline.hpp" // tkspline plus wrapper in sm::algo space
@@ -383,7 +384,6 @@ int32_t main (int32_t argc, char* argv[])
     // A window for the eye view
     mplot::Visual<glver> veye (512, 512, "Eye view");
     veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
-    //veye.setSceneRotation (sm::quaternion<float>{ float{0.658107}, float{0.752674}, float{0.0157197}, float{0.0114156} });
 
     // Use a FPS profiling with a text object on screen
     mplot::fps::profiler fps_profiler;
@@ -520,13 +520,30 @@ int32_t main (int32_t argc, char* argv[])
 
     // Visualization options
     eyevm2->show_3d = !opts.test(eye3d::options::hidehead);
-    // eyevm2->twodimensional (opts.test(eye3d::options::hidehead));
+    eyevm2->twodimensional (opts.test(eye3d::options::hidehead));
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
+    auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
+    sm::mat44<float> mflip;
+    mflip.rotate (flip);
+    if (opts.test(eye3d::options::hidehead)) { eyevm2->setViewMatrix (mflip); }
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     // Scale this model up, so it's not tiny like the one in the scene
     ep2->scaleViewMatrix (1000);
+
+    // Draw a 'forwards' arrow
+    auto vvm = std::make_unique<mplot::VectorVisual<float, 3, glver>>(sm::vec<>{0.7, 0.7, 0});
+    v.bindmodel (vvm);
+    vvm->thevec = sm::vec<>::uz() * 0.4f;
+    vvm->twodimensional (opts.test(eye3d::options::hidehead));
+    vvm->fixed_colour = true;
+    vvm->single_colour = mplot::colour::slateblue2;
+    //vvm->addLabel ("Direction", {-0.8, -0.5, 0}, mplot::TextFeatures(0.1f)); // weird - causes GL invalid op
+    vvm->thickness /= 10.0f;
+    if (opts.test(eye3d::options::hidehead)) { vvm->setViewMatrix (mflip); }
+    vvm->finalize();
+    veye.addVisualModel (vvm);
 
     // The ant body
     auto av = std::make_unique<biosim::AntVisual<glver>>();
