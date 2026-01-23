@@ -139,6 +139,7 @@ namespace eye3d
         playback,         // Play back saved sequence of poses from a crash data file (.h5 format)
         path_from_csv,    // Move the ant from a sequence of 2D coordinates that give it a path
         save_hdf5,        // If true, then same output data (path_from_csv mode only at present)
+        hidehead,         // If true, hide the 3D head/eye view in the Eye-only window
         can_exit
     };
     // Parse cmd line to find the path and set options
@@ -170,6 +171,8 @@ namespace eye3d
                 csvpath = std::string(argv[i]);
             } else if (arg == "-d") {
                 opts |= eye3d::options::save_hdf5;
+            } else if (arg == "-i") {
+                opts |= eye3d::options::hidehead;
             }
         }
         if (path.empty()) {
@@ -380,7 +383,7 @@ int32_t main (int32_t argc, char* argv[])
     // A window for the eye view
     mplot::Visual<glver> veye (512, 512, "Eye view");
     veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
-    veye.setSceneRotation (sm::quaternion<float>{ float{0.658107}, float{0.752674}, float{0.0157197}, float{0.0114156} });
+    //veye.setSceneRotation (sm::quaternion<float>{ float{0.658107}, float{0.752674}, float{0.0157197}, float{0.0114156} });
 
     // Use a FPS profiling with a text object on screen
     mplot::fps::profiler fps_profiler;
@@ -452,12 +455,10 @@ int32_t main (int32_t argc, char* argv[])
     auto ptype = mplot::compoundray::EyeVisual<glver>::projection_type::mercator;
     mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
 
-    // Show or hide the head and compound ray eyes in the 'big eye window'
-    bool hidehead = true;
-
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                          (!hidehead && oces_reader.read_success) ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+                                                                          (opts.test(eye3d::options::hidehead) == false && oces_reader.read_success)
+                                                                           ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
     // First eye of eye pair (one spherical projection)
@@ -518,8 +519,8 @@ int32_t main (int32_t argc, char* argv[])
     }
 
     // Visualization options
-    eyevm2->show_3d = !hidehead;
-    // eyevm2->twodimensional (hidehead);
+    eyevm2->show_3d = !opts.test(eye3d::options::hidehead);
+    // eyevm2->twodimensional (opts.test(eye3d::options::hidehead));
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
     eyevm2->finalize();
