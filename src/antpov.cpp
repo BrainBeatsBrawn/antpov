@@ -18,7 +18,7 @@
 #include <mplot/gl/version.h>
 constexpr int32_t glver = mplot::gl::version_4_3;
 
-#include "eye3dvisual.h"
+#include "antpovvisual.h"
 #include "AntVisual.h"
 #include <mplot/fps/profiler.h>
 #include <mplot/compoundray/interop.h> // mathplot <--> compoundray interoperability
@@ -99,12 +99,12 @@ namespace mplot
     };
 } // mplot
 
-namespace eye3d
+namespace antpov
 {
     // Your application-specific help message
     void printHelp()
     {
-        std::cout << "USAGE:\neye3d -f <path to gltf scene>\n\n"
+        std::cout << "USAGE:\nantpov -f <path to gltf scene>\n\n"
                   << "\t-h\tDisplay this help information.\n"
                   << "\t-f\tPath to a gltf scene file (absolute or relative to current "
                   << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
@@ -144,7 +144,7 @@ namespace eye3d
         can_exit
     };
     // Parse cmd line to find the path and set options
-    std::tuple<std::string, std::string, std::string> parse_inputs (int argc, char* argv[], sm::flags<eye3d::options>& opts)
+    std::tuple<std::string, std::string, std::string> parse_inputs (int argc, char* argv[], sm::flags<antpov::options>& opts)
     {
         std::string path = "";
         std::string csvpath = "";
@@ -152,8 +152,8 @@ namespace eye3d
         for (int i = 0; i < argc; i++) {
             std::string arg = std::string(argv[i]);
             if (arg == "-h") {
-                eye3d::printHelp();
-                opts |= eye3d::options::can_exit;
+                antpov::printHelp();
+                opts |= antpov::options::can_exit;
             } else if (arg == "-f") {
                 i++;
                 path = std::string(argv[i]);
@@ -161,24 +161,24 @@ namespace eye3d
                 i++;
                 hovh = std::string(argv[i]);
             } else if (arg == "-b") {
-                opts |= eye3d::options::blender_axes;
+                opts |= antpov::options::blender_axes;
             } else if (arg == "-x") {
-                opts |= eye3d::options::max_fps;
+                opts |= antpov::options::max_fps;
             } else if (arg == "-p") {
-                opts |= eye3d::options::playback;
+                opts |= antpov::options::playback;
             } else if (arg == "-c") {
-                opts |= eye3d::options::path_from_csv;
+                opts |= antpov::options::path_from_csv;
                 i++;
                 csvpath = std::string(argv[i]);
             } else if (arg == "-d") {
-                opts |= eye3d::options::save_hdf5;
+                opts |= antpov::options::save_hdf5;
             } else if (arg == "-i") {
-                opts |= eye3d::options::hidehead;
+                opts |= antpov::options::hidehead;
             }
         }
         if (path.empty()) {
-            eye3d::printHelp();
-            opts |= eye3d::options::can_exit;
+            antpov::printHelp();
+            opts |= antpov::options::can_exit;
         }
         return {path, hovh, csvpath};
     }
@@ -330,7 +330,7 @@ namespace eye3d
         return best_n;
     }
 
-} // namespace eye3d
+} // namespace antpov
 
 int32_t main (int32_t argc, char* argv[])
 {
@@ -339,13 +339,13 @@ int32_t main (int32_t argc, char* argv[])
     double waittime = 0.0167; // for debug, so I can make playback slow in a simple way
 
     // Program options and boolean state
-    sm::flags<eye3d::options> opts;
-    auto[path, hovh, csv_path] = eye3d::parse_inputs (argc, argv, opts);
+    sm::flags<antpov::options> opts;
+    auto[path, hovh, csv_path] = antpov::parse_inputs (argc, argv, opts);
     std::string h5_path = csv_path;
     mplot::tools::stripFileSuffix (h5_path);
     if (h5_path.empty()) { h5_path = "trail"; }
     h5_path += ".h5";
-    if (opts.test (eye3d::options::can_exit)) { return 1; }
+    if (opts.test (antpov::options::can_exit)) { return 1; }
 
     // Boilerplate memory alloc for compound-ray
     multicamAlloc();
@@ -357,11 +357,11 @@ int32_t main (int32_t argc, char* argv[])
     setVerbosity (false);
     // Load the file
     std::cout << "Loading glTF file \"" << path << "\"..." << std::endl;
-    loadGlTFscene (path.c_str(), (opts.test(eye3d::options::blender_axes)
+    loadGlTFscene (path.c_str(), (opts.test(antpov::options::blender_axes)
                                   ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
 
     // Create a mathplot window to render the eye/sensor
-    eye3dvisual v (2000, 2000, "Scene (mathplot graphics)", opts.test(eye3d::options::blender_axes));
+    antpovvisual v (2000, 2000, "Scene (mathplot graphics)", opts.test(antpov::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.5f; // 0.5 m/s max speed for our Cataglyphis Velox
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
@@ -372,10 +372,10 @@ int32_t main (int32_t argc, char* argv[])
     v.rotateAboutNearest (true);
     // Rotate about a scene vertical axis? true for landscapes, false for cubes/objects (Ctrl-k changes I think, at runtime)
     v.rotateAboutVertical (true);
-    if (opts.test(eye3d::options::blender_axes)) {
+    if (opts.test(antpov::options::blender_axes)) {
         v.switch_scene_vertical_axis(); // to uz up
     }
-    v.vstate.flip (eye3dvisual::state::show_camframe);
+    v.vstate.flip (antpovvisual::state::show_camframe);
 
     // We start rotated into a drone view initial orientation for taking pictures of the world
     sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
@@ -457,7 +457,7 @@ int32_t main (int32_t argc, char* argv[])
 
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                          (opts.test(eye3d::options::hidehead) == false && oces_reader.read_success)
+                                                                          (opts.test(antpov::options::hidehead) == false && oces_reader.read_success)
                                                                            ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
@@ -519,14 +519,14 @@ int32_t main (int32_t argc, char* argv[])
     }
 
     // Visualization options
-    eyevm2->show_3d = !opts.test(eye3d::options::hidehead);
-    eyevm2->twodimensional (opts.test(eye3d::options::hidehead));
+    eyevm2->show_3d = !opts.test(antpov::options::hidehead);
+    eyevm2->twodimensional (opts.test(antpov::options::hidehead));
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
     auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
     sm::mat44<float> mflip;
     mflip.rotate (flip);
-    if (opts.test(eye3d::options::hidehead)) { eyevm2->setViewMatrix (mflip); }
+    if (opts.test(antpov::options::hidehead)) { eyevm2->setViewMatrix (mflip); }
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     // Scale this model up, so it's not tiny like the one in the scene
@@ -536,12 +536,12 @@ int32_t main (int32_t argc, char* argv[])
     auto vvm = std::make_unique<mplot::VectorVisual<float, 3, glver>>(sm::vec<>{0.7, 0.7, 0});
     v.bindmodel (vvm);
     vvm->thevec = sm::vec<>::uz() * 0.4f;
-    vvm->twodimensional (opts.test(eye3d::options::hidehead));
+    vvm->twodimensional (opts.test(antpov::options::hidehead));
     vvm->fixed_colour = true;
     vvm->single_colour = mplot::colour::slateblue2;
     //vvm->addLabel ("Direction", {-0.8, -0.5, 0}, mplot::TextFeatures(0.1f)); // weird - causes GL invalid op
     vvm->thickness /= 10.0f;
-    if (opts.test(eye3d::options::hidehead)) { vvm->setViewMatrix (mflip); }
+    if (opts.test(antpov::options::hidehead)) { vvm->setViewMatrix (mflip); }
     vvm->finalize();
     veye.addVisualModel (vvm);
 
@@ -605,7 +605,7 @@ int32_t main (int32_t argc, char* argv[])
     // most likely next triangle is the last triangle.
     std::array<uint32_t, 4> last_ti = {std::numeric_limits<uint32_t>::max()};
 
-    if (opts.test (eye3d::options::playback)) {
+    if (opts.test (antpov::options::playback)) {
         // populate mdq from file
         try {
             // Make this a cmd line arg, and open either .h5 or .csv
@@ -620,9 +620,9 @@ int32_t main (int32_t argc, char* argv[])
             /* No file to open */
             std::cout << "Playback mode, but there's no file to open\n";
         }
-    } else if (opts.test (eye3d::options::path_from_csv)) {
+    } else if (opts.test (antpov::options::path_from_csv)) {
         //waittime = 0.25; // make it slow
-        if (eye3d::read_csv (csv_path, csv_positions) == false) {
+        if (antpov::read_csv (csv_path, csv_positions) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else {
             std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
@@ -645,7 +645,7 @@ int32_t main (int32_t argc, char* argv[])
 
         sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
 
-        if (opts.test (eye3d::options::path_from_csv) && !csv_positions.empty()) {
+        if (opts.test (antpov::options::path_from_csv) && !csv_positions.empty()) {
             // Initial position from first entry in the csv
             std::cout << "Set initial position from csv\n";
             sm::vec<float> nextloc = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
@@ -689,7 +689,7 @@ int32_t main (int32_t argc, char* argv[])
     std::cout << "*****\n";
 
     // Random route generation
-    eye3d::random_outbound<float> rrg(1500, 150, 100);
+    antpov::random_outbound<float> rrg(1500, 150, 100);
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
@@ -705,10 +705,10 @@ int32_t main (int32_t argc, char* argv[])
         } // else no need to re-get data
 
         // Change showing the 'cones' of the compound eye visual model?
-        if (ep1->show_cones != v.vstate.test(eye3dvisual::state::show_cones)) {
-            ep1->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
+        if (ep1->show_cones != v.vstate.test(antpovvisual::state::show_cones)) {
+            ep1->show_cones = v.vstate.test(antpovvisual::state::show_cones);
             ep1->reinit();
-            ep2->show_cones = v.vstate.test(eye3dvisual::state::show_cones);
+            ep2->show_cones = v.vstate.test(antpovvisual::state::show_cones);
             ep2->reinit();
         }
         // Change the length of the cones?
@@ -740,14 +740,14 @@ int32_t main (int32_t argc, char* argv[])
     auto subr_reset_camspace = [&v, &initial_camera_space, &hoverheight, land, land_to_scene] (sm::mat44<float>& cam_to_scene)
     {
         // reset to initial camera space if requested
-        if (v.vstate.test (eye3dvisual::state::campose_reset_request) == true) {
+        if (v.vstate.test (antpovvisual::state::campose_reset_request) == true) {
             v.stop(); // cancel any active movements
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
             sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
             auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
             cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-            v.vstate.reset (eye3dvisual::state::campose_reset_request);
+            v.vstate.reset (antpovvisual::state::campose_reset_request);
         }
     };
 
@@ -755,7 +755,7 @@ int32_t main (int32_t argc, char* argv[])
                                     &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight,
                                     max_bc, land, land_to_scene, subr_reset_camspace](const float fps)
     {
-        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         if (v.isActivelyRotating()) {
             // Up-down (pitch) is rotation about local camera frame axis x
@@ -767,9 +767,9 @@ int32_t main (int32_t argc, char* argv[])
             cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
         }
         if (v.isActivelyTranslating()) {
-            if (v.move_state.test (eye3dvisual::move_sense::up)) {
+            if (v.move_state.test (antpovvisual::move_sense::up)) {
                 hoverheight += 0.001f;
-            } else if (v.move_state.test (eye3dvisual::move_sense::down)) {
+            } else if (v.move_state.test (antpovvisual::move_sense::down)) {
                 hoverheight -= 0.001f;
                 if (hoverheight < 0.0f) { hoverheight = 0.0f; }
             }
@@ -798,10 +798,10 @@ int32_t main (int32_t argc, char* argv[])
                                 &opts, &move_counter, &mdq, &di, &hoverheight,
                                 land, land_to_scene, subr_reset_camspace](const float fps)
     {
-        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         // play back deque of movements
-        if (opts.test (eye3d::options::playback) == false) { /* Uh oh */ }
+        if (opts.test (antpov::options::playback) == false) { /* Uh oh */ }
 
         try {
             // Note that even if the last mesh movement would land on a triangle, a further
@@ -819,8 +819,8 @@ int32_t main (int32_t argc, char* argv[])
             }
         } catch (mplot::NavException& e) {
             std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
-            opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
-            opts.set (eye3d::options::playback, false);
+            opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
+            opts.set (antpov::options::playback, false);
         }
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
         // reset to initial camera space if requested
@@ -836,11 +836,11 @@ int32_t main (int32_t argc, char* argv[])
                                 &isvp, &mdq, land, land_to_scene,
                                 &hoverheight, subr_reset_camspace](const float fps)
     {
-        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         // A random walk mode
-        if (v.vstate.test (eye3dvisual::state::walk) == false) { return; }
+        if (v.vstate.test (antpovvisual::state::walk) == false) { return; }
 
         // set rotation and step length according to the Stone paper
         rrg.step();
@@ -891,7 +891,7 @@ int32_t main (int32_t argc, char* argv[])
                 for (uint32_t i = 0; i < mdq.size(); ++i) { mdq[i].save (hd, i); }
             }
 
-            opts.set (eye3d::options::max_fps, false); // don't burn electricity after exception
+            opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
             // Draw triangle tubes
             bool first = true;
             for (auto t : e.tris) {
@@ -899,9 +899,9 @@ int32_t main (int32_t argc, char* argv[])
                     std::cout << t[0] << "-" << t[1] << "-" << t[2] << " has t[3] = " << t[3] << std::endl;
                 }
                 auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
-                eye3d::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
-                eye3d::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
-                eye3d::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
+                antpov::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
+                antpov::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
+                antpov::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
 
                 // JSON line to view with triangle_intersect
                 sm::vec<float> tn0 = land->navmesh->triangle_normal (tv);
@@ -915,7 +915,7 @@ int32_t main (int32_t argc, char* argv[])
                 first = false;
             }
 
-            v.vstate.set (eye3dvisual::state::walk, false);
+            v.vstate.set (antpovvisual::state::walk, false);
         }
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
         subr_reset_camspace (cam_to_scene); // if requested
@@ -930,7 +930,7 @@ int32_t main (int32_t argc, char* argv[])
                               max_bc, csv_positions, csv_multiplier, land, land_to_scene, subr_reset_camspace]
     (const float fps, std::array<uint32_t, 4>& _last_ti)
     {
-        antca_ptr->setHide (!v.vstate.test(eye3dvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         // Extra options for breadcrumbs in csv playback
         mplot::ColourMap cm (mplot::ColourMapType::Plasma);
@@ -997,7 +997,7 @@ int32_t main (int32_t argc, char* argv[])
 
         } else {
             // else no more movements, so switch off path_from_csv mode
-            opts.set (eye3d::options::path_from_csv, false);
+            opts.set (antpov::options::path_from_csv, false);
         }
 
         subr_reset_camspace (cam_to_scene); // if requested
@@ -1017,7 +1017,7 @@ int32_t main (int32_t argc, char* argv[])
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
-        fps_profiler.at_begin (eye3d::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        fps_profiler.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // The current camera may have changed, this subroutine deals with any changes
         subr_detect_camera_changes();
         // Now render the mathplot window
@@ -1028,18 +1028,18 @@ int32_t main (int32_t argc, char* argv[])
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
-        if (opts.test (eye3d::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
+        if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
         // Render the eye-only window
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
 
         v.setContext(); // right now key move over land needs v's context
 
-        if (v.vstate.test (eye3dvisual::state::walk)) {
+        if (v.vstate.test (antpovvisual::state::walk)) {
             subr_walk_over_land (fps_profiler.fps_mean);
-        } else if (opts.test (eye3d::options::playback)) { // play back deque of movements
+        } else if (opts.test (antpov::options::playback)) { // play back deque of movements
             subr_deque_playback (fps_profiler.fps_mean);
-        } else if (opts.test (eye3d::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
+        } else if (opts.test (antpov::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
             subr_csv_playback (fps_profiler.fps_mean, last_ti);
         } else {
             subr_key_move_over_land (fps_profiler.fps_mean);
@@ -1053,7 +1053,7 @@ int32_t main (int32_t argc, char* argv[])
             ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
 
             // if csv mode, then save the data
-            if (opts.test (eye3d::options::path_from_csv) && opts.test (eye3d::options::save_hdf5)) {
+            if (opts.test (antpov::options::path_from_csv) && opts.test (antpov::options::save_hdf5)) {
                 std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
                 try {
                     record.add_contained_vals (ommframe.c_str(), ommatidiaData);
@@ -1067,7 +1067,7 @@ int32_t main (int32_t argc, char* argv[])
         fps_profiler.at_end();
     }
 
-    if (opts.test (eye3d::options::path_from_csv)) {
+    if (opts.test (antpov::options::path_from_csv)) {
         // convert std::vector<Ommatidium>* ommatidia into vvecs that can be h5 saved
         auto ommat = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
         sm::vvec<sm::vec<float, 3>> o_pos;
