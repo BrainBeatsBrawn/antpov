@@ -46,9 +46,9 @@ namespace biosim
     "}\n";
 
     template <int glver = mplot::gl::version_4_1>
-    struct AntVisual : public mplot::VisualModel<glver>
+    struct AntBodyVisual : public mplot::VisualModel<glver>
     {
-        AntVisual() {}
+        AntBodyVisual() {}
 
         bool draw_head = false;
 

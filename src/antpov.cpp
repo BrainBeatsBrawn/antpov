@@ -19,7 +19,7 @@
 constexpr int32_t glver = mplot::gl::version_4_3;
 
 #include "antpovvisual.h"
-#include "AntVisual.h"
+#include "AntBodyVisual.h"
 #include <mplot/fps/profiler.h>
 #include <mplot/compoundray/interop.h> // mathplot <--> compoundray interoperability
 
@@ -546,7 +546,7 @@ int32_t main (int32_t argc, char* argv[])
     veye.addVisualModel (vvm);
 
     // The ant body
-    auto av = std::make_unique<biosim::AntVisual<glver>>();
+    auto av = std::make_unique<biosim::AntBodyVisual<glver>>();
     v.bindmodel (av);
     av->finalize();
     auto ant_ptr = v.addVisualModel (av);

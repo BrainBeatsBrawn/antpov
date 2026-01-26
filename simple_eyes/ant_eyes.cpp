@@ -34,7 +34,7 @@
 # include <mplot/LengthscaleVisual.h>
 
 # include "DoubleHexGridVisual.h"
-# include "AntVisual.h"
+# include "AntBodyVisual.h"
 #endif
 
 enum class spherical_projection
@@ -202,7 +202,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     v.addVisualModel (lsv);
 
     if constexpr (show_antoinette) {
-        auto av = std::make_unique<biosim::AntVisual<>>();
+        auto av = std::make_unique<biosim::AntBodyVisual<>>();
         v.bindmodel (av);
         av->finalize();
         auto avp = v.addVisualModel (av);
