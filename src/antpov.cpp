@@ -270,16 +270,27 @@ namespace antpov
         std::unique_ptr<sm::rand_vonmises<T>> rVM;
     };
 
-    // Read a simple csv with 2D coordinates.
-    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions)
+    // Read a simple csv with 2D coordinates. Should also read flags.
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<uint32_t>& antflags)
     {
         std::ifstream f (path.c_str(), std::ios::in);
         if (f.is_open() == false) { return false; }
         std::string line;
+        std::vector<std::string> tokens;
         while (std::getline (f, line)) {
             sm::vec<float, 2> twodpos;
+            // Tokenize line into the coordinates and the flags
             twodpos.set_from_str (line, ",");
             positions.push_back (twodpos);
+            // Get flags from third entry
+            tokens.clear();
+            tokens = mplot::tools::stringToVector (line, ",");
+            if (tokens.size() > 2) {
+                uint32_t fl = std::stoi (tokens[2]);
+                antflags.push_back (fl);
+            } else {
+                antflags.push_back (0u);
+            }
         }
         return true;
     }
@@ -329,6 +340,15 @@ namespace antpov
         }
         return best_n;
     }
+
+    // The flags recorded by the experimenters
+    enum class antflags : uint8_t
+    {
+        bush,
+        cookie,
+        shadow,
+        visibility
+    };
 
 } // namespace antpov
 
@@ -555,7 +575,7 @@ int32_t main (int32_t argc, char* argv[])
 
     // Breadcrumb trail
     uint64_t move_counter = 0u;
-    uint64_t max_bc = 8000;
+    uint64_t max_bc = 32000;
     sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
     sm::vvec<float> breadcrumb_data = {};
 
@@ -601,6 +621,7 @@ int32_t main (int32_t argc, char* argv[])
     [[maybe_unused]] uint32_t di = 0; // data index (for playback)
     // A file to be read from csv with 2D coordinates
     sm::vvec<sm::vec<float, 2>> csv_positions;
+    sm::vvec<uint32_t> csv_antflags;
     // When reproducing csv paths, it's useful to keep a record of the last triangle, because the
     // most likely next triangle is the last triangle.
     std::array<uint32_t, 4> last_ti = {std::numeric_limits<uint32_t>::max()};
@@ -622,16 +643,32 @@ int32_t main (int32_t argc, char* argv[])
         }
     } else if (opts.test (antpov::options::path_from_csv)) {
         //waittime = 0.25; // make it slow
-        if (antpov::read_csv (csv_path, csv_positions) == false) {
+        if (antpov::read_csv (csv_path, csv_positions, csv_antflags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else {
             std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
         }
     }
 
+    // Turn antflags into colour info, all at the start:
+    sm::flags<antpov::antflags> aflags;
+    sm::vvec<std::array<float, 3>> bc_clr (csv_antflags.size());
+    sm::vvec<float> bc_alpha (csv_antflags.size());
+    sm::vvec<float> bc_scale (csv_antflags.size());
+    for (uint32_t i = 0; i < csv_antflags.size(); ++i) {
+        aflags = csv_antflags[i];
+        bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
+        if (i % 4 == 0) {
+            bc_alpha[i] = 1.0f;
+            bc_scale[i] = 1.0f;
+        } else {
+            bc_alpha[i] = 0.7f;
+            bc_scale[i] = 0.5f;
+        }
+    }
+
     sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
 
-    constexpr float csv_multiplier = 10.0f;
     float hoverheight = 0.01f;
     if (!hovh.empty()) {
         hoverheight = std::atof (hovh.c_str());
@@ -650,7 +687,6 @@ int32_t main (int32_t argc, char* argv[])
             std::cout << "Set initial position from csv\n";
             sm::vec<float> nextloc = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
             nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
-            nextloc *= csv_multiplier;
             std::cout << "Initial position is " << nextloc << std::endl;
             // Change camspace based on nextloc. nextloc in landscape coords, so cam_nextloc = landscape.location + nextloc;
             sm::vec<float> ltstr = land_to_scene.translation();
@@ -867,7 +903,7 @@ int32_t main (int32_t argc, char* argv[])
                     breadcrumb_data.push_back (0.0f); // dummy for now
                 } else {
                     breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
-                    // breadcrumb_data.push_back (0.0f); // dummy for now
+                    // breadcrumb_data.push_back (0.0f); // dummy for now, to be flags.
                 }
                 isvp->set_instance_data (breadcrumb_coords);
 
@@ -927,16 +963,17 @@ int32_t main (int32_t argc, char* argv[])
 
     auto subr_csv_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
                               &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight, &opts,
-                              max_bc, csv_positions, csv_multiplier, land, land_to_scene, subr_reset_camspace]
+                              max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
+                              land, land_to_scene, subr_reset_camspace]
     (const float fps, std::array<uint32_t, 4>& _last_ti)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         // Extra options for breadcrumbs in csv playback
-        mplot::ColourMap cm (mplot::ColourMapType::Plasma);
-        sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
-        sm::vvec<float> bc_alpha = { 1, 0.5, 0.5, 1 };
-        sm::vvec<float> bc_scale = { 0.5, 0.5, 0.5, 1 };
+        //mplot::ColourMap cm (mplot::ColourMapType::Plasma);
+        //sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
+        //sm::vvec<float> bc_alpha = { 1, 0.5, 0.5, 1 };
+        //sm::vvec<float> bc_scale = { 0.5, 0.5, 0.5, 1 };
 
         if (csv_positions.size() > move_counter) {
             /*
@@ -946,11 +983,7 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> lastcamloc = cam_to_scene.translation();
 
             sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
-            nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f }; // hack for normalized positions
-            nextloc *= csv_multiplier;                // hack for size of environment
             sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
-            lastloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f };
-            lastloc *= csv_multiplier;
             //std::cout << "Teleport a distance " << (lastloc - nextloc).length() << std::endl;
 
             sm::vec<float> ltstr = land_to_scene.translation(); // always the same

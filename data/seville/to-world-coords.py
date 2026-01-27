@@ -25,6 +25,29 @@ if __name__ == "__main__":
 
     diff = bottom_right-top_left
 
+    # Open associated labels file
+    labels_file = sys.argv[1]
+    labels_file = labels_file.replace ("-warped.csv", "_labels.csv")
+    # print ("Opening associated labels file: ".format(labels_file))
+
+    # I'll pack the labels up into an unsigned integer with bits meaning: 0:bush, 1:cookie, 2:shadow, 3:visibility
+    # I'm assuming exactly as many rows in the "_labels.csv" as in the "-warped.csv"
+    counter = np.uint32(0)
+    myflags = np.array([], dtype=np.uint32)
+    with open(labels_file, 'r') as f:
+        for line in f:
+            if not line.startswith("#"):
+                # want line, but everything from the 3rd col.
+                labeldata = vecFromString (line)
+                bush = np.uint32(labeldata[2])
+                cookie = np.uint32(labeldata[3])
+                shadow = np.uint32(labeldata[4])
+                visibility = np.uint32(labeldata[5])
+                #print ("Flags: {},{},{},{}".format(bush,cookie,shadow,visibility))
+                myflags = np.append (myflags, np.uint32(bush + (2 * cookie) + (4 * shadow) + (8 * visibility)))
+                counter = counter + 1
+
+    counter = np.uint32(0)
     with open(sys.argv[1], 'r') as f:
         for line in f:
             # Preserve headings
@@ -33,5 +56,6 @@ if __name__ == "__main__":
             else:
                 # Scale the actual coordinates (which should be the first two)
                 inbound_point = vecFromString(line)
-                new_point = top_left + inbound_point*diff
-                print(f"{new_point[0]},{new_point[1]}")
+                new_point = top_left + inbound_point * diff
+                print(f"{new_point[0]},{new_point[1]},{myflags[counter]}")
+                counter = counter + 1
