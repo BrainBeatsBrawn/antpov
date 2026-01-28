@@ -1068,14 +1068,16 @@ int32_t main (int32_t argc, char* argv[])
 
         v.setContext(); // right now key move over land needs v's context
 
-        if (v.vstate.test (antpovvisual::state::walk)) {
-            subr_walk_over_land (fps_profiler.fps_mean);
-        } else if (opts.test (antpov::options::playback)) { // play back deque of movements
-            subr_deque_playback (fps_profiler.fps_mean);
-        } else if (opts.test (antpov::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
-            subr_csv_playback (fps_profiler.fps_mean, last_ti);
-        } else {
-            subr_key_move_over_land (fps_profiler.fps_mean);
+        if (v.vstate.test (antpovvisual::state::paused) == false) {
+            if (v.vstate.test (antpovvisual::state::walk)) {
+                subr_walk_over_land (fps_profiler.fps_mean);
+            } else if (opts.test (antpov::options::playback)) { // play back deque of movements
+                subr_deque_playback (fps_profiler.fps_mean);
+            } else if (opts.test (antpov::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
+                subr_csv_playback (fps_profiler.fps_mean, last_ti);
+            } else {
+                subr_key_move_over_land (fps_profiler.fps_mean);
+            }
         }
 
         // Do the compound-ray ray casting to recompute the scene

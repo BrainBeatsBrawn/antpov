@@ -69,7 +69,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     sm::vec<float, 3> eyepos = { 0.0f, 0.0f, 0.0f };
 
     sm::scale<float> clr_scale;
-    clr_scale.setParams (1.0f, 0.0f);
+    clr_scale.set_params (1.0f, 0.0f);
 
     sm::vvec<float> data;
     data.linspace (0, 1, hg.num());
