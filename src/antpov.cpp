@@ -47,8 +47,8 @@ namespace mplot
     struct NavMeshMovementData
     {
         sm::vec<float> mv_camframe = {};
-        sm::mat44<float> cam_to_scene = {};
-        sm::mat44<float> model_to_scene = {};
+        sm::mat<float, 4> cam_to_scene = {};
+        sm::mat<float, 4> model_to_scene = {};
         std::array<uint32_t, 4> ti0 = {};
         float hoverheight = 0.0f;
 
@@ -71,9 +71,9 @@ namespace mplot
             std::string s = pcom.str() + std::string("/mv_camframe");
             hd.add_contained_vals (s.c_str(), mv_camframe);
             s = pcom.str() + std::string("/cam_to_scene");
-            hd.add_contained_vals (s.c_str(), cam_to_scene.mat);
+            hd.add_contained_vals (s.c_str(), cam_to_scene.arr);
             s = pcom.str() + std::string("/model_to_scene");
-            hd.add_contained_vals (s.c_str(), model_to_scene.mat);
+            hd.add_contained_vals (s.c_str(), model_to_scene.arr);
             s = pcom.str() + std::string("/ti0");
             hd.add_contained_vals (s.c_str(), ti0);
             s = pcom.str() + std::string("/hoverheight");
@@ -88,9 +88,9 @@ namespace mplot
             std::string s = pcom.str() + std::string("/mv_camframe");
             hd.read_contained_vals (s.c_str(), mv_camframe);
             s = pcom.str() + std::string("/cam_to_scene");
-            hd.read_contained_vals (s.c_str(), cam_to_scene.mat);
+            hd.read_contained_vals (s.c_str(), cam_to_scene.arr);
             s = pcom.str() + std::string("/model_to_scene");
-            hd.read_contained_vals (s.c_str(), model_to_scene.mat);
+            hd.read_contained_vals (s.c_str(), model_to_scene.arr);
             s = pcom.str() + std::string("/ti0");
             hd.read_contained_vals (s.c_str(), ti0);
             s = pcom.str() + std::string("/hoverheight");
@@ -435,7 +435,7 @@ int32_t main (int32_t argc, char* argv[])
     }
 
     // We get the initial camera localspace. This also serves to reset the camera pose. This is set in the GLTF file.
-    sm::mat44<float> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
+    sm::mat<float, 4> initial_camera_space = mplot::compoundray::getCameraSpace (scene);
 
     // Get the visual models from the scene
     mplot::compoundray::scene_to_visualmodels<glver> (scene, &v, false); // true for 'make_navmeshes'
@@ -492,7 +492,7 @@ int32_t main (int32_t argc, char* argv[])
         centre = { -0.00056, 0.00005, -0.00005 };
     }
 
-    sm::mat44<float> twod_tr;                             // twod projection transformation
+    sm::mat<float, 4> twod_tr;                             // twod projection transformation
     float twod_scale = 1.0f;                              // twod projection scaling
     sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f };      // twod projection translation to move to centre
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
@@ -522,13 +522,13 @@ int32_t main (int32_t argc, char* argv[])
             centre = (oces_reader.mirrors[0] * centre).less_one_dim();
             sm::vec<> twod_shift_left = twod_shift;
             twod_shift_left[0] *= -1.0f;
-            twod_tr.setToIdentity();
+            twod_tr.set_identity();
             twod_tr.translate (twod_shift_left);
             eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn.invert(), sz/2, sz);
         }
     } else {
         centre[0] = -centre[0];
-        twod_tr.setToIdentity();
+        twod_tr.set_identity();
         twod_offset[0] = -twod_offset[0];
         twod_offset2[0] = -twod_offset2[0];
         twod_tr.translate (twod_offset2);
@@ -544,7 +544,7 @@ int32_t main (int32_t argc, char* argv[])
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
     auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
-    sm::mat44<float> mflip;
+    sm::mat<float, 4> mflip;
     mflip.rotate (flip);
     if (opts.test(antpov::options::hidehead)) { eyevm2->setViewMatrix (mflip); }
     eyevm2->finalize();
@@ -667,7 +667,7 @@ int32_t main (int32_t argc, char* argv[])
         }
     }
 
-    sm::mat44<float> land_to_scene;  // land's viewmatrix. converts land model to scene
+    sm::mat<float, 4> land_to_scene;  // land's viewmatrix. converts land model to scene
 
     float hoverheight = 0.01f;
     if (!hovh.empty()) {
@@ -680,7 +680,7 @@ int32_t main (int32_t argc, char* argv[])
 
         land_to_scene = land->getViewMatrix();
 
-        sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
+        sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
 
         if (opts.test (antpov::options::path_from_csv) && !csv_positions.empty()) {
             // Initial position from first entry in the csv
@@ -696,7 +696,7 @@ int32_t main (int32_t argc, char* argv[])
             std::cout << "cam_nextloc = land locn (" << ltstr << ") + nextloc [xz ONLY] (" << nextloc << ") = " << cam_nextloc << std::endl;
             std::cout << "cf from-gltf camera location: " << camspace.translation() << std::endl;
 
-            sm::mat44<float> cnl;
+            sm::mat<float, 4> cnl;
             cnl.translate (cam_nextloc);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
 
@@ -706,8 +706,8 @@ int32_t main (int32_t argc, char* argv[])
         auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
         if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
             // Set up our camera using the data obtained from find_triangle_hit()
-            sm::mat44<float> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
-            if (cam_to_scene != sm::mat44<float>::identity()) {
+            sm::mat<float, 4> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
+            if (cam_to_scene != sm::mat<float, 4>::identity()) {
                 std::cout << "Set camera pose matrix from\n" << cam_to_scene << std::endl;
                 setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             } else {
@@ -717,7 +717,7 @@ int32_t main (int32_t argc, char* argv[])
             std::cout << "Failed to find the landscape; Camera position unchanged from glTF\n";
         }
 
-        sm::mat44<float> _cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        sm::mat<float, 4> _cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         std::cout << "Got camera pose matrix from scene:\n" << _cam_to_scene << std::endl;
         sm::vec<float> _lastloc = _cam_to_scene.translation();
         std::cout << "lastloc = " << _lastloc << " [this is cam_to_scene.translation()]" << std::endl;
@@ -773,13 +773,13 @@ int32_t main (int32_t argc, char* argv[])
     };
 
     // Helper subroutine used by all the movement subroutines
-    auto subr_reset_camspace = [&v, &initial_camera_space, &hoverheight, land, land_to_scene] (sm::mat44<float>& cam_to_scene)
+    auto subr_reset_camspace = [&v, &initial_camera_space, &hoverheight, land, land_to_scene] (sm::mat<float, 4>& cam_to_scene)
     {
         // reset to initial camera space if requested
         if (v.vstate.test (antpovvisual::state::campose_reset_request) == true) {
             v.stop(); // cancel any active movements
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
-            sm::mat44<float> camspace = mplot::compoundray::getCameraSpace (scene);
+            sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
             auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
             cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -792,7 +792,7 @@ int32_t main (int32_t argc, char* argv[])
                                     max_bc, land, land_to_scene, subr_reset_camspace](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
-        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         if (v.isActivelyRotating()) {
             // Up-down (pitch) is rotation about local camera frame axis x
             rotateCamerasLocallyAround (v.getVerticalRotationAngle(), 1.0f, 0.0f, 0.0f);
@@ -835,7 +835,7 @@ int32_t main (int32_t argc, char* argv[])
                                 land, land_to_scene, subr_reset_camspace](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
-        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         // play back deque of movements
         if (opts.test (antpov::options::playback) == false) { /* Uh oh */ }
 
@@ -845,7 +845,7 @@ int32_t main (int32_t argc, char* argv[])
             // we are on the edge of a landscape)
             land->navmesh->ti0 = mdq[di].ti0;
             std::cout << "Playback of saved movement index = " << di << std::endl;
-            sm::mat44<float> cam_to_scene_sv = cam_to_scene;
+            sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
             cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, /*ti0,*/ mdq[di].hoverheight);
             di++;
             if (land->navmesh->ti0[3] == 1) {
@@ -873,7 +873,7 @@ int32_t main (int32_t argc, char* argv[])
                                 &hoverheight, subr_reset_camspace](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
-        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         // A random walk mode
         if (v.vstate.test (antpovvisual::state::walk) == false) { return; }
@@ -886,7 +886,7 @@ int32_t main (int32_t argc, char* argv[])
         cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
         // saves
-        sm::mat44<float> cam_to_scene_sv = cam_to_scene;
+        sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
         //std::array<uint32_t, 4> ti0_sv = ti0;
         try {
             try {
@@ -968,7 +968,7 @@ int32_t main (int32_t argc, char* argv[])
     (const float fps, std::array<uint32_t, 4>& _last_ti)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
-        sm::mat44<float> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+        sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         // Extra options for breadcrumbs in csv playback
         //mplot::ColourMap cm (mplot::ColourMapType::Plasma);
         //sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
@@ -992,7 +992,7 @@ int32_t main (int32_t argc, char* argv[])
             cam_nextloc[2] += ltstr[2]; // update only x and z
             //std::cout << "--> cam_nextloc: " << cam_nextloc << std::endl;
 
-            sm::mat44<float> cnl;
+            sm::mat<float, 4> cnl;
             cnl.translate (cam_nextloc);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
             cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -1009,7 +1009,7 @@ int32_t main (int32_t argc, char* argv[])
                 sm::vec<float> fwds = nextloc - lastloc;
                 // Set up our camera using the data obtained from find_triangle_hit()
                 cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
-                if (cam_to_scene != sm::mat44<float>::identity()) {
+                if (cam_to_scene != sm::mat<float, 4>::identity()) {
                     setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
                 } // else what to do if cam_to_scene is identity?
             } else {

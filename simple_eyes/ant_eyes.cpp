@@ -17,7 +17,7 @@
 #include <cmath>
 
 #include <sm/mathconst>
-#include <sm/mat44>
+#include <sm/mat>
 #include <sm/scale>
 #include <sm/vec>
 #include <sm/vvec>
@@ -280,7 +280,7 @@ int main (int argc, char** argv)
                 z_sph = -std::sqrt (-z_sq); // Anything beyond the edge of r_sph
             }
             sm::vec<float> prerotate = { eye_x_loc + z_sph, xy[0], xy[1] };
-            sm::mat44<float> m1;
+            sm::mat<float, 4> m1;
             m1.rotate (sm::vec<float>{0, 1, 0}, mc::pi_over_6 + mc::pi);
             sphere_coords[i] = (m1 * prerotate).less_one_dim();
 
