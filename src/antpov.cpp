@@ -401,9 +401,15 @@ int32_t main (int32_t argc, char* argv[])
     sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
     v.setSceneRotation (def_q);
 
-    // A window for the eye view
-    mplot::Visual<glver> veye (512, 512, "Eye view");
+    // A window for the 2D eye view projection
+    mplot::Visual<glver> veye (920, 512, "Eye view");
     veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
+    veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-0.972577} });
+
+    // A window for the Ant body view
+    mplot::Visual<glver> vant (920, 920, "Ant view");
+    vant.setSceneTrans (sm::vec<float,3>{ float{0.0976446}, float{0.158883}, float{-3.70978} });
+    vant.setSceneRotation (sm::quaternion<float>{ float{-0.387933}, float{-0.00951467}, float{0.910505}, float{0.142823} });
 
     // Use a FPS profiling with a text object on screen
     mplot::fps::profiler fps_profiler;
@@ -455,7 +461,7 @@ int32_t main (int32_t argc, char* argv[])
     }
 
     // Create an EyeVisual 'eye' in our mathplot scene, v.
-    mplot::compoundray::EyeVisual<glver>* ep1 = nullptr;
+    mplot::compoundray::EyeVisual<glver>* ep0 = nullptr;
     auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
                                                                          oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
@@ -463,22 +469,26 @@ int32_t main (int32_t argc, char* argv[])
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
     eyevm->finalize();
-    ep1 = v.addVisualModel (eyevm);
+    ep0 = v.addVisualModel (eyevm);
 
     // We follow the eyevisual as it moves
     v.options.set (mplot::visual_options::viewFollowsVMTranslations);
 
     //v.options.set (mplot::visual_options::viewFollowsVMRotations);
-    v.setFollowedVM (ep1);
+    v.setFollowedVM (ep0);
 
     // A second eye goes in the 'eye only' window
     auto ptype = mplot::compoundray::EyeVisual<glver>::projection_type::mercator;
+    mplot::compoundray::EyeVisual<glver>* ep1 = nullptr;
     mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
 
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                          (opts.test(antpov::options::hidehead) == false && oces_reader.read_success)
-                                                                           ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+                                                                          oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+    vant.bindmodel (eyevm1);
+
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
+                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia), nullptr);
     veye.bindmodel (eyevm2);
     eyevm2->name = "Big Eye";
     // First eye of eye pair (one spherical projection)
@@ -492,7 +502,7 @@ int32_t main (int32_t argc, char* argv[])
         centre = { -0.00056, 0.00005, -0.00005 };
     }
 
-    sm::mat<float, 4> twod_tr;                             // twod projection transformation
+    sm::mat<float, 4> twod_tr;                            // twod projection transformation
     float twod_scale = 1.0f;                              // twod projection scaling
     sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f };      // twod projection translation to move to centre
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
@@ -514,8 +524,6 @@ int32_t main (int32_t argc, char* argv[])
 
     eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, 0, sz/2);
 
-    //eyevm->add_spherical_projection (ptype, twod_tr, pscentre, psrad, psrotn, 0, oces_reader.position.size() / 2);
-
     // Second of eye pair (another spherical projection)
     if (oces_reader.read_success == true) {
         if (oces_reader.mirrors.empty() == false) {
@@ -526,42 +534,45 @@ int32_t main (int32_t argc, char* argv[])
             twod_tr.translate (twod_shift_left);
             eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn.invert(), sz/2, sz);
         }
-    } else {
-        centre[0] = -centre[0];
-        twod_tr.set_identity();
-        twod_offset[0] = -twod_offset[0];
-        twod_offset2[0] = -twod_offset2[0];
-        twod_tr.translate (twod_offset2);
-        twod_tr.scale (twod_scale);
-        twod_tr.rotate (sm::vec<>::uy(), -rotn);
-        twod_tr.translate (twod_offset);
-        eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, sz/2, sz);
     }
 
-    // Visualization options
-    eyevm2->show_3d = !opts.test(antpov::options::hidehead);
-    eyevm2->twodimensional (opts.test(antpov::options::hidehead));
-    eyevm2->show_sphere = false;
-    eyevm2->show_rays = false;
+    // Visualization options ant body
+    eyevm1->show_3d = true;
     auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
     sm::mat<float, 4> mflip;
     mflip.rotate (flip);
-    if (opts.test(antpov::options::hidehead)) { eyevm2->setViewMatrix (mflip); }
+    eyevm1->setViewMatrix (mflip);
+    eyevm1->finalize();
+    ep1 = vant.addVisualModel (eyevm1);
+    // Scale this model up, so it's not tiny like the one in the scene
+    ep1->scaleViewMatrix (1000);
+    // The ant body itself
+    auto av1 = std::make_unique<biosim::AntBodyVisual<glver>>();
+    vant.bindmodel (av1);
+    av1->setViewMatrix (mflip);
+    av1->finalize();
+    auto ant_ptr1 = vant.addVisualModel (av1);
+    ant_ptr1->name = "ant";
+    ant_ptr1->scaleViewMatrix (1000);
+
+    // Visualization options - 2D one
+    eyevm2->show_3d = false;
+    eyevm2->twodimensional (true);
+    eyevm2->show_sphere = false;
+    eyevm2->show_rays = false;
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
-    // Scale this model up, so it's not tiny like the one in the scene
     ep2->scaleViewMatrix (1000);
 
-    // Draw a 'forwards' arrow
+    // Draw a 'forwards' arrow on veye
     auto vvm = std::make_unique<mplot::VectorVisual<float, 3, glver>>(sm::vec<>{0.7, 0.7, 0});
-    v.bindmodel (vvm);
+    veye.bindmodel (vvm);
     vvm->thevec = sm::vec<>::uz() * 0.4f;
-    vvm->twodimensional (opts.test(antpov::options::hidehead));
+    vvm->twodimensional (true);
     vvm->fixed_colour = true;
     vvm->single_colour = mplot::colour::slateblue2;
-    //vvm->addLabel ("Direction", {-0.8, -0.5, 0}, mplot::TextFeatures(0.1f)); // weird - causes GL invalid op
     vvm->thickness /= 10.0f;
-    if (opts.test(antpov::options::hidehead)) { vvm->setViewMatrix (mflip); }
+    vvm->setViewMatrix (mflip);
     vvm->finalize();
     veye.addVisualModel (vvm);
 
@@ -669,7 +680,7 @@ int32_t main (int32_t argc, char* argv[])
 
     sm::mat<float, 4> land_to_scene;  // land's viewmatrix. converts land model to scene
 
-    float hoverheight = 0.01f;
+    float hoverheight = 0.002f; // 2 mm is good for C. velox model
     if (!hovh.empty()) {
         hoverheight = std::atof (hovh.c_str());
         std::cout << "Set user-supplied hoverheight to " << hoverheight << std::endl;
@@ -732,7 +743,7 @@ int32_t main (int32_t argc, char* argv[])
 
     uint32_t render_counter = 0u;
     auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData,
-                                       &last_eye_size, &ep1, &ep2, &render_counter, opts] ()
+                                       &last_eye_size, &ep0, &ep1, &ep2, &render_counter, opts] ()
     {
         size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
@@ -740,20 +751,8 @@ int32_t main (int32_t argc, char* argv[])
             if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
         } // else no need to re-get data
 
-        // Change showing the 'cones' of the compound eye visual model?
-        if (ep1->show_cones != v.vstate.test(antpovvisual::state::show_cones)) {
-            ep1->show_cones = v.vstate.test(antpovvisual::state::show_cones);
-            ep1->reinit();
-            ep2->show_cones = v.vstate.test(antpovvisual::state::show_cones);
-            ep2->reinit();
-        }
-        // Change the length of the cones?
-        if (ep1->get_cone_length() != v.manual_cone_length) {
-            std::cout << "Cone length " << ep1->get_cone_length() << " != requested: " << v.manual_cone_length << std::endl;
-            ep1->set_cone_length (v.manual_cone_length);
-            ep2->set_cone_length (v.manual_cone_length);
-        }
         // Update eyevm model (or just update colours)
+        ep0->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
         ep1->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
         ep2->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
 
@@ -761,12 +760,14 @@ int32_t main (int32_t argc, char* argv[])
         if (ommatidia != nullptr) {
             curr_eye_size = ommatidia->size();
             if (curr_eye_size != last_eye_size) {
-                if (render_counter % render_every == 0u) { ep1->reinit(); }
+                if (render_counter % render_every == 0u) { ep0->reinit(); }
+                ep1->reinit();
                 ep2->reinit();
                 last_eye_size = curr_eye_size;
             } else {
-                if (render_counter % render_every == 0u) { ep1->reinitColours(); }
-                ep2->reinitColours(); // 4x faster to just reinitColours
+                if (render_counter % render_every == 0u) { ep0->reinitColours(); }
+                ep1->reinitColours(); // 4x faster to just reinitColours
+                ep2->reinitColours();
             }
             ++render_counter;
         }
@@ -787,7 +788,7 @@ int32_t main (int32_t argc, char* argv[])
         }
     };
 
-    auto subr_key_move_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &move_counter,
+    auto subr_key_move_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &move_counter,
                                     &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight,
                                     max_bc, land, land_to_scene, subr_reset_camspace](const float fps)
     {
@@ -804,9 +805,9 @@ int32_t main (int32_t argc, char* argv[])
         }
         if (v.isActivelyTranslating()) {
             if (v.move_state.test (antpovvisual::move_sense::up)) {
-                hoverheight += 0.001f;
+                hoverheight += 0.0001f;
             } else if (v.move_state.test (antpovvisual::move_sense::down)) {
-                hoverheight -= 0.001f;
+                hoverheight -= 0.0001f;
                 if (hoverheight < 0.0f) { hoverheight = 0.0f; }
             }
             // Obtain the commanded movement vector and turn this into a translation matrix
@@ -825,12 +826,12 @@ int32_t main (int32_t argc, char* argv[])
         }
         subr_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
-        ep1->setViewMatrix (cam_to_scene);
+        ep0->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_deque_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
+    auto subr_deque_playback = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space,
                                 &opts, &move_counter, &mdq, &di, &hoverheight,
                                 land, land_to_scene, subr_reset_camspace](const float fps)
     {
@@ -862,12 +863,12 @@ int32_t main (int32_t argc, char* argv[])
         // reset to initial camera space if requested
         subr_reset_camspace (cam_to_scene);
         // Update the view matrix of eye and eye localspace axes
-        ep1->setViewMatrix (cam_to_scene);
+        ep0->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_walk_over_land = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
+    auto subr_walk_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                 &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
                                 &isvp, &mdq, land, land_to_scene,
                                 &hoverheight, subr_reset_camspace](const float fps)
@@ -956,12 +957,12 @@ int32_t main (int32_t argc, char* argv[])
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
         subr_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
-        ep1->setViewMatrix (cam_to_scene);
+        ep0->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_csv_playback = [&v, &ep1, &ant_ptr, &antca_ptr, &initial_camera_space,
+    auto subr_csv_playback = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space,
                               &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight, &opts,
                               max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
                               land, land_to_scene, subr_reset_camspace]
@@ -969,11 +970,6 @@ int32_t main (int32_t argc, char* argv[])
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-        // Extra options for breadcrumbs in csv playback
-        //mplot::ColourMap cm (mplot::ColourMapType::Plasma);
-        //sm::vvec<std::array<float, 3>> bc_clr = { cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f), cm.convert(0.9f) };
-        //sm::vvec<float> bc_alpha = { 1, 0.5, 0.5, 1 };
-        //sm::vvec<float> bc_scale = { 0.5, 0.5, 0.5, 1 };
 
         if (csv_positions.size() > move_counter) {
             /*
@@ -1035,7 +1031,7 @@ int32_t main (int32_t argc, char* argv[])
 
         subr_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
-        ep1->setViewMatrix (cam_to_scene);
+        ep0->setViewMatrix (cam_to_scene);
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
     };
@@ -1063,6 +1059,7 @@ int32_t main (int32_t argc, char* argv[])
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
         // Render the eye-only window
+        vant.render();
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
 
