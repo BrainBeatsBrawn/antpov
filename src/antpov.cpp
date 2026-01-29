@@ -400,6 +400,7 @@ int32_t main (int32_t argc, char* argv[])
     // We start rotated into a drone view initial orientation for taking pictures of the world
     sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
     v.setSceneRotation (def_q);
+    v.bgcolour = {static_cast<float>(0x4c)/0xff, static_cast<float>(0x69)/0xff, static_cast<float>(0x93)/0xff, 1.0f};
 
     // A window for the 2D eye view projection
     mplot::Visual<glver> veye (920, 512, "Eye view");
@@ -408,8 +409,8 @@ int32_t main (int32_t argc, char* argv[])
 
     // A window for the Ant body view
     mplot::Visual<glver> vant (920, 920, "Ant view");
-    vant.setSceneTrans (sm::vec<float,3>{ float{0.0976446}, float{0.158883}, float{-3.70978} });
-    vant.setSceneRotation (sm::quaternion<float>{ float{-0.387933}, float{-0.00951467}, float{0.910505}, float{0.142823} });
+    vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
+    vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
     // Use a FPS profiling with a text object on screen
     mplot::fps::profiler fps_profiler;
@@ -538,10 +539,6 @@ int32_t main (int32_t argc, char* argv[])
 
     // Visualization options ant body
     eyevm1->show_3d = true;
-    auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
-    sm::mat<float, 4> mflip;
-    mflip.rotate (flip);
-    eyevm1->setViewMatrix (mflip);
     eyevm1->finalize();
     ep1 = vant.addVisualModel (eyevm1);
     // Scale this model up, so it's not tiny like the one in the scene
@@ -549,7 +546,6 @@ int32_t main (int32_t argc, char* argv[])
     // The ant body itself
     auto av1 = std::make_unique<biosim::AntBodyVisual<glver>>();
     vant.bindmodel (av1);
-    av1->setViewMatrix (mflip);
     av1->finalize();
     auto ant_ptr1 = vant.addVisualModel (av1);
     ant_ptr1->name = "ant";
@@ -560,21 +556,13 @@ int32_t main (int32_t argc, char* argv[])
     eyevm2->twodimensional (true);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
+    auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
+    sm::mat<float, 4> mflip;
+    mflip.rotate (flip);
+    eyevm2->setViewMatrix (mflip);
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
-
-    // Draw a 'forwards' arrow on veye
-    auto vvm = std::make_unique<mplot::VectorVisual<float, 3, glver>>(sm::vec<>{0.7, 0.7, 0});
-    veye.bindmodel (vvm);
-    vvm->thevec = sm::vec<>::uz() * 0.4f;
-    vvm->twodimensional (true);
-    vvm->fixed_colour = true;
-    vvm->single_colour = mplot::colour::slateblue2;
-    vvm->thickness /= 10.0f;
-    vvm->setViewMatrix (mflip);
-    vvm->finalize();
-    veye.addVisualModel (vvm);
 
     // The ant body
     auto av = std::make_unique<biosim::AntBodyVisual<glver>>();
