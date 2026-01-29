@@ -801,7 +801,12 @@ int32_t main (int32_t argc, char* argv[])
             // Obtain the commanded movement vector and turn this into a translation matrix
             sm::vec<float> mv_camframe = v.getMovementVector (fps);
             sm::vec<float> lastloc = cam_to_scene.translation();
-            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
+            try {
+                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
+            } catch (const std::exception& e) {
+                std::cout << "Re-throwing exception: " << e.what() << std::endl;
+                throw e;
+            }
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             move_counter++;
             // This should be the right place to update breadcrumbs
