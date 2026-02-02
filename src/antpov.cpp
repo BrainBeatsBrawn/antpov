@@ -49,7 +49,7 @@ namespace mplot
         sm::vec<float> mv_camframe = {};
         sm::mat<float, 4> cam_to_scene = {};
         sm::mat<float, 4> model_to_scene = {};
-        std::array<uint32_t, 4> ti0 = {};
+        mplot::mesh::face<> ti0 = {};
         float hoverheight = 0.0f;
 
         bool operator== (const NavMeshMovementData& rhs) const noexcept
@@ -57,7 +57,7 @@ namespace mplot
             return (mv_camframe == rhs.mv_camframe
                     && cam_to_scene == rhs.cam_to_scene
                     && model_to_scene == rhs.model_to_scene
-                    && ti0 == rhs.ti0
+                    && ti0.i == rhs.ti0.i
                     && hoverheight == rhs.hoverheight);
         }
 
@@ -74,8 +74,8 @@ namespace mplot
             hd.add_contained_vals (s.c_str(), cam_to_scene.arr);
             s = pcom.str() + std::string("/model_to_scene");
             hd.add_contained_vals (s.c_str(), model_to_scene.arr);
-            s = pcom.str() + std::string("/ti0");
-            hd.add_contained_vals (s.c_str(), ti0);
+            s = pcom.str() + std::string("/ti0_i");
+            hd.add_contained_vals (s.c_str(), ti0.i);
             s = pcom.str() + std::string("/hoverheight");
             hd.add_val (s.c_str(), hoverheight);
         }
@@ -91,8 +91,8 @@ namespace mplot
             hd.read_contained_vals (s.c_str(), cam_to_scene.arr);
             s = pcom.str() + std::string("/model_to_scene");
             hd.read_contained_vals (s.c_str(), model_to_scene.arr);
-            s = pcom.str() + std::string("/ti0");
-            hd.read_contained_vals (s.c_str(), ti0);
+            s = pcom.str() + std::string("/ti0_i");
+            hd.read_contained_vals (s.c_str(), ti0.i);
             s = pcom.str() + std::string("/hoverheight");
             hd.read_val (s.c_str(), hoverheight);
         }
@@ -623,7 +623,7 @@ int32_t main (int32_t argc, char* argv[])
     sm::vvec<uint32_t> csv_antflags;
     // When reproducing csv paths, it's useful to keep a record of the last triangle, because the
     // most likely next triangle is the last triangle.
-    std::array<uint32_t, 4> last_ti = {std::numeric_limits<uint32_t>::max()};
+    mplot::mesh::face<> last_ti = {std::numeric_limits<uint32_t>::max()};
 
     if (opts.test (antpov::options::playback)) {
         // populate mdq from file
@@ -702,8 +702,8 @@ int32_t main (int32_t argc, char* argv[])
             ++move_counter;
         }
 
-        auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
-        if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
+        auto[hp_scene, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
+        if (_ti0.i[0] != std::numeric_limits<uint32_t>::max()) {
             // Set up our camera using the data obtained from find_triangle_hit()
             sm::mat<float, 4> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             if (cam_to_scene != sm::mat<float, 4>::identity()) {
@@ -769,7 +769,7 @@ int32_t main (int32_t argc, char* argv[])
             v.stop(); // cancel any active movements
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
             sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
-            auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
+            auto[hp_scene, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
             cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             v.vstate.reset (antpovvisual::state::campose_reset_request);
@@ -842,7 +842,7 @@ int32_t main (int32_t argc, char* argv[])
             sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
             cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, /*ti0,*/ mdq[di].hoverheight);
             di++;
-            if (land->navmesh->ti0[3] == 1) {
+            if (land->navmesh->ti0.i[3] == 1) {
                 // After movement we'd be on the edge, so cancel movement
                 std::cout << "(Playback) Would be on edge, cancel movement\n";
                 cam_to_scene = cam_to_scene_sv;
@@ -881,7 +881,7 @@ int32_t main (int32_t argc, char* argv[])
         sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
         // saves
         sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
-        //std::array<uint32_t, 4> ti0_sv = ti0;
+        //mplot::mesh::face<> ti0_sv = ti0;
         try {
             try {
                 // Note that even if the last mesh movement would land on a triangle, a further
@@ -925,9 +925,7 @@ int32_t main (int32_t argc, char* argv[])
             // Draw triangle tubes
             bool first = true;
             for (auto t : e.tris) {
-                if (first) {
-                    std::cout << t[0] << "-" << t[1] << "-" << t[2] << " has t[3] = " << t[3] << std::endl;
-                }
+                if (first) { std::cout << "Triangle " << t.i << std::endl; }
                 auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
                 antpov::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
                 antpov::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
@@ -959,7 +957,7 @@ int32_t main (int32_t argc, char* argv[])
                               &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight, &opts,
                               max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
                               land, land_to_scene, subr_reset_camspace]
-    (const float fps, std::array<uint32_t, 4>& _last_ti)
+    (const float fps, mplot::mesh::face<>& _last_ti)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -990,11 +988,11 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> camloc_mf = (land_to_scene.inverse() * cam_to_scene).translation();
             sm::vec<float> vnrm = v.scene_up;
             vnrm *= 4.0f;
-            auto[hp_scene, _tn0, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm, _last_ti);
+            auto[hp_scene, _ti0] = land->navmesh->find_triangle_hit (land_to_scene, camloc_mf + (vnrm / 2.0f), -2.0f * vnrm, _last_ti);
             _last_ti = _ti0;
             //std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
 
-            if (_ti0[0] != std::numeric_limits<uint32_t>::max()) {
+            if (_ti0.i[0] != std::numeric_limits<uint32_t>::max()) {
                 sm::vec<float> fwds = nextloc - lastloc;
                 // Set up our camera using the data obtained from find_triangle_hit()
                 cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
