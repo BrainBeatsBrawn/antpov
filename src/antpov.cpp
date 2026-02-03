@@ -839,7 +839,7 @@ int32_t main (int32_t argc, char* argv[])
             // we are on the edge of a landscape)
             land->navmesh->ti0 = mdq[di].ti0;
             std::cout << "Playback of saved movement index = " << di << std::endl;
-            sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
+            //sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
             cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, mdq[di].hoverheight);
             di++;
 #if 0
