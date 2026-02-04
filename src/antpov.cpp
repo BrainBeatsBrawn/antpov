@@ -137,7 +137,6 @@ namespace antpov
     {
         blender_axes,     // Set true to transform glTF into Blender's z-up axes
         max_fps,          // If true, poll, instead of fps
-        playback,         // Play back saved sequence of poses from a crash data file (.h5 format)
         path_from_csv,    // Move the ant from a sequence of 2D coordinates that give it a path
         save_hdf5,        // If true, then same output data (path_from_csv mode only at present)
         hidehead,         // If true, hide the 3D head/eye view in the Eye-only window
@@ -164,8 +163,6 @@ namespace antpov
                 opts |= antpov::options::blender_axes;
             } else if (arg == "-x") {
                 opts |= antpov::options::max_fps;
-            } else if (arg == "-p") {
-                opts |= antpov::options::playback;
             } else if (arg == "-c") {
                 opts |= antpov::options::path_from_csv;
                 i++;
@@ -615,9 +612,7 @@ int32_t main (int32_t argc, char* argv[])
     }
 
     // Load data from h5 or csv file for pre-defined paths
-    constexpr uint32_t qlen = 20;
-    std::deque<mplot::NavMeshMovementData> mdq;
-    [[maybe_unused]] uint32_t di = 0; // data index (for playback)
+    uint32_t di = 0; // data index (for playback)
     // A file to be read from csv with 2D coordinates
     sm::vvec<sm::vec<float, 2>> csv_positions;
     sm::vvec<uint32_t> csv_antflags;
@@ -625,22 +620,7 @@ int32_t main (int32_t argc, char* argv[])
     // most likely next triangle is the last triangle.
     uint32_t last_ti = std::numeric_limits<uint32_t>::max();
 
-    if (opts.test (antpov::options::playback)) {
-        // populate mdq from file
-        try {
-            // Make this a cmd line arg, and open either .h5 or .csv
-            sm::hdfdata hd ("./navmesh_data.h5", std::ios::in);
-            for (uint32_t i = 0; i < qlen; ++i) {
-                mplot::NavMeshMovementData nmd;
-                nmd.load (hd, i);
-                mdq.push_back (nmd);
-            }
-            std::cout << "Loaded navigation data from navmesh_data.h5 (hardcoded)\n";
-        } catch (const std::exception& e) {
-            /* No file to open */
-            std::cout << "Playback mode, but there's no file to open\n";
-        }
-    } else if (opts.test (antpov::options::path_from_csv)) {
+    if (opts.test (antpov::options::path_from_csv)) {
         //waittime = 0.25; // make it slow
         if (antpov::read_csv (csv_path, csv_positions, csv_antflags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
@@ -824,48 +804,9 @@ int32_t main (int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_deque_playback = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space,
-                                &opts, &move_counter, &mdq, &di, &hoverheight,
-                                land, land_to_scene, subr_reset_camspace](const float fps)
-    {
-        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
-        sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-        // play back deque of movements
-        if (opts.test (antpov::options::playback) == false) { /* Uh oh */ }
-
-        try {
-            // Note that even if the last mesh movement would land on a triangle, a further
-            // rotation might mean that we get a 'no triangle intersection' exception (esp. if
-            // we are on the edge of a landscape)
-            land->navmesh->ti0 = mdq[di].ti0;
-            std::cout << "Playback of saved movement index = " << di << std::endl;
-            //sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
-            cam_to_scene = land->navmesh->compute_mesh_movement (mdq[di].mv_camframe, mdq[di].cam_to_scene, mdq[di].model_to_scene, mdq[di].hoverheight);
-            di++;
-#if 0
-            if (edge_test(land->navmesh->ti0)) {
-                // After movement we'd be on the edge, so cancel movement
-                std::cout << "(Playback) Would be on edge, cancel movement\n";
-                cam_to_scene = cam_to_scene_sv;
-            }
-#endif
-        } catch (mplot::NavException& e) {
-            std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
-            opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
-            opts.set (antpov::options::playback, false);
-        }
-        setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-        // reset to initial camera space if requested
-        subr_reset_camspace (cam_to_scene);
-        // Update the view matrix of eye and eye localspace axes
-        ep0->setViewMatrix (cam_to_scene);
-        ant_ptr->setViewMatrix (cam_to_scene);
-        antca_ptr->setViewMatrix (cam_to_scene);
-    };
-
     auto subr_walk_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                 &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
-                                &isvp, &mdq, land, land_to_scene,
+                                &isvp, land, land_to_scene,
                                 &hoverheight, subr_reset_camspace](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
@@ -888,10 +829,8 @@ int32_t main (int32_t argc, char* argv[])
                 // Note that even if the last mesh movement would land on a triangle, a further
                 // rotation might mean that we get a 'no triangle intersection' exception (esp. if
                 // we are on the edge of a landscape)
-                mdq.push_back (mplot::NavMeshMovementData { mv_camframe, cam_to_scene, land_to_scene, land->navmesh->ti0, hoverheight });
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
                 ++move_counter;
-                if (mdq.size() > qlen) { mdq.pop_front(); }
 
                 if (breadcrumb_coords.size() < max_bc) {
                     breadcrumb_coords.push_back (cam_to_scene_sv.translation());
@@ -907,7 +846,6 @@ int32_t main (int32_t argc, char* argv[])
                     // After movement we'd be near the edge, so cancel movement
                     cam_to_scene = cam_to_scene_sv;
                     //ti0 = ti0_sv;
-                    mdq.pop_back();
                 } else {
                     throw e;
                 }
@@ -915,35 +853,7 @@ int32_t main (int32_t argc, char* argv[])
         } catch (mplot::NavException& e) {
 
             std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
-
-            // save data
-            {
-                sm::hdfdata hd("./navmesh_data.h5", std::ios::out | std::ios::trunc);
-                for (uint32_t i = 0; i < mdq.size(); ++i) { mdq[i].save (hd, i); }
-            }
-
             opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
-            // Draw triangle tubes
-            bool first = true;
-            for (auto t : e.tris) {
-                if (first) { std::cout << "Triangle " << t << std::endl; }
-                auto tv = land->navmesh->triangle_vertices (t, land_to_scene);
-                antpov::add_tube_vm (&v, tv[0], tv[1], first ? mplot::colour::black : mplot::colour::maroon2);
-                antpov::add_tube_vm (&v, tv[1], tv[2], first ? mplot::colour::black : mplot::colour::maroon2);
-                antpov::add_tube_vm (&v, tv[2], tv[0], first ? mplot::colour::black : mplot::colour::maroon2);
-
-                // JSON line to view with triangle_intersect
-                sm::vec<float> tn0 = land->navmesh->triangle_normal (tv);
-                std::cout << std::endl;
-                std::cout << "{ \"t0\" : " << tv[0].str_mat() << ", "
-                          << "\"t1\" : " << tv[1].str_mat() << ", "
-                          << "\"t2\" : " << tv[2].str_mat() << ", "
-                          << "\"l0\" : " << cam_to_scene.translation().str_mat() << ", "
-                          << "\"l\" : " << (-tn0).str_mat() << " }" << std::endl;
-
-                first = false;
-            }
-
             v.vstate.set (antpovvisual::state::walk, false);
         }
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -955,7 +865,7 @@ int32_t main (int32_t argc, char* argv[])
     };
 
     auto subr_csv_playback = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space,
-                              &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &mdq, &hoverheight, &opts,
+                              &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight, &opts,
                               max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
                               land, land_to_scene, subr_reset_camspace]
     (const float fps, uint32_t& _last_ti)
@@ -1060,8 +970,6 @@ int32_t main (int32_t argc, char* argv[])
         if (v.vstate.test (antpovvisual::state::paused) == false) {
             if (v.vstate.test (antpovvisual::state::walk)) {
                 subr_walk_over_land (fps_profiler.fps_mean);
-            } else if (opts.test (antpov::options::playback)) { // play back deque of movements
-                subr_deque_playback (fps_profiler.fps_mean);
             } else if (opts.test (antpov::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
                 subr_csv_playback (fps_profiler.fps_mean, last_ti);
             } else {
