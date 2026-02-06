@@ -29,6 +29,7 @@ constexpr int32_t glver = mplot::gl::version_4_3;
 #include <mplot/RodVisual.h>
 #include <mplot/VectorVisual.h>
 #include <mplot/InstancedScatterVisual.h>
+#include <mplot/NormalsVisual.h>
 
 #include "spline.hpp" // tkspline plus wrapper in sm::algo space
 
@@ -542,13 +543,21 @@ int32_t main (int32_t argc, char* argv[])
         mplot::VisualModel<glver>* vmp = nullptr;
         v.init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
-            // The 'land' is a cube for now
-            if (vmp->name == "Cube.002" && land == nullptr) { land = vmp; land->make_navmesh(); }
-            else if (vmp->name == "Cube.001" && land == nullptr) { land = vmp; land->make_navmesh(); }
-            else if (vmp->name == "Landscape.003" /* && land == nullptr */) { land = vmp; land->make_navmesh(); } // land trumps other objects
-            else if (vmp->name == "Rock.Landscape.Style_2.Mesh.003" && land == nullptr) { land = vmp; land->make_navmesh(); }
-            else if (vmp->name == "ground_inner_high_res" && land == nullptr) { land = vmp; land->make_navmesh(); }
-            else { std::cout << "Model name " << vmp->name << std::endl; }
+            if (vmp->name == "Landscape.003" || vmp->name == "ground_inner_high_res") {
+                land = vmp;
+                land->make_navmesh();
+                // normals for debug
+                auto nrm = std::make_unique<mplot::NormalsVisual<glver>> (land);
+                v.bindmodel (nrm);
+                nrm->scale_factor = 0.01f;
+                // Set options to show just the boundary edge
+                nrm->options.set (mplot::normalsvisual_flags::show_tri_normals, false);
+                nrm->options.set (mplot::normalsvisual_flags::show_gl_normals, false);
+                nrm->options.set (mplot::normalsvisual_flags::show_boundary_halfedges, true);
+                //nrm->options.set (mplot::normalsvisual_flags::show_inner_halfedges, true); // Heavy lifting
+                nrm->finalize();
+                v.addVisualModel (nrm);
+            } else { std::cout << "Model name " << vmp->name << std::endl; }
         }
     }
 
