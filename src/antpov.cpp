@@ -731,12 +731,8 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> lastloc = cam_to_scene.translation();
             try {
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
-            } catch (mplot::NavException& e) {
-                if (e.m_type == mplot::NavException::type::off_edge) {
-                    std::cout << "Can't move there (would fall off the edge). Try a different direction\n";
-                } else {
-                    std::cout << "Move failed...\n";
-                }
+            } catch (const std::exception& e) {
+                std::cout << "key-command move was not possible...\n";
             }
 
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -776,34 +772,24 @@ int32_t main (int32_t argc, char* argv[])
         sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
         sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
         try {
-            try {
-                // Note that even if the last mesh movement would land on a triangle, a further
-                // rotation might mean that we get a 'no triangle intersection' exception (esp. if
-                // we are on the edge of a landscape)
-                cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, /*ti0,*/ hoverheight);
-                ++move_counter;
+            // Note that even if the last mesh movement would land on a triangle, a further
+            // rotation might mean that we get a 'no triangle intersection' exception (esp. if
+            // we are on the edge of a landscape)
+            cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
+            ++move_counter;
 
-                if (breadcrumb_coords.size() < max_bc) {
-                    breadcrumb_coords.push_back (cam_to_scene_sv.translation());
-                    breadcrumb_data.push_back (0.0f); // dummy for now
-                } else {
-                    breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
-                    // breadcrumb_data.push_back (0.0f); // dummy for now, to be flags.
-                }
-                isvp->set_instance_data (breadcrumb_coords);
-
-            } catch (mplot::NavException& e) {
-                if (e.m_type == mplot::NavException::type::off_edge) {
-                    // After movement we'd be near the edge, so cancel movement
-                    cam_to_scene = cam_to_scene_sv;
-                    //ti0 = ti0_sv;
-                } else {
-                    cam_to_scene = cam_to_scene_sv;
-                }
+            if (breadcrumb_coords.size() < max_bc) {
+                breadcrumb_coords.push_back (cam_to_scene_sv.translation());
+                breadcrumb_data.push_back (0.0f); // dummy for now
+            } else {
+                breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
+                // breadcrumb_data.push_back (0.0f); // dummy for now, to be flags.
             }
-        } catch (mplot::NavException& e) {
+            isvp->set_instance_data (breadcrumb_coords);
 
-            std::cout << "Exception navigating mesh at movement count " << move_counter << ": " << e.what() << std::endl;
+        } catch (const std::exception& e) {
+            std::cout << e.what();
+            //cam_to_scene = cam_to_scene_sv;
             opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
             v.vstate.set (antpovvisual::state::walk, false);
         }
