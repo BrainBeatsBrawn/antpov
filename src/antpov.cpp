@@ -161,6 +161,8 @@ namespace antpov
             this->speed = T{0};
         }
 
+        void about_turn() { this->theta += sm::mathconst<float>::pi; }
+
         // Advance the route generation by one timestep
         void step()
         {
@@ -316,6 +318,9 @@ int32_t main (int32_t argc, char* argv[])
     setVerbosity (false);
     // Load the file
     std::cout << "Loading glTF file \"" << path << "\"..." << std::endl;
+    std::string basepath = path;
+    mplot::tools::stripUnixFile (basepath);
+    std::cout << "glTF dir: " << basepath << std::endl;
     loadGlTFscene (path.c_str(), (opts.test(antpov::options::blender_axes)
                                   ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
 
@@ -513,7 +518,7 @@ int32_t main (int32_t argc, char* argv[])
 
     // Breadcrumb trail
     uint64_t move_counter = 0u;
-    uint64_t max_bc = 32000;
+    uint64_t max_bc = 320;//00; // 32000
     sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
     sm::vvec<float> breadcrumb_data = {};
 
@@ -545,7 +550,7 @@ int32_t main (int32_t argc, char* argv[])
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
             if (vmp->name == "Landscape.003" || vmp->name == "ground_inner_high_res") {
                 land = vmp;
-                land->make_navmesh();
+                land->make_navmesh (basepath);
                 // normals for debug
                 auto nrm = std::make_unique<mplot::NormalsVisual<glver>> (land);
                 v.bindmodel (nrm);
@@ -733,6 +738,7 @@ int32_t main (int32_t argc, char* argv[])
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
             } catch (const std::exception& e) {
                 std::cout << "key-command move was not possible...\n";
+                throw e;
             }
 
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -788,10 +794,16 @@ int32_t main (int32_t argc, char* argv[])
             isvp->set_instance_data (breadcrumb_coords);
 
         } catch (const std::exception& e) {
-            std::cout << e.what();
-            //cam_to_scene = cam_to_scene_sv;
-            opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
-            v.vstate.set (antpovvisual::state::walk, false);
+            std::string msg (e.what());
+            std::cout << "Exception: " << msg << std::endl;
+            if (msg.find ("off-edge:") == 0) {
+                std::cout << "We went off the edge. Change direction.\n";
+                rrg.about_turn();
+            } else {
+                //cam_to_scene = cam_to_scene_sv;
+                opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
+                v.vstate.set (antpovvisual::state::walk, false);
+            }
         }
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
         subr_reset_camspace (cam_to_scene); // if requested
@@ -881,19 +893,36 @@ int32_t main (int32_t argc, char* argv[])
     v.render();
     std::string m_count_str = {};
 
+    mplot::fps::profiler move_fps;
+    mplot::fps::profiler mplot_fps;
+    mplot::fps::profiler cray_fps;
+    mplot::fps::profiler detect_fps;
+
     sm::hdfdata record (h5_path, std::ios::out | std::ios::trunc);
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
         fps_profiler.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+
+        detect_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // The current camera may have changed, this subroutine deals with any changes
         subr_detect_camera_changes();
+        detect_fps.at_end();
+
+        mplot_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Now render the mathplot window
         v.render();
         // Change label after render (it needs v's context, not veye's)
         if (move_counter % 1000 == 0) {
             m_count_str = std::to_string (move_counter);
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
+
+            std::cout << "mplot FPS: " << mplot_fps.fps_txt << std::endl;
+            std::cout << "cray FPS: " << cray_fps.fps_txt << std::endl;
+            std::cout << "move FPS: " << move_fps.fps_txt << std::endl;
+            std::cout << "detect FPS: " << detect_fps.fps_txt << std::endl;
+            std::cout << "Overall FPS: " << fps_profiler.fps_txt << std::endl;
+
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
@@ -903,7 +932,10 @@ int32_t main (int32_t argc, char* argv[])
         // Deal with any movements commanded by key press events (including reset)
 
         v.setContext(); // right now key move over land needs v's context
+        mplot_fps.at_end();
 
+        // tmp profile
+        move_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         if (v.vstate.test (antpovvisual::state::paused) == false) {
             if (v.vstate.test (antpovvisual::state::walk)) {
                 subr_walk_over_land (fps_profiler.fps_mean);
@@ -913,7 +945,10 @@ int32_t main (int32_t argc, char* argv[])
                 subr_key_move_over_land (fps_profiler.fps_mean);
             }
         }
+        // tmp profile
+        move_fps.at_end();
 
+        cray_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed
@@ -923,6 +958,7 @@ int32_t main (int32_t argc, char* argv[])
 
             // if csv mode, then save the data
             if (opts.test (antpov::options::path_from_csv) && opts.test (antpov::options::save_hdf5)) {
+                std::cout << "Saving frame...\n";
                 std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
                 try {
                     record.add_contained_vals (ommframe.c_str(), ommatidiaData);
@@ -930,8 +966,9 @@ int32_t main (int32_t argc, char* argv[])
                     // Probably didn't move this time.
                 }
             }
-
         }
+        cray_fps.at_end();
+
         // Mark that we got to the end of the loop
         fps_profiler.at_end();
     }
