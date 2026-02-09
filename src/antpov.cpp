@@ -554,7 +554,7 @@ int32_t main (int32_t argc, char* argv[])
                 nrm->options.set (mplot::normalsvisual_flags::show_tri_normals, false);
                 nrm->options.set (mplot::normalsvisual_flags::show_gl_normals, false);
                 nrm->options.set (mplot::normalsvisual_flags::show_boundary_halfedges, true);
-                //nrm->options.set (mplot::normalsvisual_flags::show_inner_halfedges, true); // Heavy lifting
+                nrm->options.set (mplot::normalsvisual_flags::show_inner_halfedges, false); // Heavy lifting
                 nrm->finalize();
                 v.addVisualModel (nrm);
             } else { std::cout << "Model name " << vmp->name << std::endl; }
@@ -731,10 +731,14 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> lastloc = cam_to_scene.translation();
             try {
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
-            } catch (const std::exception& e) {
-                std::cout << "Re-throwing exception: " << e.what() << std::endl;
-                throw e;
+            } catch (mplot::NavException& e) {
+                if (e.m_type == mplot::NavException::type::off_edge) {
+                    std::cout << "Can't move there (would fall off the edge). Try a different direction\n";
+                } else {
+                    std::cout << "Move failed...\n";
+                }
             }
+
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
             move_counter++;
             // This should be the right place to update breadcrumbs
@@ -770,7 +774,6 @@ int32_t main (int32_t argc, char* argv[])
         rotateCamerasLocallyAround (rrg.omega, 0.0f, 1.0f, 0.0f);
         cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
-        // saves
         sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
         try {
             try {
@@ -795,7 +798,7 @@ int32_t main (int32_t argc, char* argv[])
                     cam_to_scene = cam_to_scene_sv;
                     //ti0 = ti0_sv;
                 } else {
-                    throw e;
+                    cam_to_scene = cam_to_scene_sv;
                 }
             }
         } catch (mplot::NavException& e) {
