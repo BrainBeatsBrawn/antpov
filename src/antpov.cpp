@@ -560,6 +560,9 @@ int32_t main (int32_t argc, char* argv[])
                 nrm->options.set (mplot::normalsvisual_flags::show_gl_normals, false);
                 nrm->options.set (mplot::normalsvisual_flags::show_boundary_halfedges, true);
                 nrm->options.set (mplot::normalsvisual_flags::show_inner_halfedges, false); // Heavy lifting
+                nrm->options.set (mplot::normalsvisual_flags::show_boundary_next, true);
+                nrm->options.set (mplot::normalsvisual_flags::show_boundary_prev, true);
+                nrm->nextprev_offset = sm::vec<float>::uy() * 0.01f;
                 nrm->finalize();
                 v.addVisualModel (nrm);
             } else { std::cout << "Model name " << vmp->name << std::endl; }
@@ -916,13 +919,13 @@ int32_t main (int32_t argc, char* argv[])
         if (move_counter % 1000 == 0) {
             m_count_str = std::to_string (move_counter);
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
-
+#if 0
             std::cout << "mplot FPS: " << mplot_fps.fps_txt << std::endl;
             std::cout << "cray FPS: " << cray_fps.fps_txt << std::endl;
             std::cout << "move FPS: " << move_fps.fps_txt << std::endl;
             std::cout << "detect FPS: " << detect_fps.fps_txt << std::endl;
             std::cout << "Overall FPS: " << fps_profiler.fps_txt << std::endl;
-
+#endif
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
