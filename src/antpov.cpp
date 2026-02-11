@@ -560,8 +560,8 @@ int32_t main (int32_t argc, char* argv[])
                 nrm->options.set (mplot::normalsvisual_flags::show_gl_normals, false);
                 nrm->options.set (mplot::normalsvisual_flags::show_boundary_halfedges, true);
                 nrm->options.set (mplot::normalsvisual_flags::show_inner_halfedges, false); // Heavy lifting
-                nrm->options.set (mplot::normalsvisual_flags::show_boundary_next, true);
-                nrm->options.set (mplot::normalsvisual_flags::show_boundary_prev, true);
+                nrm->options.set (mplot::normalsvisual_flags::show_boundary_next, false);
+                nrm->options.set (mplot::normalsvisual_flags::show_boundary_prev, false);
                 nrm->nextprev_offset = sm::vec<float>::uy() * 0.01f;
                 nrm->finalize();
                 v.addVisualModel (nrm);
