@@ -80,8 +80,9 @@ namespace antpov
         blender_axes,     // Set true to transform glTF into Blender's z-up axes
         max_fps,          // If true, poll, instead of fps
         path_from_csv,    // Move the ant from a sequence of 2D coordinates that give it a path
-        save_hdf5,        // If true, then same output data (path_from_csv mode only at present)
+        save_hdf5,        // If true, then save output data (path_from_csv mode only at present)
         hidehead,         // If true, hide the 3D head/eye view in the Eye-only window
+        debug_mv,         // Open debug h5 file and run compute_mesh_movement once for debug
         can_exit
     };
     // Parse cmd line to find the path and set options
@@ -111,6 +112,8 @@ namespace antpov
                 csvpath = std::string(argv[i]);
             } else if (arg == "-d") {
                 opts |= antpov::options::save_hdf5;
+            } else if (arg == "-g") {
+                opts |= antpov::options::debug_mv;
             } else if (arg == "-i") {
                 opts |= antpov::options::hidehead;
             }
@@ -780,10 +783,14 @@ int32_t main (int32_t argc, char* argv[])
         cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
         sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
+        uint32_t ti0_sv = land->navmesh->ti0;
         try {
             // Note that even if the last mesh movement would land on a triangle, a further
             // rotation might mean that we get a 'no triangle intersection' exception (esp. if
-            // we are on the edge of a landscape)
+            // we are on the edge of a
+
+            // ti0, mv_camframe, cam_to_scene to save.
+
             cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
             ++move_counter;
 
@@ -806,6 +813,16 @@ int32_t main (int32_t argc, char* argv[])
                 //cam_to_scene = cam_to_scene_sv;
                 opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
                 v.vstate.set (antpovvisual::state::walk, false);
+                {
+                    std::cout << "Saving compute_mesh_movement data\n";
+                    sm::hdfdata dsv ("./antpov.h5", std::ios::out | std::ios::trunc);
+                    dsv.add_contained_vals ("/mv_camframe", mv_camframe);
+                    dsv.add_contained_vals ("/cam_to_scene", cam_to_scene_sv.arr);
+                    dsv.add_contained_vals ("/land_to_scene", land_to_scene.arr);
+                    dsv.add_val ("/hoverheight", hoverheight);
+                    dsv.add_val ("/ti0", ti0_sv);
+                }
+                throw e;
             }
         }
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -889,6 +906,28 @@ int32_t main (int32_t argc, char* argv[])
         ant_ptr->setViewMatrix (cam_to_scene);
         antca_ptr->setViewMatrix (cam_to_scene);
     };
+
+    if (opts.test (antpov::options::debug_mv)) {
+
+        std::cout << "Loading compute_mesh_movement data\n";
+
+        sm::mat<float, 4> _cam_to_scene = {{}};
+        sm::mat<float, 4> _land_to_scene = {{}};
+        sm::vec<float> _mv_camframe = {};
+        float _hoverheight = 0.0f;
+        uint32_t _ti0 = 0u;
+
+        sm::hdfdata dsv ("./antpov.h5", std::ios::in);
+        dsv.read_contained_vals ("/mv_camframe", _mv_camframe);
+        dsv.read_contained_vals ("/cam_to_scene", _cam_to_scene.arr);
+        dsv.read_contained_vals ("/land_to_scene", _land_to_scene.arr);
+        dsv.read_val ("/hoverheight", _hoverheight);
+        dsv.read_val ("/ti0", _ti0);
+
+        _cam_to_scene = land->navmesh->compute_mesh_movement (_mv_camframe, _cam_to_scene, _land_to_scene, _hoverheight);
+        std::cout << "compute_mesh_movement returned\n";
+    }
+
 
     /**
      * The main program loop
