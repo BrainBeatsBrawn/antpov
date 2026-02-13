@@ -764,10 +764,15 @@ int32_t main (int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
+    // For debug saving:
+    sm::mat<float, 4> tm1_cam_to_scene;
+    sm::vec<float> tm1_mv_camframe = {};
+    uint32_t tm1_ti0 = 0u;
     auto subr_walk_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                 &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
                                 &isvp, land, land_to_scene,
-                                &hoverheight, subr_reset_camspace](const float fps)
+                                &hoverheight, subr_reset_camspace,
+                                &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -790,9 +795,12 @@ int32_t main (int32_t argc, char* argv[])
             // we are on the edge of a
 
             // ti0, mv_camframe, cam_to_scene to save.
-
             cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
             ++move_counter;
+
+            tm1_ti0 = ti0_sv;
+            tm1_mv_camframe = mv_camframe;
+            tm1_cam_to_scene = cam_to_scene_sv;
 
             if (breadcrumb_coords.size() < max_bc) {
                 breadcrumb_coords.push_back (cam_to_scene_sv.translation());
@@ -815,12 +823,19 @@ int32_t main (int32_t argc, char* argv[])
                 v.vstate.set (antpovvisual::state::walk, false);
                 {
                     std::cout << "Saving compute_mesh_movement data\n";
+                    std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << tm1_mv_camframe << std::endl;
+                    std::cout << "cam_to_scene_sv is\n" << cam_to_scene_sv
+                              << "\nand tm1_cam_to_scene:\n" << tm1_cam_to_scene << std::endl;
                     sm::hdfdata dsv ("./antpov.h5", std::ios::out | std::ios::trunc);
                     dsv.add_contained_vals ("/mv_camframe", mv_camframe);
                     dsv.add_contained_vals ("/cam_to_scene", cam_to_scene_sv.arr);
                     dsv.add_contained_vals ("/land_to_scene", land_to_scene.arr);
                     dsv.add_val ("/hoverheight", hoverheight);
                     dsv.add_val ("/ti0", ti0_sv);
+                    // Also save t-1 values:
+                    dsv.add_contained_vals ("/tm1_mv_camframe", tm1_mv_camframe);
+                    dsv.add_contained_vals ("/tm1_cam_to_scene", tm1_cam_to_scene.arr);
+                    dsv.add_val ("/tm1_ti0", tm1_ti0);
                 }
                 throw e;
             }
@@ -909,7 +924,7 @@ int32_t main (int32_t argc, char* argv[])
 
     if (opts.test (antpov::options::debug_mv)) {
 
-        std::cout << "Loading compute_mesh_movement data\n";
+        std::cout << "Loading compute_mesh_movement data from crash file\n";
 
         sm::mat<float, 4> _cam_to_scene = {{}};
         sm::mat<float, 4> _land_to_scene = {{}};
@@ -923,9 +938,51 @@ int32_t main (int32_t argc, char* argv[])
         dsv.read_contained_vals ("/land_to_scene", _land_to_scene.arr);
         dsv.read_val ("/hoverheight", _hoverheight);
         dsv.read_val ("/ti0", _ti0);
+        dsv.read_contained_vals ("/tm1_mv_camframe", tm1_mv_camframe);
+        dsv.read_contained_vals ("/tm1_cam_to_scene", tm1_cam_to_scene.arr);
+        dsv.read_val ("/tm1_ti0", tm1_ti0);
 
-        _cam_to_scene = land->navmesh->compute_mesh_movement (_mv_camframe, _cam_to_scene, _land_to_scene, _hoverheight);
-        std::cout << "compute_mesh_movement returned\n";
+        try {
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (tm1_cam_to_scene));
+            ep0->setViewMatrix (tm1_cam_to_scene);
+            ant_ptr->setViewMatrix (tm1_cam_to_scene);
+            antca_ptr->setViewMatrix (tm1_cam_to_scene);
+
+            std::cout << "First compute_mesh_movement from saved data:\n";
+
+            land->navmesh->ti0 = tm1_ti0;
+            sm::mat<float, 4> _cam_to_scene_1 = land->navmesh->compute_mesh_movement (tm1_mv_camframe, tm1_cam_to_scene, _land_to_scene, _hoverheight);
+
+            std::cout << "\ncompute_mesh_movement for time t-1 returned!\n\n";
+
+            //if (_cam_to_scene_1 != _cam_to_scene) {
+            // There is an expected rotation that has been applied!!!!
+            //}
+
+            std::cout << "Running second compute_mesh_movement from saved data:\n";
+
+            land->navmesh->ti0 = _ti0;
+            _cam_to_scene = land->navmesh->compute_mesh_movement (_mv_camframe, _cam_to_scene, _land_to_scene, _hoverheight);
+
+            std::cout << "compute_mesh_movement for time t returned!\n";
+
+            // Set the new position for camera and ant models
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (_cam_to_scene));
+            ep0->setViewMatrix (_cam_to_scene);
+            ant_ptr->setViewMatrix (_cam_to_scene);
+            antca_ptr->setViewMatrix (_cam_to_scene);
+
+        } catch (const std::exception& e) {
+            std::cout << "Exception moving: " << e.what() << std::endl;
+            while (!v.readyToFinish()) {
+                antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
+                v.waitevents (0.02);
+                v.render();
+                vant.render();
+                veye.render();
+            }
+            throw e;
+        }
     }
 
 
