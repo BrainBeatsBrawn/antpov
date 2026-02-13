@@ -668,6 +668,11 @@ int32_t main (int32_t argc, char* argv[])
     // We keep a track of the eye size. Used in subr_detect_camera_changes
     size_t last_eye_size = 0u;
 
+    // For debug saving:
+    sm::mat<float, 4> tm1_cam_to_scene;
+    sm::vec<float> tm1_mv_camframe = {};
+    uint32_t tm1_ti0 = 0u;
+
     uint32_t render_counter = 0u;
     auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData,
                                        &last_eye_size, &ep0, &ep1, &ep2, &render_counter, opts] ()
@@ -716,8 +721,9 @@ int32_t main (int32_t argc, char* argv[])
     };
 
     auto subr_key_move_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &move_counter,
-                                    &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight,
-                                    max_bc, land, land_to_scene, subr_reset_camspace](const float fps)
+                                    &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight, &rrg,
+                                    max_bc, land, land_to_scene, subr_reset_camspace,
+                                    &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -738,13 +744,44 @@ int32_t main (int32_t argc, char* argv[])
                 if (hoverheight < 0.0f) { hoverheight = 0.0f; }
             }
             // Obtain the commanded movement vector and turn this into a translation matrix
-            sm::vec<float> mv_camframe = v.getMovementVector (fps);
+            rrg.step();
+            sm::vec<float> mv_camframe = v.getMovementVector (1.0f / rrg.speed);
             sm::vec<float> lastloc = cam_to_scene.translation();
+            sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
+            uint32_t ti0_sv = land->navmesh->ti0;
             try {
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
+
+                tm1_ti0 = ti0_sv;
+                tm1_mv_camframe = mv_camframe;
+                tm1_cam_to_scene = cam_to_scene_sv;
+
             } catch (const std::exception& e) {
-                std::cout << "key-command move was not possible...\n";
-                throw e;
+                std::string msg (e.what());
+                std::cout << "Exception: " << msg << std::endl;
+                if (msg.find ("off-edge:") == 0) {
+                    std::cout << "We went off the edge. Key move not possible. Don't crash.\n";
+                    land->navmesh->ti0 = ti0_sv;
+                } else {
+                    std::cout << "key-command move was not possible...\n";
+                    {
+                        std::cout << "Saving compute_mesh_movement data\n";
+                        std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << tm1_mv_camframe << std::endl;
+                        std::cout << "cam_to_scene_sv is\n" << cam_to_scene_sv
+                                  << "\nand tm1_cam_to_scene:\n" << tm1_cam_to_scene << std::endl;
+                        sm::hdfdata dsv ("./antpov.h5", std::ios::out | std::ios::trunc);
+                        dsv.add_contained_vals ("/mv_camframe", mv_camframe);
+                        dsv.add_contained_vals ("/cam_to_scene", cam_to_scene_sv.arr);
+                        dsv.add_contained_vals ("/land_to_scene", land_to_scene.arr);
+                        dsv.add_val ("/hoverheight", hoverheight);
+                        dsv.add_val ("/ti0", ti0_sv);
+                        // Also save t-1 values:
+                        dsv.add_contained_vals ("/tm1_mv_camframe", tm1_mv_camframe);
+                        dsv.add_contained_vals ("/tm1_cam_to_scene", tm1_cam_to_scene.arr);
+                        dsv.add_val ("/tm1_ti0", tm1_ti0);
+                    }
+                    throw e;
+                }
             }
 
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
@@ -764,10 +801,6 @@ int32_t main (int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    // For debug saving:
-    sm::mat<float, 4> tm1_cam_to_scene;
-    sm::vec<float> tm1_mv_camframe = {};
-    uint32_t tm1_ti0 = 0u;
     auto subr_walk_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
                                 &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
                                 &isvp, land, land_to_scene,
@@ -815,8 +848,9 @@ int32_t main (int32_t argc, char* argv[])
             std::string msg (e.what());
             std::cout << "Exception: " << msg << std::endl;
             if (msg.find ("off-edge:") == 0) {
-                std::cout << "We went off the edge. Change direction.\n";
+                std::cout << "We went off the edge. Change direction (rrg.about_turn()).\n";
                 rrg.about_turn();
+                land->navmesh->ti0 = ti0_sv;
             } else {
                 //cam_to_scene = cam_to_scene_sv;
                 opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
@@ -953,10 +987,10 @@ int32_t main (int32_t argc, char* argv[])
             land->navmesh->ti0 = tm1_ti0;
             sm::mat<float, 4> _cam_to_scene_1 = land->navmesh->compute_mesh_movement (tm1_mv_camframe, tm1_cam_to_scene, _land_to_scene, _hoverheight);
 
-            std::cout << "\ncompute_mesh_movement for time t-1 returned!\n\n";
+            std::cout << "\ncompute_mesh_movement for time t-1 returned cam_to_scene:\n" << _cam_to_scene_1 << "\n";
 
             //if (_cam_to_scene_1 != _cam_to_scene) {
-            // There is an expected rotation that has been applied!!!!
+            // Random walk may have rotated the camera, to further alter cam_to_scene
             //}
 
             std::cout << "Running second compute_mesh_movement from saved data:\n";
