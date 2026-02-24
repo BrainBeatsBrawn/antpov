@@ -521,7 +521,7 @@ int32_t main (int32_t argc, char* argv[])
 
     // Breadcrumb trail
     uint64_t move_counter = 0u;
-    uint64_t max_bc = 320;//00; // 32000
+    uint64_t max_bc = 32000;//00; // 32000
     sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
     sm::vvec<float> breadcrumb_data = {};
 
@@ -1101,6 +1101,11 @@ int32_t main (int32_t argc, char* argv[])
             }
         }
         cray_fps.at_end();
+
+        // Scale size of breadcrumbs based on distance
+        float iscl = 2.0f * std::log (1.0f + v.get_d_to_rotation_centre());
+        //if (move_counter % 50 == 0) { std::cout << "iscl = " << iscl << std::endl; }
+        isvp->set_instance_scale (iscl);
 
         // Mark that we got to the end of the loop
         fps_profiler.at_end();
