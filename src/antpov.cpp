@@ -420,9 +420,11 @@ int32_t main (int32_t argc, char* argv[])
     ep0 = v.addVisualModel (eyevm);
 
     // We follow the eyevisual as it moves
-    v.options.set (mplot::visual_options::viewFollowsVMTranslations);
+    //v.options.set (mplot::visual_options::viewFollowsVMTranslations);
 
-    //v.options.set (mplot::visual_options::viewFollowsVMRotations);
+    // or:
+    v.options.set (mplot::visual_options::viewFollowsVMBehind);
+
     v.setFollowedVM (ep0);
 
     // A second eye goes in the 'eye only' window
@@ -745,7 +747,8 @@ int32_t main (int32_t argc, char* argv[])
             }
             // Obtain the commanded movement vector and turn this into a translation matrix
             rrg.step();
-            sm::vec<float> mv_camframe = v.getMovementVector (1.0f / rrg.speed);
+            //sm::vec<float> mv_camframe = v.getMovementVector (1.0f / rrg.speed); // confusing, can have -ve speed
+            sm::vec<float> mv_camframe = v.getMovementVector (60);
             sm::vec<float> lastloc = cam_to_scene.translation();
             sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
             uint32_t ti0_sv = land->navmesh->ti0;
@@ -1010,7 +1013,7 @@ int32_t main (int32_t argc, char* argv[])
             std::cout << "Exception moving: " << e.what() << std::endl;
             while (!v.readyToFinish()) {
                 antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
-                v.waitevents (0.02);
+                v.waitevents (1.0);
                 v.render();
                 vant.render();
                 veye.render();
