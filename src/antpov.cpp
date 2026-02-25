@@ -420,10 +420,10 @@ int32_t main (int32_t argc, char* argv[])
     ep0 = v.addVisualModel (eyevm);
 
     // We follow the eyevisual as it moves
-    //v.options.set (mplot::visual_options::viewFollowsVMTranslations);
+    v.options.set (mplot::visual_options::viewFollowsVMTranslations);
 
-    // or:
-    v.options.set (mplot::visual_options::viewFollowsVMBehind);
+    // or in a future version:
+    // v.options.set (mplot::visual_options::viewFollowsVMBehind);
 
     v.setFollowedVM (ep0);
 
