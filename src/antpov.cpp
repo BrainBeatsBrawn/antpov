@@ -51,42 +51,7 @@ namespace antpov
                   << "\t-f\tPath to a gltf scene file (absolute or relative to current "
                   << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
     }
-#if 0
-    // use a damped spring to move v0 towards target given a current velocity,
-    // time over which the spring would cover 90% of the distance from rest;
-    // and dt, the change in time.
-    template<typename T>
-    inline void damp_spring (T& v0, const T& target, T& vel, float time_90, float dt)
-    {
-	const float c0 = dt * 3.75f / time_90;
-	if(c0 >= 1.0f)	{
-            // here, constant is too small, spring too stiff.  so go the whole way to prevent oscillation.
-            v0 = target;
-            vel = T(0.0f);
-            return;
-	}
-	const T delta = target - v0;
-	const T force = delta - 2.0f * vel;
-	v0 += vel * c0; // update position
-	vel += force * c0; // update vel
-     }
 
-
-    void Frame::spring_facing (float time_90, float dt)
-    {
-        vec4 z(m_ornt.z_axis());
-        damp_spring<vec4>(z, m_target_z, m_zvel, time_90, dt);
-        // now make sure that normalizing z preserves the y coord.
-	// linearly interpolating the z-axis is an approximation,
- 	// and the y distortion is most noticeable.
-        const float D = 1.0f - z.y * z.y;
-        const float L = z.x * z.x + z.z * z.z;
-	const float mult = sqrtf(D / L);
-	z.x *= mult;
-        z.z *= mult;
-        m_ornt.face (z);
-    }
-#endif
     template<typename T>
     sm::vec<T, 3> get_cam_movement (sm::mat<T, 4>& current, const sm::mat<T, 4>& target, sm::vec<T, 3>& vel, T time_90, T dt)
     {
@@ -95,7 +60,6 @@ namespace antpov
             throw std::runtime_error ("spring too stiff");
         }
         const sm::vec<T, 3> delta = target.translation() - current.translation();
-
         const sm::vec<T, 3> force = delta - (vel * T{2});
         sm::vec<T, 3> pos_shift = vel * c0;
         vel += force * c0;
@@ -450,9 +414,8 @@ int32_t main (int32_t argc, char* argv[])
     eyevm->finalize();
     ep0 = v.addVisualModel (eyevm);
 
-    // We follow the eyevisual as it moves
+    // We follow the eyevisual as it moves by default
     v.options.set (mplot::visual_options::viewFollowsVMTranslations);
-
     // or in a future version:
     // v.options.set (mplot::visual_options::viewFollowsVMBehind);
 
@@ -578,6 +541,7 @@ int32_t main (int32_t argc, char* argv[])
     antca_ptr->name = "ant";
     antca_ptr->setViewMatrix (initial_camera_space);
 
+#if 0
     // A follower coordinate arrow, to debug camera following.
     auto folca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
     v.bindmodel (folca);
@@ -590,18 +554,8 @@ int32_t main (int32_t argc, char* argv[])
     auto folca_ptr = v.addVisualModel (folca);
     folca_ptr->name = "fol";
     folca_ptr->setViewMatrix (initial_camera_space);
-
-#if 0
-    // Debug follower by plotting delta
-    auto vvm = std::make_unique<mplot::VectorVisual<float, 3, glver>>(sm::vec<>{});
-    v.bindmodel (vvm);
-    vvm->thevec = {1,1,1};
-    vvm->thickness = 0.006f;
-    vvm->fixed_colour = true;
-    vvm->single_colour = mplot::colour::goldenrod2;
-    vvm->finalize();
-    auto delta_ptr = v.addVisualModel (vvm);
 #endif
+
     // Get access to the landscape VisualModel by searching for a selection of model names
     mplot::VisualModel<glver>* land = nullptr;
     {
@@ -1090,10 +1044,12 @@ int32_t main (int32_t argc, char* argv[])
     mplot::fps::profiler cray_fps;
     mplot::fps::profiler detect_fps;
 
+#if 0
     // Follower velocity
     sm::vec<float> fvel = {};
     // Follower rotation
     sm::quaternion<float> cam_rotn;
+#endif
 
     sm::hdfdata record (h5_path, std::ios::out | std::ios::trunc);
     while (!v.readyToFinish()) {
@@ -1145,10 +1101,10 @@ int32_t main (int32_t argc, char* argv[])
         // tmp profile
         move_fps.at_end();
 
-        // Follower
+#if 0
+        // Follower coordinate arrows
         {
             constexpr float time_90 = 1.0f; // s
-
             sm::mat<float, 4> fol_targ = mplot::compoundray::getCameraSpace (scene);
             fol_targ.translate (sm::vec<float>{0, 0.4f, -0.5f}); // Always follow behind the camera
             sm::mat<float, 4> cur_ = folca_ptr->getViewMatrix();
@@ -1158,23 +1114,21 @@ int32_t main (int32_t argc, char* argv[])
             sm::quaternion<float> r_cur0 = cur_.rotation();
             sm::vec<float> pos_shift = antpov::get_cam_movement<float> (fol_cur, fol_targ, fvel, time_90,
                                                                         static_cast<float>(waittime));
-            //const float c0 = static_cast<float>(waittime) * 3.75f / time_90;
             sm::mat<float, 4> fol_targ0 = fol_targ;
             fol_targ0.translate (-fol_targ.translation());
             sm::mat<float, 4> fol_cur0 = fol_cur;
             fol_cur0.translate (-fol_cur.translation());
             sm::quaternion<float> r_targ0 = fol_targ0.rotation();
             r_targ0.renormalize();
-            //sm::quaternion<float> r_cur0 = fol_cur0.rotation();
             r_cur0.renormalize();
-            cam_rotn = r_cur0.slerp (r_targ0, 0.1f);
-            std::cout << "r_cur0: " << r_cur0 << " cam_rotn " << cam_rotn << " r_targ0 " << r_targ0 << std::endl;
+            cam_rotn = r_cur0.slerp (r_targ0, 0.05f);
             // set the translation/rotation into fol_cur
             fol_cur.pretranslate (pos_shift); // Aaaaaargh pretranslate, not translate!!!
             fol_cur.rotate (cam_rotn);
             folca_ptr->setViewMatrix (fol_cur);
+            folca_ptr->setHide (v.options.test (mplot::visual_options::viewFollowsVMBehind));
         }
-
+#endif
         cray_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
