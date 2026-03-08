@@ -3,9 +3,11 @@
 #include <string>
 #include <iostream>
 #include <sm/mathconst>
-#include <sm/vec>
-#include <sm/flags>
-#include <mplot/Visual.h>
+
+//import sm.vec;
+//import sm.flags;
+
+import mplot.visual;
 
 // Reproduce controller functions for the mplot window for ease of use
 struct antpovvisual final : public mplot::Visual<glver>

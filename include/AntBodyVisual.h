@@ -2,8 +2,8 @@
 
 #include <sm/config>
 
-#include <mplot/colour.h>
-#include <mplot/VisualModel.h>
+import mplot.visualmodel;
+//import mplot.colour;
 
 namespace biosim
 {

@@ -5,31 +5,31 @@
 #include <deque>
 #include <chrono>
 
-#include <sm/flags>
-#include <sm/vvec>
-#include <sm/grid>
-#include <sm/hdfdata>
+import sm.flags;
+import sm.vvec;
+import sm.grid;
+import sm.hdfdata;
 
 #include <sampleConfig.h>
 
 #include "MulticamScene.h"
 #include "libEyeRenderer.h"
 
-#include <mplot/gl/version.h>
+import mplot.gl.version;
 constexpr int32_t glver = mplot::gl::version_4_3;
 
 #include "antpovvisual.h"
 #include "AntBodyVisual.h"
-#include <mplot/fps/profiler.h>
-#include <mplot/compoundray/interop.h> // mathplot <--> compoundray interoperability
 
-#include <mplot/compoundray/EyeVisual.h>
-#include <mplot/CoordArrows.h>
-#include <mplot/GridVisual.h>
-#include <mplot/RodVisual.h>
-#include <mplot/VectorVisual.h>
-#include <mplot/InstancedScatterVisual.h>
-#include <mplot/NormalsVisual.h>
+import mplot.fps.profiler;
+import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
+import mplot.compoundray.eyevisual;
+import mplot.coordarrows;
+import mplot.gridvisual;
+import mplot.rodvisual;
+import mplot.vectorvisual;
+import mplot.instancedscattervisual;
+import mplot.normalsvisual;
 
 #include "spline.hpp" // tkspline plus wrapper in sm::algo space
 
@@ -1037,6 +1037,8 @@ int32_t main (int32_t argc, char* argv[])
      * The main program loop
      */
     v.render();
+    vant.render();
+    veye.render();
     std::string m_count_str = {};
 
     mplot::fps::profiler move_fps;
@@ -1064,23 +1066,25 @@ int32_t main (int32_t argc, char* argv[])
 
         mplot_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Now render the mathplot window
-        v.render();
+        //v.render();
         // Change label after render (it needs v's context, not veye's)
-        if (move_counter % 1000 == 0) {
+        if (move_counter++ % 100 == 0) {
+            v.render();
             m_count_str = std::to_string (move_counter);
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
-#if 0
+#if 1
             std::cout << "mplot FPS: " << mplot_fps.fps_txt << std::endl;
             std::cout << "cray FPS: " << cray_fps.fps_txt << std::endl;
             std::cout << "move FPS: " << move_fps.fps_txt << std::endl;
             std::cout << "detect FPS: " << detect_fps.fps_txt << std::endl;
             std::cout << "Overall FPS: " << fps_profiler.fps_txt << std::endl;
 #endif
+            vant.render();
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
         // Render the eye-only window
-        vant.render();
+        //vant.render();
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
 

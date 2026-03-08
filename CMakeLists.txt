@@ -70,7 +70,7 @@ cmake_policy(VERSION 3.5)
 
 # This sets up the name of our project.  For our purposes the main thing this controls is
 # the name of the VS solution file.
-project(c-ray-eye3d)
+project(c-ray-eye3d LANGUAGES CXX C)
 
 if( POLICY CMP0072 )
   # FindOpenGL prefers GLVND by default when available
