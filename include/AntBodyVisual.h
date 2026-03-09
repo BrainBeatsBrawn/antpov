@@ -1,12 +1,14 @@
-#pragma once
+module;
 
 #include <sm/config>
 
-import mplot.visualmodel;
-//import mplot.colour;
+export module antbodyvisual;
+
+export import mplot.visualmodel;
+
 import sm.mat;
 
-namespace biosim
+export namespace biosim
 {
     // Parameters for our ant model
     const char* ant_json =

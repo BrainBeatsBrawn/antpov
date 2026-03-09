@@ -5,6 +5,8 @@
 #include <deque>
 #include <chrono>
 
+#include <sm/mathconst>
+
 import sm.flags;
 import sm.vvec;
 import sm.grid;
@@ -19,9 +21,8 @@ import sm.random;
 import mplot.gl.version;
 constexpr int32_t glver = mplot::gl::version_4_3;
 
-#include "antpovvisual.h"
-#include "AntBodyVisual.h"
-
+import antpov.visual;
+import antbodyvisual;
 import mplot.fps.profiler;
 import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
@@ -324,7 +325,7 @@ int32_t main (int32_t argc, char* argv[])
                                   ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
 
     // Create a mathplot window to render the eye/sensor
-    antpovvisual v (2000, 2000, "Scene (mathplot graphics)", opts.test(antpov::options::blender_axes));
+    antpovvisual<glver> v (2000, 2000, "Scene (mathplot graphics)", opts.test(antpov::options::blender_axes));
     // Choose how fast the camera should move for key press and mouse events
     v.speed = 0.5f; // 0.5 m/s max speed for our Cataglyphis Velox
     v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
@@ -338,7 +339,7 @@ int32_t main (int32_t argc, char* argv[])
     if (opts.test(antpov::options::blender_axes)) {
         v.switch_scene_vertical_axis(); // to uz up
     }
-    v.vstate.flip (antpovvisual::state::show_camframe);
+    v.vstate.flip (antpovvisual<glver>::state::show_camframe);
 
     // We start rotated into a drone view initial orientation for taking pictures of the world
     sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
@@ -724,14 +725,14 @@ int32_t main (int32_t argc, char* argv[])
     auto subr_reset_camspace = [&v, &initial_camera_space, &hoverheight, land, land_to_scene] (sm::mat<float, 4>& cam_to_scene)
     {
         // reset to initial camera space if requested
-        if (v.vstate.test (antpovvisual::state::campose_reset_request) == true) {
+        if (v.vstate.test (antpovvisual<glver>::state::campose_reset_request) == true) {
             v.stop(); // cancel any active movements
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (initial_camera_space));
             sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
             auto[hp_scene, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene);
             cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-            v.vstate.reset (antpovvisual::state::campose_reset_request);
+            v.vstate.reset (antpovvisual<glver>::state::campose_reset_request);
         }
     };
 
@@ -740,7 +741,7 @@ int32_t main (int32_t argc, char* argv[])
                                     max_bc, land, land_to_scene, subr_reset_camspace,
                                     &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
-        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         if (v.isActivelyRotating()) {
             // Up-down (pitch) is rotation about local camera frame axis x
@@ -752,9 +753,9 @@ int32_t main (int32_t argc, char* argv[])
             cam_to_scene = mplot::compoundray::getCameraSpace (scene); // update
         }
         if (v.isActivelyTranslating()) {
-            if (v.move_state.test (antpovvisual::move_sense::up)) {
+            if (v.move_state.test (antpovvisual<glver>::move_sense::up)) {
                 hoverheight += 0.0001f;
-            } else if (v.move_state.test (antpovvisual::move_sense::down)) {
+            } else if (v.move_state.test (antpovvisual<glver>::move_sense::down)) {
                 hoverheight -= 0.0001f;
                 if (hoverheight < 0.0f) { hoverheight = 0.0f; }
             }
@@ -824,11 +825,11 @@ int32_t main (int32_t argc, char* argv[])
                                 &hoverheight, subr_reset_camspace,
                                 &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
-        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         // A random walk mode
-        if (v.vstate.test (antpovvisual::state::walk) == false) { return; }
+        if (v.vstate.test (antpovvisual<glver>::state::walk) == false) { return; }
 
         // set rotation and step length according to the Stone paper
         rrg.step();
@@ -871,7 +872,7 @@ int32_t main (int32_t argc, char* argv[])
             } else {
                 //cam_to_scene = cam_to_scene_sv;
                 opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
-                v.vstate.set (antpovvisual::state::walk, false);
+                v.vstate.set (antpovvisual<glver>::state::walk, false);
                 {
                     std::cout << "Saving compute_mesh_movement data\n";
                     std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << tm1_mv_camframe << std::endl;
@@ -905,7 +906,7 @@ int32_t main (int32_t argc, char* argv[])
                               land, land_to_scene, subr_reset_camspace]
     (const float fps, uint32_t& _last_ti)
     {
-        antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
+        antca_ptr->setHide (!v.vstate.test(antpovvisual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
         if (csv_positions.size() > move_counter) {
@@ -1026,7 +1027,7 @@ int32_t main (int32_t argc, char* argv[])
         } catch (const std::exception& e) {
             std::cout << "Exception moving: " << e.what() << std::endl;
             while (!v.readyToFinish()) {
-                antca_ptr->setHide (!v.vstate.test(antpovvisual::state::show_camframe));
+                antca_ptr->setHide (!v.vstate.test(antpovvisual<glver>::state::show_camframe));
                 v.waitevents (1.0);
                 v.render();
                 vant.render();
@@ -1097,8 +1098,8 @@ int32_t main (int32_t argc, char* argv[])
 
         // tmp profile
         move_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
-        if (v.vstate.test (antpovvisual::state::paused) == false) {
-            if (v.vstate.test (antpovvisual::state::walk)) {
+        if (v.vstate.test (antpovvisual<glver>::state::paused) == false) {
+            if (v.vstate.test (antpovvisual<glver>::state::walk)) {
                 subr_walk_over_land (fps_profiler.fps_mean);
             } else if (opts.test (antpov::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
                 subr_csv_playback (fps_profiler.fps_mean, last_ti);

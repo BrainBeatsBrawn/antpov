@@ -1,13 +1,22 @@
-#pragma once
+module;
 
 #include <string>
 #include <iostream>
+#include <cstdint>
 #include <sm/mathconst>
+
+#include "libEyeRenderer.h"
+
 #include <mplot/keys.h>
 
-import mplot.visual;
+export module antpov.visual;
+
+export import mplot.gl.version;
+export import mplot.visual;
 
 // Reproduce controller functions for the mplot window for ease of use
+export
+template <int glver>
 struct antpovvisual final : public mplot::Visual<glver>
 {
     using mc = sm::mathconst<float>;
@@ -133,7 +142,7 @@ protected:
         if (this->vstate.test (state::freeze)) { return; } // Don't respond to movement keys
 
         // Process press/repeat key actions (none will work with Ctrl or Shift)
-        if (action == mplot::keyaction::press && !(mods & keymod::shift)) {
+        if (action == mplot::keyaction::press && !(mods & mplot::keymod::shift)) {
             if (key == mplot::key::w) {
                 this->vstate.reset (state::paused);
                 this->move_state.set (move_sense::forward);
@@ -181,7 +190,7 @@ protected:
                 this->vstate.set (state::campose_reset_request);
             }
 
-        } else if (action == mplot::keyaction::release && !(mods & keymod::shift)) {
+        } else if (action == mplot::keyaction::release && !(mods & mplot::keymod::shift)) {
 
             if (key == mplot::key::w) {
                 this->move_state.reset (move_sense::forward);
@@ -214,7 +223,7 @@ protected:
             if (key == mplot::key::t) {
                 // Toggle the morph view
                 this->vstate.flip (state::show_cones);
-            } else if (key == mplot::key::w && (mods & keymod::control)) {
+            } else if (key == mplot::key::w && (mods & mplot::keymod::control)) {
                 // walk
                 std::cout << "Flip walk\n";
                 this->vstate.flip (state::walk);

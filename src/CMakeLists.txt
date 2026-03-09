@@ -10,7 +10,8 @@ set_source_files_properties (
   ${PROJECT_SOURCE_DIR}/include/spline.hpp
 
   ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader
-
+  ${PROJECT_SOURCE_DIR}/include/antpovvisual.h
+  ${PROJECT_SOURCE_DIR}/include/AntBodyVisual.h
   ${MPLOT_INCLUDE_PATH}/maths/sm/range
   ${MPLOT_INCLUDE_PATH}/maths/sm/random
   ${MPLOT_INCLUDE_PATH}/maths/sm/vec
@@ -128,6 +129,8 @@ function(OPTIX_add_modules_executable target_name_base target_name_var)
   target_sources(${target_name} PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
     FILES
     ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader
+    ${PROJECT_SOURCE_DIR}/include/antpovvisual.h
+    ${PROJECT_SOURCE_DIR}/include/AntBodyVisual.h
     ${PROJECT_SOURCE_DIR}/include/spline.hpp
     ## mathplot main imports
     ${MPLOT_INCLUDE_PATH}/mplot/win_t.h
