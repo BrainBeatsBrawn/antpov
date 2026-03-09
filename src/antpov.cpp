@@ -1069,25 +1069,25 @@ int32_t main (int32_t argc, char* argv[])
 
         mplot_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Now render the mathplot window
-        //v.render();
+        v.render();
         // Change label after render (it needs v's context, not veye's)
-        if (move_counter++ % 100 == 0) {
-            v.render();
+        if (move_counter % 100 == 0) {
+            //v.render();
             m_count_str = std::to_string (move_counter);
             fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
-#if 1
+#if 0
             std::cout << "mplot FPS: " << mplot_fps.fps_txt << std::endl;
             std::cout << "cray FPS: " << cray_fps.fps_txt << std::endl;
             std::cout << "move FPS: " << move_fps.fps_txt << std::endl;
             std::cout << "detect FPS: " << detect_fps.fps_txt << std::endl;
             std::cout << "Overall FPS: " << fps_profiler.fps_txt << std::endl;
 #endif
-            vant.render();
+            //vant.render();
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
         if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
         // Render the eye-only window
-        //vant.render();
+        vant.render();
         veye.render();
         // Deal with any movements commanded by key press events (including reset)
 
