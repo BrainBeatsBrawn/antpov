@@ -65,12 +65,15 @@
 # If you have any questions, don't feel shy about posting to the OptiX forums:
 # https://devtalk.nvidia.com/default/board/90/
 
-cmake_minimum_required(VERSION 3.5.0 FATAL_ERROR)
-cmake_policy(VERSION 3.5)
+cmake_minimum_required(VERSION 3.28.5 FATAL_ERROR)
 
 # This sets up the name of our project.  For our purposes the main thing this controls is
 # the name of the VS solution file.
-project(c-ray-eye3d LANGUAGES CXX C)
+project(antpov LANGUAGES CXX C)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if( POLICY CMP0072 )
   # FindOpenGL prefers GLVND by default when available
@@ -114,7 +117,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 # Process our custom setup scripts here.
 
 # Enable C++11. Needs to be done before the include of ConfigCompilerFlags.cmake below.
-set(GCC_LIBSTDCPP11 ON)
+#set(GCC_LIBSTDCPP11 ON)
 
 # Include all CMake Macros.
 include (Macros)
@@ -193,11 +196,11 @@ if(APPLE)
   endif()
 endif()
 
-if(CMAKE_CXX_STANDARD EQUAL 11)
-  set(EYE_RENDERER_NVRTC_CXX "-std=c++11")
-else()
-  set(EYE_RENDERER_NVRTC_CXX "")
-endif()
+#if(CMAKE_CXX_STANDARD EQUAL 11)
+set(EYE_RENDERER_NVRTC_CXX "-std=c++11")
+#else()
+#  set(EYE_RENDERER_NVRTC_CXX "")
+#endif()
 set(CUDA_NVRTC_FLAGS ${EYE_RENDERER_NVRTC_CXX} "-arch compute_${ARCH_INT} -use_fast_math -lineinfo -default-device -rdc true -D__x86_64" CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
 
 mark_as_advanced(CUDA_NVRTC_FLAGS)

@@ -9,8 +9,7 @@
  *
  * Licence: GPL v2
  */
-
-#pragma once
+module;
 
 #include <limits>
 #include <cstdint>
@@ -21,13 +20,16 @@
 #include <algorithm>
 
 #include <sm/mathconst>
-#include <sm/vvec>
+
+export module tk.spline;
+
+export import sm.vvec;
 
 // not ideal but disable unused-function warnings
 //#pragma GCC diagnostic push
 //#pragma GCC diagnostic ignored "-Wunused-function"
 
-namespace tk
+export namespace tk
 {
     namespace internal
     {
@@ -789,7 +791,7 @@ namespace tk
 
 // #pragma GCC diagnostic pop
 
-namespace sm::algo
+export namespace sm::algo
 {
     // Place n elements between each element in v, computing a cubic spline interpolation.
     template <typename T>

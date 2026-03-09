@@ -9,6 +9,7 @@ import sm.flags;
 import sm.vvec;
 import sm.grid;
 import sm.hdfdata;
+import sm.random;
 
 #include <sampleConfig.h>
 
@@ -22,6 +23,7 @@ constexpr int32_t glver = mplot::gl::version_4_3;
 #include "AntBodyVisual.h"
 
 import mplot.fps.profiler;
+import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.eyevisual;
 import mplot.coordarrows;
@@ -31,7 +33,8 @@ import mplot.vectorvisual;
 import mplot.instancedscattervisual;
 import mplot.normalsvisual;
 
-#include "spline.hpp" // tkspline plus wrapper in sm::algo space
+//#include "spline.hpp" // tkspline plus wrapper in sm::algo space
+import tk.spline;
 
 #include <oces/reader>
 
@@ -408,7 +411,7 @@ int32_t main (int32_t argc, char* argv[])
     auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
                                                                          oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
-    v.bindmodel (eyevm);
+    eyevm->set_parent (v.get_id());
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
     eyevm->finalize();
@@ -429,11 +432,11 @@ int32_t main (int32_t argc, char* argv[])
     auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
                                                                           oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
-    vant.bindmodel (eyevm1);
+    eyevm1->set_parent (vant.get_id());
 
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia), nullptr);
-    veye.bindmodel (eyevm2);
+    eyevm2->set_parent (veye.get_id());
     eyevm2->name = "Big Eye";
     // First eye of eye pair (one spherical projection)
     uint32_t sz = 1024;
@@ -488,7 +491,7 @@ int32_t main (int32_t argc, char* argv[])
     ep1->scaleViewMatrix (1000);
     // The ant body itself
     auto av1 = std::make_unique<biosim::AntBodyVisual<glver>>();
-    vant.bindmodel (av1);
+    av1->set_parent (vant.get_id());
     av1->finalize();
     auto ant_ptr1 = vant.addVisualModel (av1);
     ant_ptr1->name = "ant";
@@ -509,7 +512,7 @@ int32_t main (int32_t argc, char* argv[])
 
     // The ant body
     auto av = std::make_unique<biosim::AntBodyVisual<glver>>();
-    v.bindmodel (av);
+    av->set_parent (v.get_id());
     av->finalize();
     auto ant_ptr = v.addVisualModel (av);
     ant_ptr->name = "ant";
@@ -522,7 +525,7 @@ int32_t main (int32_t argc, char* argv[])
     sm::vvec<float> breadcrumb_data = {};
 
     auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
-    v.bindmodel (isv);
+    isv->set_parent (v.get_id());
     isv->max_instances = max_bc;
     isv->radiusFixed = 0.004f;
     isv->finalize();
@@ -530,7 +533,7 @@ int32_t main (int32_t argc, char* argv[])
 
     // Make CoordArrows axes to show our camera's localspace (and to help find our tiny ant)
     auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
-    v.bindmodel (antca);
+    antca->set_parent (v.get_id());
     antca->em = 0.0f; // labels don't work so well
     float len = 2.0f;
     antca->lengths = { len, len, len };
@@ -544,7 +547,7 @@ int32_t main (int32_t argc, char* argv[])
 #if 0
     // A follower coordinate arrow, to debug camera following.
     auto folca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
-    v.bindmodel (folca);
+    folca->set_parent (v.get_id());
     folca->em = 0.0f;
     len *= 0.5f;
     folca->lengths = { len, len, len };
@@ -567,7 +570,7 @@ int32_t main (int32_t argc, char* argv[])
                 land->make_navmesh (basepath);
                 // normals for debug
                 auto nrm = std::make_unique<mplot::NormalsVisual<glver>> (land);
-                v.bindmodel (nrm);
+                nrm->set_parent (v.get_id());
                 nrm->scale_factor = 0.01f;
                 // Set options to show just the boundary edge
                 nrm->options.set (mplot::normalsvisual_flags::show_tri_normals, false);

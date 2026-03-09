@@ -3,9 +3,7 @@
 #include <string>
 #include <iostream>
 #include <sm/mathconst>
-
-//import sm.vec;
-//import sm.flags;
+#include <mplot/keys.h>
 
 import mplot.visual;
 

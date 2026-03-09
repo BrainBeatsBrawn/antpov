@@ -4,6 +4,7 @@
 
 import mplot.visualmodel;
 //import mplot.colour;
+import sm.mat;
 
 namespace biosim
 {
