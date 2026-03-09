@@ -1,10 +1,15 @@
 # All #includes in test programs have to be #include <mplot/header.h>
 include_directories(BEFORE ${PROJECT_SOURCE_DIR})
 
+include_directories (BEFORE "${PROJECT_SOURCE_DIR}/extern/oces_viewer")
+include_directories (BEFORE "${PROJECT_SOURCE_DIR}/extern/oces_viewer/extern")
+
 # Each C++ module file has to be listed here (as they don't have a .cppm or .ixx file suffix)
 set_source_files_properties (
 
   ${PROJECT_SOURCE_DIR}/include/spline.hpp
+
+  ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader
 
   ${MPLOT_INCLUDE_PATH}/maths/sm/range
   ${MPLOT_INCLUDE_PATH}/maths/sm/random
@@ -74,9 +79,7 @@ set_source_files_properties (
   PROPERTIES LANGUAGE CXX
 )
 
-include_directories (BEFORE "${PROJECT_SOURCE_DIR}/extern/oces_viewer")
-include_directories (BEFORE "${PROJECT_SOURCE_DIR}/extern/oces_viewer/extern")
-
+#
 # Build glad library here
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH}/mplot/glad)
 add_library(glad STATIC ${MPLOT_INCLUDE_PATH}/mplot/glad/gl.c)
@@ -124,6 +127,7 @@ function(OPTIX_add_modules_executable target_name_base target_name_var)
   # We'll have to pass in MODULES_FILES or something
   target_sources(${target_name} PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
     FILES
+    ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader
     ${PROJECT_SOURCE_DIR}/include/spline.hpp
     ## mathplot main imports
     ${MPLOT_INCLUDE_PATH}/mplot/win_t.h
