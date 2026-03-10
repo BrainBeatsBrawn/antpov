@@ -33,11 +33,7 @@ import mplot.rodvisual;
 import mplot.vectorvisual;
 import mplot.instancedscattervisual;
 import mplot.normalsvisual;
-
-//#include "spline.hpp" // tkspline plus wrapper in sm::algo space
-import tk.spline;
-
-//#include <oces/reader>
+import tk.spline; // tkspline plus wrapper in sm::algo space
 import oces.reader;
 
 // scene exists at global scope in libEyeRenderer.so
