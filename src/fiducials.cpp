@@ -2,10 +2,11 @@
  * Make a scene of fiducials
  */
 
-#include <sm/vec>
-#include <mplot/Visual.h>
-#include <mplot/RhomboVisual.h>
-#include <mplot/colour.h>
+#include <memory>
+#include <array>
+
+import mplot.visual;
+import mplot.rhombovisual;
 
 void fiducial (mplot::Visual<>& v, const sm::vec<float>& pos, const std::array<float, 3>& colour)
 {
@@ -19,11 +20,11 @@ void fiducial (mplot::Visual<>& v, const sm::vec<float>& pos, const std::array<f
     constexpr sm::vec<float, 3> b3 = sm::vec<float>::uy() * 0.3f;
 
     auto rv = std::make_unique<mplot::RhomboVisual<>> (pos, p1, p2, p3, mplot::colour::gold1);
-    v.bindmodel (rv);
+    rv->set_parent (v.get_id());
     rv->finalize();
     v.addVisualModel (rv);
     rv = std::make_unique<mplot::RhomboVisual<>> (pos, b1, b2, b3, colour);
-    v.bindmodel (rv);
+    rv->set_parent (v.get_id());
     rv->finalize();
     v.addVisualModel (rv);
 }
