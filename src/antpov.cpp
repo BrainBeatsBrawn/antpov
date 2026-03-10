@@ -690,8 +690,8 @@ int32_t main (int32_t argc, char* argv[])
     uint32_t tm1_ti0 = 0u;
 
     uint32_t render_counter = 0u;
-    auto subr_detect_camera_changes = [&v, &ommatidia, &ommatidiaData,
-                                       &last_eye_size, &ep0, &ep1, &ep2, &render_counter, opts] ()
+    auto subr_detect_camera_changes = [&ommatidia, &ommatidiaData,
+                                       &last_eye_size, &ep0, &ep1, &ep2, &render_counter] ()
     {
         size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
@@ -736,8 +736,8 @@ int32_t main (int32_t argc, char* argv[])
         }
     };
 
-    auto subr_key_move_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &move_counter,
-                                    &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight, &rrg,
+    auto subr_key_move_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &move_counter,
+                                    &breadcrumb_coords, &isvp, &hoverheight, &rrg,
                                     max_bc, land, land_to_scene, subr_reset_camspace,
                                     &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
@@ -819,7 +819,7 @@ int32_t main (int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_walk_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space, &rrg,
+    auto subr_walk_over_land = [&v, &ep0, &ant_ptr, &antca_ptr, &rrg,
                                 &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
                                 &isvp, land, land_to_scene,
                                 &hoverheight, subr_reset_camspace,
@@ -900,8 +900,8 @@ int32_t main (int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_csv_playback = [&v, &ep0, &ant_ptr, &antca_ptr, &initial_camera_space,
-                              &move_counter, &breadcrumb_coords, &breadcrumb_data, &isvp, &hoverheight, &opts,
+    auto subr_csv_playback = [&v, &ep0, &ant_ptr, &antca_ptr,
+                              &move_counter, &breadcrumb_coords, &isvp, &hoverheight, &opts,
                               max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
                               land, land_to_scene, subr_reset_camspace]
     (const float fps, uint32_t& _last_ti)
