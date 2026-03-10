@@ -155,24 +155,6 @@ set_source_files_properties (
   PROPERTIES LANGUAGE CXX
 )
 
-set(ANTPOV_MODULES
-  ${MY_MODULES}
-  ${OCES_MODULES}
-  ${MATHS_CORE_MODULES}
-  ${MATHS_MATHPLOT_MODULES}
-  ${MATHPLOT_CORE_MODULES}
-  ${ANTPOV_VM_MODULES}
-)
-
-set(FIDUCIALS_MODULES
-  ${MATHS_CORE_MODULES}
-  ${MATHS_MATHPLOT_MODULES}
-  ${MATHPLOT_CORE_MODULES}
-  ${FIDUCIALS_VM_MODULES}
-)
-
-
-#
 # Build glad library here
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH}/mplot/glad)
 add_library(glad STATIC ${MPLOT_INCLUDE_PATH}/mplot/glad/gl.c)
@@ -180,10 +162,14 @@ add_library(glad STATIC ${MPLOT_INCLUDE_PATH}/mplot/glad/gl.c)
 # Build mathplot fonts data
 add_library(mplot_fontdata STATIC ${MPLOT_INCLUDE_PATH}/mplot/VisualFaceAsm.cpp)
 
+# A special exe to make fiducials for the Seville environment
 add_executable (fiducials fiducials.cpp)
+set(FIDUCIALS_MODULES ${MATHS_CORE_MODULES} ${MATHS_MATHPLOT_MODULES} ${MATHPLOT_CORE_MODULES} ${FIDUCIALS_VM_MODULES})
 target_sources(fiducials PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR} FILES ${FIDUCIALS_MODULES})
 target_link_libraries(fiducials ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glfw glad mplot_fontdata)
 
+# The main ant simulator
+set(ANTPOV_MODULES ${MY_MODULES} ${OCES_MODULES} ${MATHS_CORE_MODULES} ${MATHS_MATHPLOT_MODULES} ${MATHPLOT_CORE_MODULES} ${ANTPOV_VM_MODULES})
 # A hacked OptiX function to generate modules-happy exe
 add_modules_exe (antpov target_name SOURCES antpov.cpp MODULES ${ANTPOV_MODULES} OPTIONS -rdc true)
 # Link CUDA, mathplot dependencies and libEyeRenderer3.so omit: ${CUDA_LIBRARIES}
