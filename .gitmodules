@@ -1,0 +1,6 @@
+[submodule "extern/mathplot"]
+	path = extern/mathplot
+	url = git@github.com:sebsjames/mathplot
+[submodule "extern/oces_viewer"]
+	path = extern/oces_viewer
+	url = git@github.com:sebsjames/oces_viewer
