@@ -12,30 +12,29 @@
  * in metres.
  */
 
+#include <memory>
 #include <iostream>
 #include <fstream>
 #include <cmath>
 
 #include <sm/mathconst>
-#include <sm/mat>
-#include <sm/scale>
-#include <sm/vec>
-#include <sm/vvec>
-#define HEXGRID_COMPILE_LOAD_AND_SAVE 1 // DO need to save out the HexGrid
-#include <sm/hexgrid>
-#include <sm/hdfdata>
 
-#define DO_PLOTTING
-#ifdef DO_PLOTTING
-# include <mplot/Visual.h>
-# include <mplot/ScatterVisual.h>
-# include <mplot/QuiverVisual.h>
-# include <mplot/HexGridVisual.h>
-# include <mplot/LengthscaleVisual.h>
+import sm.mat;
+import sm.scale;
+import sm.vec;
+import sm.vvec;
+import sm.hexgrid;
+import sm.hexgrid.hdf;
+import sm.hdfdata;
 
-# include "DoubleHexGridVisual.h"
-# include "AntBodyVisual.h"
-#endif
+import mplot.visual;
+import mplot.scattervisual;
+import mplot.quivervisual;
+import mplot.hexgridvisual;
+import mplot.lengthscalevisual;
+
+import antpov.doublehexgridvisual;
+import antbodyvisual;
 
 enum class spherical_projection
 {
@@ -45,7 +44,6 @@ enum class spherical_projection
     splodge
 };
 
-#ifdef DO_PLOTTING
 // You can hide the RGB arrows and/or the second eye
 constexpr bool two_eyes = true;
 constexpr bool show_rgb = false;
@@ -80,7 +78,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     constexpr float hex_d_prop = 0.2f;
     if constexpr (show_scatter) {
         auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
-        v.bindmodel (sv);
+        sv->set_parent (v.get_id());
         sv->setDataCoords (&sphere_coords);
         sv->setScalarData (&data);
         sv->radiusFixed = hg.getd() * hex_d_prop;
@@ -94,7 +92,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     if constexpr (two_eyes == true) {
         sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
         auto hgv = std::make_unique<mplot::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
-        v.bindmodel (hgv);
+        hgv->set_parent (v.get_id());
         hgv->setDataCoords (&eye_coords); // pass combined coords
         hgv->setScalarData (&datatwice);          // pass combined data
         hgv->hexVisMode = mplot::HexVisMode::HexInterp; // HexInterp or mplot::HexVisMode::Triangles for a smoother surface plot
@@ -106,7 +104,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     // Second eye
     if constexpr (two_eyes && show_scatter) {
         auto sv = std::make_unique<mplot::ScatterVisual<float>> (eyepos);
-        v.bindmodel (sv);
+        sv->set_parent (v.get_id());
         sv->setDataCoords (&sphere_coords2);
         sv->setScalarData (&data);
         sv->radiusFixed = hg.getd() * hex_d_prop;
@@ -121,7 +119,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
         sm::vvec<float> clrs (neighb_r.size(), 0.0f); // red
         auto vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_r,
                                                                 mplot::ColourMapType::Rainbow);
-        v.bindmodel (vmp);
+        vmp->set_parent (v.get_id());
         vmp->scalarData = &clrs;
         vmp->colourScale.compute_scaling (0, 1);
         vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
@@ -133,7 +131,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
         clrs.set_from (0.33333f); // green
         vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_g,
                                                            mplot::ColourMapType::Rainbow);
-        v.bindmodel (vmp);
+        vmp->set_parent (v.get_id());
         vmp->scalarData = &clrs;
         vmp->colourScale.compute_scaling (0, 1);
         vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
@@ -145,7 +143,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
         clrs.set_from (0.66667f); // blue
         vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords, eyepos, &neighb_b,
                                                            mplot::ColourMapType::Rainbow);
-        v.bindmodel (vmp);
+        vmp->set_parent (v.get_id());
         vmp->scalarData = &clrs;
         vmp->colourScale.compute_scaling (0, 1);
         vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
@@ -159,7 +157,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
             clrs.set_from (0.0f); // red
             vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_r2,
                                                                mplot::ColourMapType::Rainbow);
-            v.bindmodel (vmp);
+            vmp->set_parent (v.get_id());
             vmp->scalarData = &clrs;
             vmp->colourScale.compute_scaling (0, 1);
             vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
@@ -171,7 +169,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
             clrs.set_from (0.33333f); // green
             vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_g2,
                                                                mplot::ColourMapType::Rainbow);
-            v.bindmodel (vmp);
+            vmp->set_parent (v.get_id());
             vmp->scalarData = &clrs;
             vmp->colourScale.compute_scaling (0, 1);
             vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
@@ -183,7 +181,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
             clrs.set_from (0.66667f); // blue
             vmp = std::make_unique<mplot::QuiverVisual<float>>(&sphere_coords2, eyepos, &neighb_b2,
                                                                mplot::ColourMapType::Rainbow);
-            v.bindmodel (vmp);
+            vmp->set_parent (v.get_id());
             vmp->scalarData = &clrs;
             vmp->colourScale.compute_scaling (0, 1);
             vmp->do_quiver_length_scaling = false; // Don't (auto)scale the lengths of the vectors
@@ -196,20 +194,19 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
 
     // This will be a 1 mm bar
     auto lsv = std::make_unique<mplot::LengthscaleVisual<>>(sm::vec<>{-0.5f, -2.0f, 0});
-    v.bindmodel (lsv);
+    lsv->set_parent (v.get_id());
     lsv->label = "1 mm";
     lsv->finalize();
     v.addVisualModel (lsv);
 
     if constexpr (show_antoinette) {
         auto av = std::make_unique<biosim::AntBodyVisual<>>();
-        v.bindmodel (av);
+        av->set_parent (v.get_id());
         av->finalize();
         auto avp = v.addVisualModel (av);
         avp->scaleViewMatrix (1000);
     }
 }
-#endif
 
 int main (int argc, char** argv)
 {
@@ -333,7 +330,7 @@ int main (int argc, char** argv)
     }
 
     // Save data out that will give the neighbour information in the geoflow program
-    hg.save ("ant_eyes_dhex_hexgrid.h5");
+    sm::hexgrid_save (hg, "ant_eyes_dhex_hexgrid.h5");
     {
         sm::hdfdata d("ant_eyes_dhex_3d_coords.h5", std::ios::out | std::ios::trunc);
         d.add_contained_vals ("/neighb_r", neighb_r); // Will I need to access the neigb vectors?
@@ -348,7 +345,7 @@ int main (int argc, char** argv)
     }
 
     // Will call this fn once for each eye
-    auto output_coords = [r_sph, hg](const sm::vvec<sm::vec<float, 3>>& coords, sm::vec<float, 3> eyeoffset, std::ofstream& fout) {
+    auto output_coords = [hg](const sm::vvec<sm::vec<float, 3>>& coords, sm::vec<float, 3> eyeoffset, std::ofstream& fout) {
         constexpr float focal_offset = r_sph;
         constexpr float radius = r_sph;
         constexpr float mm_to_metres = 0.001f;
@@ -389,8 +386,6 @@ int main (int argc, char** argv)
         output_coords (sphere_coords2, sm::vec<float, 3>{eye_x_loc, 0, 0}, fout);
     }
 
-#ifdef DO_PLOTTING
-
     constexpr bool show_version_stdout = false;
     mplot::Visual v(1024, 768, "Desert Anty Eyes", show_version_stdout);
     v.setSceneTrans (sm::vec<float,3>{ float{-1.91057}, float{1.07071}, float{-23.0144} });
@@ -411,8 +406,6 @@ int main (int argc, char** argv)
                                             neighb_r, neighb_g, neighb_b, neighb_r2, neighb_g2, neighb_b2); }
         v.render();
     }
-
-#endif // PLOTTING
 
     return 0;
 }

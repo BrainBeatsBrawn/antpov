@@ -1,14 +1,18 @@
-#pragma once
+module;
 
 #include <array>
 #include <stdexcept>
 #include <iostream>
 #include <cmath>
-#include <sm/vec>
-#include <mplot/HexGridVisual.h>
 
-namespace mplot {
+export module antpov.doublehexgridvisual;
 
+export import sm.vec;
+export import sm.hexgrid;
+export import mplot.hexgridvisual;
+
+export namespace mplot
+{
     //! Display a grid that has two sections, each of which uses a single hexgrid, but has separate coordinates.
     template <class T, int glver = mplot::gl::version_4_1>
     class DoubleHexGridVisual : public mplot::HexGridVisual<T, glver>
@@ -159,18 +163,18 @@ namespace mplot {
 
                 // Build indices based on neighbour relations in the HexGrid
                 for (unsigned int hi = 0; hi < nhex; ++hi) {
-                    if (HAS_NNE(hi) && HAS_NE(hi)) {
+                    if (this->hg->has_nne(hi) && this->hg->has_ne(hi)) {
                         //std::cout << "1st triangle " << hi << "->" << NNE(hi) << "->" << NE(hi) << std::endl;
                         this->indices.push_back (sdo + hi);
-                        this->indices.push_back (sdo + NNE(hi));
-                        this->indices.push_back (sdo + NE(hi));
+                        this->indices.push_back (sdo + this->hg->nne(hi));
+                        this->indices.push_back (sdo + this->hg->ne(hi));
                     }
 
-                    if (HAS_NW(hi) && HAS_NSW(hi)) {
+                    if (this->hg->has_nw(hi) && this->hg->has_nsw(hi)) {
                         //std::cout << "2nd triangle " << hi << "->" << NW(hi) << "->" << NSW(hi) << std::endl;
-                        this->indices.push_back (sdo +hi);
-                        this->indices.push_back (sdo +NW(hi));
-                        this->indices.push_back (sdo +NSW(hi));
+                        this->indices.push_back (sdo + hi);
+                        this->indices.push_back (sdo + this->hg->nw(hi));
+                        this->indices.push_back (sdo + this->hg->nsw(hi));
                     }
                 }
                 this->idx += nhex;
@@ -253,12 +257,12 @@ namespace mplot {
                         _y = this->hg->d_y[hi];
                         // Use the linear scaled copy of the data, dcopy.
                         datumC   = this->dcopy[hi]; // '_z'
-                        datumNE  = HAS_NE(hi)  ? this->dcopy[NE(hi)]  : datumC; // datum Neighbour East
-                        datumNNE = HAS_NNE(hi) ? this->dcopy[NNE(hi)] : datumC; // datum Neighbour North East
-                        datumNNW = HAS_NNW(hi) ? this->dcopy[NNW(hi)] : datumC; // etc
-                        datumNW  = HAS_NW(hi)  ? this->dcopy[NW(hi)]  : datumC;
-                        datumNSW = HAS_NSW(hi) ? this->dcopy[NSW(hi)] : datumC;
-                        datumNSE = HAS_NSE(hi) ? this->dcopy[NSE(hi)] : datumC;
+                        datumNE  = this->hg->has_ne(hi)  ? this->dcopy[this->hg->ne(hi)]  : datumC; // datum Neighbour East
+                        datumNNE = this->hg->has_nne(hi) ? this->dcopy[this->hg->nne(hi)] : datumC; // datum Neighbour North East
+                        datumNNW = this->hg->has_nnw(hi) ? this->dcopy[this->hg->nnw(hi)] : datumC; // etc
+                        datumNW  = this->hg->has_nw(hi)  ? this->dcopy[this->hg->nw(hi)]  : datumC;
+                        datumNSW = this->hg->has_nsw(hi) ? this->dcopy[this->hg->nsw(hi)] : datumC;
+                        datumNSE = this->hg->has_nse(hi) ? this->dcopy[this->hg->nse(hi)] : datumC;
                     } else {
                         // Get coordinates from dataCoords
                         coordC = coffs + (*this->dataCoords)[dhi];
@@ -266,12 +270,12 @@ namespace mplot {
                         _y = (*this->dataCoords)[dhi][1];
                         datumC = (*this->dataCoords)[dhi][2];
 
-                        coordNE  = HAS_NE(hi)  ? coffs + (*this->dataCoords)[sdo + NE(hi)]  : coordC; // datum Neighbour East
-                        coordNNE = HAS_NNE(hi) ? coffs + (*this->dataCoords)[sdo + NNE(hi)] : coordC; // datum Neighbour North East
-                        coordNNW = HAS_NNW(hi) ? coffs + (*this->dataCoords)[sdo + NNW(hi)] : coordC; // etc
-                        coordNW  = HAS_NW(hi)  ? coffs + (*this->dataCoords)[sdo + NW(hi)]  : coordC;
-                        coordNSW = HAS_NSW(hi) ? coffs + (*this->dataCoords)[sdo + NSW(hi)] : coordC;
-                        coordNSE = HAS_NSE(hi) ? coffs + (*this->dataCoords)[sdo + NSE(hi)] : coordC;
+                        coordNE  = this->hg->has_ne(hi)  ? coffs + (*this->dataCoords)[sdo + this->hg->ne(hi)]  : coordC; // datum Neighbour East
+                        coordNNE = this->hg->has_nne(hi) ? coffs + (*this->dataCoords)[sdo + this->hg->nne(hi)] : coordC; // datum Neighbour North East
+                        coordNNW = this->hg->has_nnw(hi) ? coffs + (*this->dataCoords)[sdo + this->hg->nnw(hi)] : coordC; // etc
+                        coordNW  = this->hg->has_nw(hi)  ? coffs + (*this->dataCoords)[sdo + this->hg->nw(hi)]  : coordC;
+                        coordNSW = this->hg->has_nsw(hi) ? coffs + (*this->dataCoords)[sdo + this->hg->nsw(hi)] : coordC;
+                        coordNSE = this->hg->has_nse(hi) ? coffs + (*this->dataCoords)[sdo + this->hg->nse(hi)] : coordC;
 
                         datumNE = coordNE[2];
                         datumNNE = coordNNE[2];
@@ -298,11 +302,11 @@ namespace mplot {
 
                     // NE vertex
                     if (this->dataCoords == nullptr) {
-                        if (HAS_NNE(hi) && HAS_NE(hi)) {
+                        if (this->hg->has_nne(hi) && this->hg->has_ne(hi)) {
                             // Compute mean of this->data[hi] and NE and E hexes
                             datum = third * (datumC + datumNNE + datumNE);
-                        } else if (HAS_NNE(hi) || HAS_NE(hi)) {
-                            if (HAS_NNE(hi)) {
+                        } else if (this->hg->has_nne(hi) || this->hg->has_ne(hi)) {
+                            if (this->hg->has_nne(hi)) {
                                 datum = half * (datumC + datumNNE);
                             } else {
                                 datum = half * (datumC + datumNE);
@@ -313,11 +317,11 @@ namespace mplot {
                         vtx_1 = { (_x+sr), (_y+vne), datum };
                     } else {
                         // Similar logic, but for the coordinate, not just the data value
-                        if (HAS_NNE(hi) && HAS_NE(hi)) {
+                        if (this->hg->has_nne(hi) && this->hg->has_ne(hi)) {
                             // Compute mean of coordC and NE and E hexes
                             vtx_1 = third * (coordC + coordNNE + coordNE);
-                        } else if (HAS_NNE(hi) || HAS_NE(hi)) {
-                            if (HAS_NNE(hi)) {
+                        } else if (this->hg->has_nne(hi) || this->hg->has_ne(hi)) {
+                            if (this->hg->has_nne(hi)) {
                                 vtx_1 = half * (coordC + coordNNE);
                             } else {
                                 vtx_1 = half * (coordC + coordNE);
@@ -330,10 +334,10 @@ namespace mplot {
 
                     // SE vertex
                     if (this->dataCoords == nullptr) {
-                        if (HAS_NE(hi) && HAS_NSE(hi)) {
+                        if (this->hg->has_ne(hi) && this->hg->has_nse(hi)) {
                             datum = third * (datumC + datumNE + datumNSE);
-                        } else if (HAS_NE(hi) || HAS_NSE(hi)) {
-                            if (HAS_NE(hi)) {
+                        } else if (this->hg->has_ne(hi) || this->hg->has_nse(hi)) {
+                            if (this->hg->has_ne(hi)) {
                                 datum = half * (datumC + datumNE);
                             } else {
                                 datum = half * (datumC + datumNSE);
@@ -343,10 +347,10 @@ namespace mplot {
                         }
                         vtx_2 = { (_x+sr), (_y-vne), datum };
                     } else {
-                        if (HAS_NE(hi) && HAS_NSE(hi)) {
+                        if (this->hg->has_ne(hi) && this->hg->has_nse(hi)) {
                             vtx_2 = third * (coordC + coordNE + coordNSE);
-                        } else if (HAS_NE(hi) || HAS_NSE(hi)) {
-                            if (HAS_NE(hi)) {
+                        } else if (this->hg->has_ne(hi) || this->hg->has_nse(hi)) {
+                            if (this->hg->has_ne(hi)) {
                                 vtx_2 = half * (coordC + coordNE);
                             } else {
                                 vtx_2 = half * (coordC + coordNSE);
@@ -360,10 +364,10 @@ namespace mplot {
 
                     // S
                     if (this->dataCoords == nullptr) {
-                        if (HAS_NSE(hi) && HAS_NSW(hi)) {
+                        if (this->hg->has_nse(hi) && this->hg->has_nsw(hi)) {
                             datum = third * (datumC + datumNSE + datumNSW);
-                        } else if (HAS_NSE(hi) || HAS_NSW(hi)) {
-                            if (HAS_NSE(hi)) {
+                        } else if (this->hg->has_nse(hi) || this->hg->has_nsw(hi)) {
+                            if (this->hg->has_nse(hi)) {
                                 datum = half * (datumC + datumNSE);
                             } else {
                                 datum = half * (datumC + datumNSW);
@@ -374,10 +378,10 @@ namespace mplot {
                         vtx_3 = { _x, (_y-lr), datum };
 
                     } else {
-                        if (HAS_NSE(hi) && HAS_NSW(hi)) {
+                        if (this->hg->has_nse(hi) && this->hg->has_nsw(hi)) {
                             vtx_3 = third * (coordC + coordNSE + coordNSW);
-                        } else if (HAS_NSE(hi) || HAS_NSW(hi)) {
-                            if (HAS_NSE(hi)) {
+                        } else if (this->hg->has_nse(hi) || this->hg->has_nsw(hi)) {
+                            if (this->hg->has_nse(hi)) {
                                 vtx_3 = half * (coordC + coordNSE);
                             } else {
                                 vtx_3 = half * (coordC + coordNSW);
@@ -390,10 +394,10 @@ namespace mplot {
 
                     // SW
                     if (this->dataCoords == nullptr) {
-                        if (HAS_NW(hi) && HAS_NSW(hi)) {
+                        if (this->hg->has_nw(hi) && this->hg->has_nsw(hi)) {
                             datum = third * (datumC + datumNW + datumNSW);
-                        } else if (HAS_NW(hi) || HAS_NSW(hi)) {
-                            if (HAS_NW(hi)) {
+                        } else if (this->hg->has_nw(hi) || this->hg->has_nsw(hi)) {
+                            if (this->hg->has_nw(hi)) {
                                 datum = half * (datumC + datumNW);
                             } else {
                                 datum = half * (datumC + datumNSW);
@@ -403,10 +407,10 @@ namespace mplot {
                         }
                         vtx_4 = { (_x-sr), (_y-vne), datum };
                     } else {
-                        if (HAS_NW(hi) && HAS_NSW(hi)) {
+                        if (this->hg->has_nw(hi) && this->hg->has_nsw(hi)) {
                             vtx_4 = third * (coordC + coordNW + coordNSW);
-                        } else if (HAS_NW(hi) || HAS_NSW(hi)) {
-                            if (HAS_NW(hi)) {
+                        } else if (this->hg->has_nw(hi) || this->hg->has_nsw(hi)) {
+                            if (this->hg->has_nw(hi)) {
                                 vtx_4 = half * (coordC + coordNW);
                             } else {
                                 vtx_4 = half * (coordC + coordNSW);
@@ -419,10 +423,10 @@ namespace mplot {
 
                     // NW
                     if (this->dataCoords == nullptr) {
-                        if (HAS_NNW(hi) && HAS_NW(hi)) {
+                        if (this->hg->has_nnw(hi) && this->hg->has_nw(hi)) {
                             datum = third * (datumC + datumNNW + datumNW);
-                        } else if (HAS_NNW(hi) || HAS_NW(hi)) {
-                            if (HAS_NNW(hi)) {
+                        } else if (this->hg->has_nnw(hi) || this->hg->has_nw(hi)) {
+                            if (this->hg->has_nnw(hi)) {
                                 datum = half * (datumC + datumNNW);
                             } else {
                                 datum = half * (datumC + datumNW);
@@ -432,10 +436,10 @@ namespace mplot {
                         }
                         vtx_5 = { (_x-sr), (_y+vne), datum };
                     } else {
-                        if (HAS_NNW(hi) && HAS_NW(hi)) {
+                        if (this->hg->has_nnw(hi) && this->hg->has_nw(hi)) {
                             vtx_5 = third * (coordC + coordNNW + coordNW);
-                        } else if (HAS_NNW(hi) || HAS_NW(hi)) {
-                            if (HAS_NNW(hi)) {
+                        } else if (this->hg->has_nnw(hi) || this->hg->has_nw(hi)) {
+                            if (this->hg->has_nnw(hi)) {
                                 vtx_5 = half * (coordC + coordNNW);
                             } else {
                                 vtx_5 = half * (coordC + coordNW);
@@ -448,10 +452,10 @@ namespace mplot {
 
                     // N
                     if (this->dataCoords == nullptr) {
-                        if (HAS_NNW(hi) && HAS_NNE(hi)) {
+                        if (this->hg->has_nnw(hi) && this->hg->has_nne(hi)) {
                             datum = third * (datumC + datumNNW + datumNNE);
-                        } else if (HAS_NNW(hi) || HAS_NNE(hi)) {
-                            if (HAS_NNW(hi)) {
+                        } else if (this->hg->has_nnw(hi) || this->hg->has_nne(hi)) {
+                            if (this->hg->has_nnw(hi)) {
                                 datum = half * (datumC + datumNNW);
                             } else {
                                 datum = half * (datumC + datumNNE);
@@ -461,10 +465,10 @@ namespace mplot {
                         }
                         vtx_6 = { _x, (_y+lr), datum };
                     } else {
-                        if (HAS_NNW(hi) && HAS_NNE(hi)) {
+                        if (this->hg->has_nnw(hi) && this->hg->has_nne(hi)) {
                             vtx_6 = third * (coordC + coordNNW + coordNNE);
-                        } else if (HAS_NNW(hi) || HAS_NNE(hi)) {
-                            if (HAS_NNW(hi)) {
+                        } else if (this->hg->has_nnw(hi) || this->hg->has_nne(hi)) {
+                            if (this->hg->has_nnw(hi)) {
                                 vtx_6 = half * (coordC + coordNNW);
                             } else {
                                 vtx_6 = half * (coordC + coordNNE);
