@@ -19,15 +19,10 @@ module;
 #include <vector>
 #include <algorithm>
 
-#include <sm/mathconst>
-
 export module tk.spline;
 
+import sm.mathconst;
 export import sm.vvec;
-
-// not ideal but disable unused-function warnings
-//#pragma GCC diagnostic push
-//#pragma GCC diagnostic ignored "-Wunused-function"
 
 export namespace tk
 {
@@ -788,8 +783,6 @@ export namespace tk
     };
 
 } // namespace tk
-
-// #pragma GCC diagnostic pop
 
 export namespace sm::algo
 {

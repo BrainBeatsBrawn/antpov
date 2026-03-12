@@ -3,7 +3,6 @@ module;
 #include <string>
 #include <iostream>
 #include <cstdint>
-#include <sm/mathconst>
 
 #include "libEyeRenderer.h"
 
@@ -11,6 +10,7 @@ module;
 
 export module antpov.visual;
 
+import sm.mathconst;
 export import mplot.gl.version;
 export import mplot.visual;
 

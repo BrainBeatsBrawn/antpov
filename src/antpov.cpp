@@ -5,8 +5,7 @@
 #include <deque>
 #include <chrono>
 
-#include <sm/mathconst>
-
+import sm.mathconst;
 import sm.flags;
 import sm.vvec;
 import sm.grid;

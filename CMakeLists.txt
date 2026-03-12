@@ -463,6 +463,8 @@ set(MY_MODULES
 set(OCES_MODULES ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader)
 # sebsjames/maths
 set(MATHS_CORE_MODULES
+  ${MPLOT_INCLUDE_PATH}/maths/sm/mathconst
+  ${MPLOT_INCLUDE_PATH}/maths/sm/constexpr_math
   ${MPLOT_INCLUDE_PATH}/maths/sm/range
   ${MPLOT_INCLUDE_PATH}/maths/sm/random
   ${MPLOT_INCLUDE_PATH}/maths/sm/vec

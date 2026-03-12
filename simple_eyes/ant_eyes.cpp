@@ -17,8 +17,7 @@
 #include <fstream>
 #include <cmath>
 
-#include <sm/mathconst>
-
+import sm.mathconst;
 import sm.mat;
 import sm.scale;
 import sm.vec;
