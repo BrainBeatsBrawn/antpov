@@ -265,16 +265,9 @@ protected:
 
             } else if (key == mplot::key::v) { // switch view
                 // cycle between:
-                if (this->options.test (mplot::visual_options::viewFollowsVMBehind) == true
-                    && this->options.test (mplot::visual_options::viewFollowsVMTranslations) == false) {
-                    this->options.reset (mplot::visual_options::viewFollowsVMBehind);
-                    this->options.set (mplot::visual_options::viewFollowsVMTranslations);
-                    std::cout << "sceneview follows agent movements (drone view)\n";
-                } else { // this->options.test (mplot::visual_options::viewFollowsVMTranslations) == true
-                    this->options.set (mplot::visual_options::viewFollowsVMBehind);
-                    this->options.reset (mplot::visual_options::viewFollowsVMTranslations);
-                    std::cout << "sceneview follows behind agent (follower view)\n";
-                    // Don't show camframe when following
+                this->switch_view_follows_mode();
+                // Don't show camframe when following
+                if (this->options.test (mplot::visual_options::viewFollowsVMBehind) == true) {
                     this->vstate.reset (antpovvisual::state::show_camframe);
                 }
             }
