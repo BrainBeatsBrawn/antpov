@@ -1,15 +1,11 @@
 module;
 
-#include <string>
-#include <iostream>
-#include <cstdint>
-
 #include "libEyeRenderer.h"
-
 #include <mplot/keys.h>
 
 export module antpov.visual;
 
+import std;
 import sm.mathconst;
 export import mplot.gl.version;
 export import mplot.visual;

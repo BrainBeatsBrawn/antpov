@@ -65,15 +65,20 @@
 # If you have any questions, don't feel shy about posting to the OptiX forums:
 # https://devtalk.nvidia.com/default/board/90/
 
-cmake_minimum_required(VERSION 3.28.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
+
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
 
 # This sets up the name of our project.  For our purposes the main thing this controls is
 # the name of the VS solution file.
 project(antpov LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS ON)
+# Tell CMake that we explicitly want `import std`. This will initialize the
+# property on all targets declared after this to 1
+set(CMAKE_CXX_MODULE_STD 1)
 
 if( POLICY CMP0072 )
   # FindOpenGL prefers GLVND by default when available
@@ -397,14 +402,14 @@ endfunction()
 #
 
 # mathplot uses c++-20 language features
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 # Add the host definition to CXXFLAGS along with other switches, depending on OS/Compiler
 if (APPLE)
-  set(CMAKE_CXX_FLAGS "-Wall -Wfatal-errors -g -O3")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wfatal-errors -g -O3")
 else()
   # This assumes a gcc compiler (or a gcc mimic like Clang) // -Wfatal-errors
-  set(CMAKE_CXX_FLAGS "-Wall -g -O0 -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -O3 -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors")
 endif()
 
 # Tell clang to be quiet about brace initialisers:
@@ -465,7 +470,10 @@ set(OCES_MODULES ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader)
 set(MATHS_CORE_MODULES
   ${MPLOT_INCLUDE_PATH}/maths/sm/mathconst
   ${MPLOT_INCLUDE_PATH}/maths/sm/constexpr_math
+  ${MPLOT_INCLUDE_PATH}/maths/sm/trait_tests
   ${MPLOT_INCLUDE_PATH}/maths/sm/range
+  ${MPLOT_INCLUDE_PATH}/maths/sm/polysolve
+  ${MPLOT_INCLUDE_PATH}/maths/sm/bessel_i0
   ${MPLOT_INCLUDE_PATH}/maths/sm/random
   ${MPLOT_INCLUDE_PATH}/maths/sm/vec
   ${MPLOT_INCLUDE_PATH}/maths/sm/vvec

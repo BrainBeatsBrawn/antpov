@@ -35,12 +35,14 @@ SET(COMPILER_LIBRARY_PATH "${COMPILER_LIBRARY_PATH}" CACHE PATH "Path to compile
 MARK_AS_ADVANCED(COMPILER_LIBRARY_PATH)
 
 IF(EXISTS "${COMPILER_LIBRARY_PATH}")
+  message ("COMPILER_LIBRARY_PATH EXISTS: ${COMPILER_LIBRARY_PATH}")
   SET(rpath_arg "-Wl,-rpath,\"${COMPILER_LIBRARY_PATH}\"")
   # TODO(bigler): remove the old path if there is one
   FORCE_ADD_FLAGS(CMAKE_EXE_LINKER_FLAGS ${rpath_arg})
   FORCE_ADD_FLAGS(CMAKE_MODULE_LINKER_FLAGS ${rpath_arg})
   FORCE_ADD_FLAGS(CMAKE_SHARED_LINKER_FLAGS ${rpath_arg})
 ELSE(EXISTS "${COMPILER_LIBRARY_PATH}")
+  message ("COMPILER_LIBRARY_PATH EXISTS: ${COMPILER_LIBRARY_PATH}")
   IF(COMPILER_LIBRARY_PATH)
     MESSAGE(FATAL_ERROR "COMPILER_LIBRARY_PATH is set, but the path does not exist:\n${COMPILER_LIBRARY_PATH}")
   ENDIF(COMPILER_LIBRARY_PATH)
@@ -221,7 +223,7 @@ endif()
 get_filename_component(CMAKE_CURRENT_LIST_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/sse_support.h.in" "${CMAKE_BINARY_DIR}/include/sse_support.h")
 
-  
+
 ##############################################################
 ## Apple
 ##############################################################
@@ -398,9 +400,6 @@ set_flags(CMAKE_C_FLAGS         C_FLAGS)
 set_flags(CMAKE_C_FLAGS_DEBUG   C_FLAGS_DEBUG)
 set_flags(CMAKE_C_FLAGS_RELEASE C_FLAGS_RELEASE)
 
-set_flags(CMAKE_CXX_FLAGS         CXX_FLAGS)
+set_flags(CMAKE_CXX_FLAGS         ${CMAKE_CXX_FLAGS} CXX_FLAGS)
 set_flags(CMAKE_CXX_FLAGS_DEBUG   CXX_FLAGS_DEBUG)
 set_flags(CMAKE_CXX_FLAGS_RELEASE CXX_FLAGS_RELEASE)
-
-
-
