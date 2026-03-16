@@ -307,6 +307,8 @@ int32_t main (int32_t argc, char* argv[])
     multicamAlloc();
 
     std::vector<std::array<float, 3>> ommatidiaData;
+    ommatidiaData.resize (32768);
+    float3* ommatidiaDataPtr = reinterpret_cast<float3*>(&ommatidiaData);
     std::vector<Ommatidium>* ommatidia = nullptr;
 
     // Turn off verbose logging
@@ -685,13 +687,21 @@ int32_t main (int32_t argc, char* argv[])
     uint32_t tm1_ti0 = 0u;
 
     uint32_t render_counter = 0u;
-    auto subr_detect_camera_changes = [&ommatidia, &ommatidiaData,
+    auto subr_detect_camera_changes = [&ommatidia, &ommatidiaData, &ommatidiaDataPtr,
                                        &last_eye_size, &ep0, &ep1, &ep2, &render_counter] ()
     {
         size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
         if (ommatidiaData.size() == 0) {
-            if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
+            if (isCompoundEyeActive()) {
+                size_t newsz = getCameraData (ommatidiaDataPtr, ommatidiaData.size());
+                if (newsz > 0) {
+                    std::cout << "Need to resize ommatidiaData to " << newsz << std::endl;
+                    ommatidiaData.resize (newsz);
+                    std::cout << "Now getCameraData... " << newsz << std::endl;
+                    getCameraData (ommatidiaDataPtr, newsz);
+                }
+            }
         } // else no need to re-get data
 
         // Update eyevm model (or just update colours)
@@ -1138,7 +1148,11 @@ int32_t main (int32_t argc, char* argv[])
         renderFrame();
         // Access data so that a brain model could be fed
         if (isCompoundEyeActive()) {
-            getCameraData (ommatidiaData);
+            size_t newsz = getCameraData (ommatidiaDataPtr, ommatidiaData.size());
+            if (newsz > 0) {
+                ommatidiaData.resize (newsz);
+                getCameraData (ommatidiaDataPtr, ommatidiaData.size());
+            }
             ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
 
             // if csv mode, then save the data
