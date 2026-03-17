@@ -465,6 +465,9 @@ set(OCES_MODULES ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader)
 set(MATHS_CORE_MODULES
   ${MPLOT_INCLUDE_PATH}/maths/sm/mathconst
   ${MPLOT_INCLUDE_PATH}/maths/sm/constexpr_math
+  ${MPLOT_INCLUDE_PATH}/maths/sm/polysolve
+  ${MPLOT_INCLUDE_PATH}/maths/sm/bessel_i0
+  ${MPLOT_INCLUDE_PATH}/maths/sm/trait_tests
   ${MPLOT_INCLUDE_PATH}/maths/sm/range
   ${MPLOT_INCLUDE_PATH}/maths/sm/random
   ${MPLOT_INCLUDE_PATH}/maths/sm/vec
