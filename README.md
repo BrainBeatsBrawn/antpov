@@ -15,16 +15,18 @@ https://github.com/sebsjames/compound-ray
 
 You will need to use gcc-12 or gcc-11 to compile compound-ray (or possibly some version of clang).
 
-To compile antpov, you need clang-20 or higher, and ninja-build:
+To compile antpov, you need clang-22 and ninja-build:
 
 ```bash
-sudo apt-install clang-20 clang-tools-20 libc++-20-dev ninja-build
+# This won't work for now, I built clang from source
+sudo apt-install clang-22 clang-tools-22 libc++-22-dev ninja-build
 ```
-
 
 You also need cmake version 3.28.5 or higher. Either `apt install cmake`
 on Ubuntu 25+ or download and build cmake from the cmake.org download
 page (it's an easy, reliable compile).
+
+Also the mathplot dependencies (wrt branch dev/modules)
 
 ## Build
 
@@ -42,7 +44,7 @@ just as you will have done so for compound-ray:
 ```bash
 mkdir build
 cd build
-CC=clang-20 CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
+CC=clang-22 CXX=clang++-22 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
 # Optional: -DCMAKE_CXX_FLAGS="-stdlib=libc++"
 make
 ```
