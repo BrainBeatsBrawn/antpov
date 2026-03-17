@@ -782,10 +782,6 @@ export namespace tk
         T get_x_max() const { assert (!m_x.empty()); return m_x.back(); }
     };
 
-} // namespace tk
-
-export namespace sm::algo
-{
     // Place n elements between each element in v, computing a cubic spline interpolation.
     template <typename T>
     void cubic_spline (sm::vvec<T>& v, std::size_t n)

@@ -22,6 +22,7 @@ constexpr int32_t glver = mplot::gl::version_4_3;
 
 import antpov.visual;
 import antbodyvisual;
+import craysim.random_outbound;
 import mplot.fps.profiler;
 import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
@@ -32,14 +33,13 @@ import mplot.rodvisual;
 import mplot.vectorvisual;
 import mplot.instancedscattervisual;
 import mplot.normalsvisual;
-import tk.spline; // tkspline plus wrapper in sm::algo space
 import oces.reader;
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
 
 // When the program starts, how many samples per ommatidium/element do you want?
-constexpr int32_t samples_per_omm_default = 64;
+constexpr std::int32_t samples_per_omm_default = 64;
 
 namespace antpov
 {
@@ -117,97 +117,8 @@ namespace antpov
         return {path, hovh, csvpath};
     }
 
-    // Make a randomized path to follow
-    template <typename T>
-    struct random_outbound
-    {
-        random_outbound (const uint32_t _n_steps, const uint32_t _a_tau)
-        {
-            this->n_steps = _n_steps;
-            this->a_tau = _a_tau;
-            this->init();
-        }
-
-        random_outbound (const uint32_t _n_steps, const uint32_t _a_tau, const T& _kappa)
-        {
-            this->n_steps = _n_steps;
-            this->a_tau = _a_tau;
-            this->kappa = _kappa;
-            this->init();
-        }
-
-        void init()
-        {
-            this->rVM = std::make_unique<sm::rand_vonmises<T>> (T{0}, kappa);
-            this->a.resize (this->n_steps / this->a_tau);
-            this->a.randomize();
-            this->a *= (amm.span());
-            this->a += amm.min;
-            sm::algo::cubic_spline (this->a, this->a_tau);
-        }
-
-        // Reset state
-        void reset()
-        {
-            this->t = 0;
-            this->theta = T{0};
-            this->omega = T{0};
-            this->velocity = {};
-            this->speed = T{0};
-        }
-
-        void about_turn() { this->theta += sm::mathconst<float>::pi; }
-
-        // Advance the route generation by one timestep
-        void step()
-        {
-            // This is the model as stated in the paper and it should be equivalent to lfilter
-            // function.
-            T epsilon = this->rVM->get(); // Angular acceleration
-            this->omega = this->lambda * this->omega + epsilon;
-            this->theta += this->omega;
-
-            T accel = T{0};
-            if (t < this->a.size()) { accel = this->a[this->t]; }
-
-            sm::vec<T, 2> thrust = { accel * std::sin (theta), accel * std::cos (theta) };
-            this->velocity = (this->velocity + thrust) * one_minus_FD;
-            this->speed = (this->speed + accel) * one_minus_FD;
-
-            ++this->t;
-            if (this->t > this->n_steps) { this->reset(); }
-        }
-
-        // Number of steps total.
-        uint32_t n_steps = 0;
-        // Current time step
-        uint32_t t = 0;
-
-        // State
-        T theta = T{0};              // Heading/theta
-        T omega = T{0};              // Angular velocity
-        sm::vec<T, 2> velocity = {}; // Cartesian velocity (or can use speed):
-        T speed = T{0};              // Linear speed
-
-        // Parameters
-        const T lambda = T{0.4};
-        T kappa = T{100};                   // Von Mises concentration parameter
-        sm::vvec<T> a = {};                 // Acceleration values
-        // Uniform RNG range outbound [0, 0.05]
-        const sm::range<T> amm = { T{0}, T{0.005} };
-        // how often does the acceleration change?
-        uint32_t a_tau = 50;
-
-        // FD is the drag coefficient
-        static constexpr T FD = T{0.15};
-        static constexpr T one_minus_FD = (T{1} - FD);
-
-        // Random number generation
-        std::unique_ptr<sm::rand_vonmises<T>> rVM;
-    };
-
     // Read a simple csv with 2D coordinates. Should also read flags.
-    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<uint32_t>& antflags)
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags)
     {
         std::ifstream f (path.c_str(), std::ios::in);
         if (f.is_open() == false) { return false; }
@@ -222,7 +133,7 @@ namespace antpov
             tokens.clear();
             tokens = mplot::tools::stringToVector (line, ",");
             if (tokens.size() > 2) {
-                uint32_t fl = std::stoi (tokens[2]);
+                std::uint32_t fl = std::stoi (tokens[2]);
                 antflags.push_back (fl);
             } else {
                 antflags.push_back (0u);
@@ -233,9 +144,9 @@ namespace antpov
 
     // For a given samples per omm, return a sensible number of loops over which to average fps, so
     // that fps takes around 1 sec to stabilize.
-    static constexpr uint32_t best_n_samples (int32_t samples_per_omm)
+    static constexpr std::uint32_t best_n_samples (int32_t samples_per_omm)
     {
-        uint32_t best_n = 0;
+        std::uint32_t best_n = 0;
         switch (samples_per_omm) {
         case 1:
         case 2:
@@ -436,7 +347,7 @@ int32_t main (int32_t argc, char* argv[])
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "Big Eye";
     // First eye of eye pair (one spherical projection)
-    uint32_t sz = 1024;
+    std::uint32_t sz = 1024;
     float ps_rad = 0.0001f;                  // projection sphere radius
     sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
 
@@ -516,8 +427,8 @@ int32_t main (int32_t argc, char* argv[])
     ant_ptr->setViewMatrix (initial_camera_space);
 
     // Breadcrumb trail
-    uint64_t move_counter = 0u;
-    uint64_t max_bc = 32000;//00; // 32000
+    std::uint64_t move_counter = 0u;
+    std::uint64_t max_bc = 32000;//00; // 32000
     sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
     sm::vvec<float> breadcrumb_data = {};
 
@@ -585,10 +496,10 @@ int32_t main (int32_t argc, char* argv[])
 
     // Load data from csv file for pre-defined paths
     sm::vvec<sm::vec<float, 2>> csv_positions;
-    sm::vvec<uint32_t> csv_antflags;
+    sm::vvec<std::uint32_t> csv_antflags;
     // When reproducing csv paths, it's useful to keep a record of the last triangle, because the
     // most likely next triangle is the last triangle.
-    uint32_t last_ti = std::numeric_limits<uint32_t>::max();
+    std::uint32_t last_ti = std::numeric_limits<std::uint32_t>::max();
 
     if (opts.test (antpov::options::path_from_csv)) {
         //waittime = 0.25; // make it slow
@@ -604,7 +515,7 @@ int32_t main (int32_t argc, char* argv[])
     sm::vvec<std::array<float, 3>> bc_clr (csv_antflags.size());
     sm::vvec<float> bc_alpha (csv_antflags.size());
     sm::vvec<float> bc_scale (csv_antflags.size());
-    for (uint32_t i = 0; i < csv_antflags.size(); ++i) {
+    for (std::uint32_t i = 0; i < csv_antflags.size(); ++i) {
         aflags = csv_antflags[i];
         bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
         if (i % 4 == 0) {
@@ -653,7 +564,7 @@ int32_t main (int32_t argc, char* argv[])
         }
 
         auto[hp_scene, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
-        if (_ti0 != std::numeric_limits<uint32_t>::max()) {
+        if (_ti0 != std::numeric_limits<std::uint32_t>::max()) {
             // Set up our camera using the data obtained from find_triangle_hit()
             sm::mat<float, 4> cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight);
             if (cam_to_scene != sm::mat<float, 4>::identity()) {
@@ -674,21 +585,21 @@ int32_t main (int32_t argc, char* argv[])
     std::cout << "*****\n";
 
     // Random route generation
-    antpov::random_outbound<float> rrg(1500, 150, 100);
+    craysim::random_outbound<float> rrg(1500, 150, 100);
 
     // We keep a track of the eye size. Used in subr_detect_camera_changes
-    size_t last_eye_size = 0u;
+    std::size_t last_eye_size = 0u;
 
     // For debug saving:
     sm::mat<float, 4> tm1_cam_to_scene;
     sm::vec<float> tm1_mv_camframe = {};
-    uint32_t tm1_ti0 = 0u;
+    std::uint32_t tm1_ti0 = 0u;
 
-    uint32_t render_counter = 0u;
+    std::uint32_t render_counter = 0u;
     auto subr_detect_camera_changes = [&ommatidia, &ommatidiaData,
                                        &last_eye_size, &ep0, &ep1, &ep2, &render_counter] ()
     {
-        size_t curr_eye_size = last_eye_size;
+        std::size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
         if (ommatidiaData.size() == 0) {
             if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
@@ -699,7 +610,7 @@ int32_t main (int32_t argc, char* argv[])
         ep1->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
         ep2->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
 
-        static constexpr uint32_t render_every = 1u; // set to 1 for max update, 60 to reduce compute
+        static constexpr std::uint32_t render_every = 1u; // set to 1 for max update, 60 to reduce compute
         if (ommatidia != nullptr) {
             curr_eye_size = ommatidia->size();
             if (curr_eye_size != last_eye_size) {
@@ -760,7 +671,7 @@ int32_t main (int32_t argc, char* argv[])
             sm::vec<float> mv_camframe = v.getMovementVector (60);
             sm::vec<float> lastloc = cam_to_scene.translation();
             sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
-            uint32_t ti0_sv = land->navmesh->ti0;
+            std::uint32_t ti0_sv = land->navmesh->ti0;
             try {
                 cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
 
@@ -834,7 +745,7 @@ int32_t main (int32_t argc, char* argv[])
         cam_to_scene = mplot::compoundray::getCameraSpace (scene);
         sm::vec<float> mv_camframe = { 0, 0, rrg.speed };
         sm::mat<float, 4> cam_to_scene_sv = cam_to_scene;
-        uint32_t ti0_sv = land->navmesh->ti0;
+        std::uint32_t ti0_sv = land->navmesh->ti0;
         try {
             // Note that even if the last mesh movement would land on a triangle, a further
             // rotation might mean that we get a 'no triangle intersection' exception (esp. if
@@ -899,7 +810,7 @@ int32_t main (int32_t argc, char* argv[])
                               &move_counter, &breadcrumb_coords, &isvp, &hoverheight, &opts,
                               max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
                               land, land_to_scene, subr_reset_camspace]
-    (const float fps, uint32_t& _last_ti)
+    (const float fps, std::uint32_t& _last_ti)
     {
         antca_ptr->setHide (!v.vstate.test(antpovvisual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -934,7 +845,7 @@ int32_t main (int32_t argc, char* argv[])
             _last_ti = _ti0;
             //std::cout << "--> Got hp_scene: " << hp_scene << std::endl;
 
-            if (_ti0 != std::numeric_limits<uint32_t>::max()) {
+            if (_ti0 != std::numeric_limits<std::uint32_t>::max()) {
                 sm::vec<float> fwds = nextloc - lastloc;
                 // Set up our camera using the data obtained from find_triangle_hit()
                 cam_to_scene = land->navmesh->position_camera (hp_scene, land_to_scene, hoverheight, fwds);
@@ -977,7 +888,7 @@ int32_t main (int32_t argc, char* argv[])
         sm::mat<float, 4> _land_to_scene = {{}};
         sm::vec<float> _mv_camframe = {};
         float _hoverheight = 0.0f;
-        uint32_t _ti0 = 0u;
+        std::uint32_t _ti0 = 0u;
 
         sm::hdfdata dsv ("./antpov.h5", std::ios::in);
         dsv.read_contained_vals ("/mv_camframe", _mv_camframe);
