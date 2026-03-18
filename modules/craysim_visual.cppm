@@ -20,10 +20,12 @@ export module craysim.visual;
 import sm.mathconst;
 import sm.vvec;
 import sm.quaternion;
+import sm.mat;
 
 import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.ommatidium; // The mplot::Ommatidium structure
+import mplot.compoundray.eyevisual;
 
 export import mplot.gl.version;
 export import mplot.visual;
@@ -204,6 +206,8 @@ export namespace craysim
             this->setup_camera();
 
             this->setup_oces();
+
+            this->setup_eyevisual();
         }
 
         ~visual()
@@ -255,6 +259,24 @@ export namespace craysim
             }
         }
 
+        void setup_eyevisual()
+        {
+            // We get the initial camera localspace. This also serves to reset the camera pose. This is set
+            // in the GLTF file and note that it may be a LEFT HANDED coordinate system!
+            sm::mat<float, 4> ics = mplot::compoundray::getCameraSpace (scene);
+            this->initial_camera_space.translate (ics.translation()); // Right handed
+
+            // Create an EyeVisual 'eye' in our scene
+            auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &this->ommatidiaData, this->get_ommatidia_ptr(), this->get_head_mesh());
+            eyevm->set_parent (this->get_id());
+            eyevm->setViewMatrix (this->initial_camera_space);
+            eyevm->name = "EyeVisual";
+            eyevm->finalize();
+            this->eye = this->addVisualModel (eyevm);
+            // This eye is the followed VM.
+            this->setFollowedVM (this->eye);
+        }
+
         void load (const std::string& gltfpath, sm::flags<craysim::options>& opts)
         {
             // Load the file
@@ -300,6 +322,12 @@ export namespace craysim
         // Required in every craysim, I think. craysim::state? member of craysim::visual?
         std::vector<std::array<float, 3>> ommatidiaData;
         std::vector<Ommatidium>* ommatidia = nullptr;
+
+        // This is the start position of the camera as loaded from the gltf
+        sm::mat<float, 4> initial_camera_space;
+
+        // An mplot::VisualModel of the compound-ray eye
+        mplot::compoundray::EyeVisual<glver>* eye = nullptr;
 
         // Movement state (class and bitset) (flags?)
         enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };

@@ -459,6 +459,7 @@ set(MY_MODULES
   ${PROJECT_SOURCE_DIR}/modules/craysim_visual.cppm
   ${PROJECT_SOURCE_DIR}/modules/craysim_random_walk.cppm # Uses tk_spline, GPL v2
   ${PROJECT_SOURCE_DIR}/modules/craysim_antbody.cppm
+  ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm
 )
 # The OCES reader code
 set(OCES_MODULES ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader)
