@@ -5,6 +5,10 @@
 #include <deque>
 #include <chrono>
 
+#include <sampleConfig.h>
+#include "MulticamScene.h"
+#include "libEyeRenderer.h"
+
 import sm.mathconst;
 import sm.flags;
 import sm.vvec;
@@ -12,18 +16,7 @@ import sm.grid;
 import sm.hdfdata;
 import sm.random;
 
-#include <sampleConfig.h>
-
-#include "MulticamScene.h"
-#include "libEyeRenderer.h"
-
 import mplot.gl.version;
-constexpr int32_t glver = mplot::gl::version_4_3;
-
-import craysim.visual;
-import craysim.antbody;
-import craysim.random_walk;
-
 import mplot.fps.profiler;
 import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
@@ -34,7 +27,15 @@ import mplot.rodvisual;
 import mplot.vectorvisual;
 import mplot.instancedscattervisual;
 import mplot.normalsvisual;
+
+import craysim.visual;
+import craysim.antbody;
+import craysim.random_walk;
+
 import oces.reader;
+
+// OpenGL 4.3 for Instanced VisualModels
+constexpr int32_t glver = mplot::gl::version_4_3;
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
@@ -51,20 +52,6 @@ namespace antpov
                   << "\t-h\tDisplay this help information.\n"
                   << "\t-f\tPath to a gltf scene file (absolute or relative to current "
                   << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
-    }
-
-    template<typename T>
-    sm::vec<T, 3> get_cam_movement (sm::mat<T, 4>& current, const sm::mat<T, 4>& target, sm::vec<T, 3>& vel, T time_90, T dt)
-    {
-        const T c0 = dt * T{3.75} / time_90;
-        if (c0 >= T{1}) { // here, constant is too small, spring too stiff.
-            throw std::runtime_error ("spring too stiff");
-        }
-        const sm::vec<T, 3> delta = target.translation() - current.translation();
-        const sm::vec<T, 3> force = delta - (vel * T{2});
-        sm::vec<T, 3> pos_shift = vel * c0;
-        vel += force * c0;
-        return pos_shift;
     }
 
     // Flags class
@@ -452,21 +439,6 @@ int32_t main (int32_t argc, char* argv[])
     auto antca_ptr = v.addVisualModel (antca);
     antca_ptr->name = "ant";
     antca_ptr->setViewMatrix (initial_camera_space);
-
-#if 0
-    // A follower coordinate arrow, to debug camera following.
-    auto folca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
-    folca->set_parent (v.get_id());
-    folca->em = 0.0f;
-    len *= 0.5f;
-    folca->lengths = { len, len, len };
-    folca->thickness = 0.8f;
-    folca->endsphere_size = 1.1f;
-    folca->finalize();
-    auto folca_ptr = v.addVisualModel (folca);
-    folca_ptr->name = "fol";
-    folca_ptr->setViewMatrix (initial_camera_space);
-#endif
 
     // Get access to the landscape VisualModel by searching for a selection of model names
     mplot::VisualModel<glver>* land = nullptr;
@@ -958,13 +930,6 @@ int32_t main (int32_t argc, char* argv[])
     mplot::fps::profiler cray_fps;
     mplot::fps::profiler detect_fps;
 
-#if 0
-    // Follower velocity
-    sm::vec<float> fvel = {};
-    // Follower rotation
-    sm::quaternion<float> cam_rotn;
-#endif
-
     sm::hdfdata record (h5_path, std::ios::out | std::ios::trunc);
     while (!v.readyToFinish()) {
 
@@ -1017,34 +982,6 @@ int32_t main (int32_t argc, char* argv[])
         // tmp profile
         move_fps.at_end();
 
-#if 0
-        // Follower coordinate arrows
-        {
-            constexpr float time_90 = 1.0f; // s
-            sm::mat<float, 4> fol_targ = mplot::compoundray::getCameraSpace (scene);
-            fol_targ.translate (sm::vec<float>{0, 0.4f, -0.5f}); // Always follow behind the camera
-            sm::mat<float, 4> cur_ = folca_ptr->getViewMatrix();
-            sm::mat<float, 4> fol_cur;
-            fol_cur.translate (cur_.translation());
-            cur_.translate (-cur_.translation());
-            sm::quaternion<float> r_cur0 = cur_.rotation();
-            sm::vec<float> pos_shift = antpov::get_cam_movement<float> (fol_cur, fol_targ, fvel, time_90,
-                                                                        static_cast<float>(waittime));
-            sm::mat<float, 4> fol_targ0 = fol_targ;
-            fol_targ0.translate (-fol_targ.translation());
-            sm::mat<float, 4> fol_cur0 = fol_cur;
-            fol_cur0.translate (-fol_cur.translation());
-            sm::quaternion<float> r_targ0 = fol_targ0.rotation();
-            r_targ0.renormalize();
-            r_cur0.renormalize();
-            cam_rotn = r_cur0.slerp (r_targ0, 0.05f);
-            // set the translation/rotation into fol_cur
-            fol_cur.pretranslate (pos_shift); // Aaaaaargh pretranslate, not translate!!!
-            fol_cur.rotate (cam_rotn);
-            folca_ptr->setViewMatrix (fol_cur);
-            folca_ptr->setHide (v.options.test (mplot::visual_options::viewFollowsVMBehind));
-        }
-#endif
         cray_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
