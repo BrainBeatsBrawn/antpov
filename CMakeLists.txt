@@ -532,6 +532,7 @@ set(ANTPOV_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/SphereVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/NormalsVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.h
+  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/Ommatidium.h
   ${MPLOT_INCLUDE_PATH}/mplot/compoundray/EyeVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/InstancedScatterVisual.h
 )

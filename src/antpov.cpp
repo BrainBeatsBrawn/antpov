@@ -39,23 +39,13 @@ extern MulticamScene* scene;
 
 namespace antpov
 {
-    // Flags class, app specific options
-    enum class options : std::uint8_t
-    {
-        hidehead          // If true, hide the 3D head/eye view in the Eye-only window
-    };
     // Parse cmd line to find the path and set app specific options. Return hoverheight
-    std::string parse_inputs (int argc, char* argv[], sm::flags<antpov::options>& opts)
+    std::string parse_inputs (int argc, char* argv[])
     {
         std::string hovh = "";
         for (int i = 0; i < argc; i++) {
             std::string arg = std::string(argv[i]);
-            if (arg == "-H") {
-                i++;
-                hovh = std::string(argv[i]);
-            } else if (arg == "-i") {
-                opts |= antpov::options::hidehead; // no longer used?
-            }
+            if (arg == "-H") { hovh = std::string(argv[++i]); }
         }
         return hovh;
     }
@@ -94,6 +84,56 @@ namespace antpov
         return true;
     }
 
+    // Add a suitable 2D projection to show our ant eye in a flat fiew
+    void add_ant_eye_spherical_projection (craysim::visual<glver>& v, mplot::compoundray::EyeVisual<glver>* eyevm2)
+    {
+        // First eye of eye pair (one spherical projection)
+        std::uint32_t sz = 1024;
+        float ps_rad = 0.0001f;                  // projection sphere radius
+        sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
+
+        if (v.oces_reader.read_success == true) {
+            sz = v.oces_reader.position.size();
+            ps_rad = 0.0002f;
+            centre = { -0.00056, 0.00005, -0.00005 };
+        }
+
+        sm::mat<float, 4> twod_tr;                            // twod projection transformation
+        float twod_scale = 1.0f;                              // twod projection scaling
+        sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f };      // twod projection translation to move to centre
+        sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
+        sm::vec<> twod_shift = {0,0.0006,0};
+        float rotn = -sm::mathconst<float>::pi_over_8;
+        auto ptype = mplot::compoundray::EyeVisual<glver>::projection_type::mercator;
+        if (v.oces_reader.read_success == true) {
+            std::cout << "Read from oces file!!\n";
+            ptype = mplot::compoundray::EyeVisual<glver>::projection_type::equirectangular;
+            twod_tr.translate (twod_shift);
+        } else {
+            twod_tr.translate (twod_offset2);
+            twod_tr.scale (twod_scale);
+            twod_tr.rotate (sm::vec<>::uy(), rotn);
+            twod_tr.translate (twod_offset);
+        }
+
+        // Projection sphere rotation about x axis by 0.2 radians. Numbers determined using oces_viewer
+        sm::quaternion<float> psrotn (sm::vec<>::ux(), 0.2f);
+
+        eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, 0, sz/2);
+
+        // Second eye of the eye pair (another spherical projection)
+        if (v.oces_reader.read_success == true) {
+            if (v.oces_reader.mirrors.empty() == false) {
+                centre = (v.oces_reader.mirrors[0] * centre).less_one_dim();
+                sm::vec<> twod_shift_left = twod_shift;
+                twod_shift_left[0] *= -1.0f;
+                twod_tr.set_identity();
+                twod_tr.translate (twod_shift_left);
+                eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn.invert(), sz/2, sz);
+            }
+        }
+    }
+
 } // namespace antpov
 
 std::int32_t main (std::int32_t argc, char* argv[])
@@ -103,19 +143,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // craysim-common options parsing
     sm::flags<craysim::options> opts;
     auto[path, csv_path, h5_path] = craysim::parse_inputs (argc, argv, opts);
-    // app-specific options parsing
-    sm::flags<antpov::options> aopts;
-    std::string hovh = antpov::parse_inputs (argc, argv, aopts);
+    std::string hovh = antpov::parse_inputs (argc, argv);
 
     // Perhaps we printed options help and can now exit
     if (opts.test (craysim::options::can_exit)) { return 1; }
 
-    // Required in every craysim, I think. craysim::state? member of craysim::visual?
-    std::vector<std::array<float, 3>> ommatidiaData;
-    std::vector<Ommatidium>* ommatidia = nullptr;
-
-    // Create a mathplot window to render the eye/sensor. This loads in the modesl from gltf file at path
-    craysim::visual<glver> v (2000, 2000, "Scene (mathplot graphics)", path, opts);
+    // Create a craysim main window to render the eye/sensor. This loads in the models from gltf file at path
+    craysim::visual<glver> v (2000, 2000, "Compound-ray sim", path, opts);
 
     // We get the initial camera localspace. This also serves to reset the camera pose. This is set
     // in the GLTF file and note that it may be a LEFT HANDED coordinate system!
@@ -133,85 +167,26 @@ std::int32_t main (std::int32_t argc, char* argv[])
     vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
-    // Create an EyeVisual 'eye' in our mathplot scene, v.
+    // Create an EyeVisual 'eye' in our main scene, v. Surely this goes in craysim::visual?
     mplot::compoundray::EyeVisual<glver>* ep0 = nullptr;
-    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
-                                                                         reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                         v.oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&v.oces_reader.head_mesh) : nullptr);
+    auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), v.get_head_mesh());
     eyevm->set_parent (v.get_id());
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
     eyevm->finalize();
     ep0 = v.addVisualModel (eyevm);
 
-    // We follow the eyevisual as it moves by default. More setup for craysim::visual?
-    v.options.set (mplot::visual_options::viewFollowsVMTranslations);
-
+    // The ep0 eye is the followed VM.
     v.setFollowedVM (ep0);
 
-    // A second eye goes in the 'eye only' window
-    auto ptype = mplot::compoundray::EyeVisual<glver>::projection_type::mercator;
-    mplot::compoundray::EyeVisual<glver>* ep1 = nullptr;
-    mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
-
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
-                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                          v.oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&v.oces_reader.head_mesh) : nullptr);
+    // Ant body window
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), v.get_head_mesh());
     eyevm1->set_parent (vant.get_id());
-
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
-                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia), nullptr);
-    eyevm2->set_parent (veye.get_id());
-    eyevm2->name = "Big Eye";
-    // First eye of eye pair (one spherical projection)
-    std::uint32_t sz = 1024;
-    float ps_rad = 0.0001f;                  // projection sphere radius
-    sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
-
-    if (v.oces_reader.read_success == true) {
-        sz = v.oces_reader.position.size();
-        ps_rad = 0.0002f;
-        centre = { -0.00056, 0.00005, -0.00005 };
-    }
-
-    sm::mat<float, 4> twod_tr;                            // twod projection transformation
-    float twod_scale = 1.0f;                              // twod projection scaling
-    sm::vec<> twod_offset = { 0.0001f, 0.0f, 0.0f };      // twod projection translation to move to centre
-    sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
-    sm::vec<> twod_shift = {0,0.0006,0};
-    float rotn = -sm::mathconst<float>::pi_over_8;
-    if (v.oces_reader.read_success == true) {
-        std::cout << "Read from oces file!!\n";
-        ptype = mplot::compoundray::EyeVisual<glver>::projection_type::equirectangular;
-        twod_tr.translate (twod_shift);
-    } else {
-        twod_tr.translate (twod_offset2);
-        twod_tr.scale (twod_scale);
-        twod_tr.rotate (sm::vec<>::uy(), rotn);
-        twod_tr.translate (twod_offset);
-    }
-
-    // Projection sphere rotation about x axis by 0.2 radians. Numbers determined using oces_viewer
-    sm::quaternion<float> psrotn (sm::vec<>::ux(), 0.2f);
-
-    eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, 0, sz/2);
-
-    // Second of eye pair (another spherical projection)
-    if (v.oces_reader.read_success == true) {
-        if (v.oces_reader.mirrors.empty() == false) {
-            centre = (v.oces_reader.mirrors[0] * centre).less_one_dim();
-            sm::vec<> twod_shift_left = twod_shift;
-            twod_shift_left[0] *= -1.0f;
-            twod_tr.set_identity();
-            twod_tr.translate (twod_shift_left);
-            eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn.invert(), sz/2, sz);
-        }
-    }
-
+    eyevm1->name = "Ant Eyes";
     // Visualization options ant body
     eyevm1->show_3d = true;
     eyevm1->finalize();
-    ep1 = vant.addVisualModel (eyevm1);
+    mplot::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
     // Scale this model up, so it's not tiny like the one in the scene
     ep1->scaleViewMatrix (1000);
     // The ant body itself
@@ -222,17 +197,21 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->name = "ant";
     ant_ptr1->scaleViewMatrix (1000);
 
-    // Visualization options - 2D one
+    // 2D eye representation
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), nullptr);
+    eyevm2->set_parent (veye.get_id());
+    eyevm2->name = "2D Ant Eyes";
+    antpov::add_ant_eye_spherical_projection (v, eyevm2.get());
     eyevm2->show_3d = false;
     eyevm2->twodimensional (true);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
-    auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
-    sm::mat<float, 4> mflip;
-    mflip.rotate (flip);
+    //auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
+    sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
+    //mflip.rotate (flip);
     eyevm2->setViewMatrix (mflip);
     eyevm2->finalize();
-    ep2 = veye.addVisualModel (eyevm2);
+    mplot::compoundray::EyeVisual<glver>* ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
 
     // The ant body
@@ -398,23 +377,22 @@ std::int32_t main (std::int32_t argc, char* argv[])
     std::uint32_t tm1_ti0 = 0u;
 
     std::uint32_t render_counter = 0u;
-    auto subr_detect_camera_changes = [&ommatidia, &ommatidiaData,
-                                       &last_eye_size, &ep0, &ep1, &ep2, &render_counter] ()
+    auto subr_detect_camera_changes = [&v, &last_eye_size, &ep0, &ep1, &ep2, &render_counter] ()
     {
         std::size_t curr_eye_size = last_eye_size;
         // Detect changes in the camera and update eye model as necessary
-        if (ommatidiaData.size() == 0) {
-            if (isCompoundEyeActive()) { getCameraData (ommatidiaData); }
+        if (v.ommatidiaData.size() == 0) {
+            if (isCompoundEyeActive()) { getCameraData (v.ommatidiaData); }
         } // else no need to re-get data
 
         // Update eyevm model (or just update colours)
-        ep0->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
-        ep1->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
-        ep2->ommatidia = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
+        ep0->ommatidia = v.get_ommatidia_ptr();
+        ep1->ommatidia = v.get_ommatidia_ptr();
+        ep2->ommatidia = v.get_ommatidia_ptr();
 
         static constexpr std::uint32_t render_every = 1u; // set to 1 for max update, 60 to reduce compute
-        if (ommatidia != nullptr) {
-            curr_eye_size = ommatidia->size();
+        if (v.ommatidia != nullptr) {
+            curr_eye_size = v.ommatidia->size();
             if (curr_eye_size != last_eye_size) {
                 if (render_counter % render_every == 0u) { ep0->reinit(); }
                 ep1->reinit();
@@ -794,15 +772,15 @@ std::int32_t main (std::int32_t argc, char* argv[])
         renderFrame();
         // Access data so that a brain model could be fed
         if (isCompoundEyeActive()) {
-            getCameraData (ommatidiaData);
-            ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
+            getCameraData (v.ommatidiaData);
+            v.ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
 
             // if csv mode, then save the data
             if (opts.test (craysim::options::path_from_csv) && opts.test (craysim::options::save_hdf5)) {
                 std::cout << "Saving frame...\n";
                 std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
                 try {
-                    record.add_contained_vals (ommframe.c_str(), ommatidiaData);
+                    record.add_contained_vals (ommframe.c_str(), v.ommatidiaData);
                 } catch (const std::exception& e) {
                     // Probably didn't move this time.
                 }
@@ -820,7 +798,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     if (opts.test (craysim::options::path_from_csv)) {
         // convert std::vector<Ommatidium>* ommatidia into vvecs that can be h5 saved
-        auto ommat = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
+        auto ommat = v.get_ommatidia_ptr();
         sm::vvec<sm::vec<float, 3>> o_pos;
         sm::vvec<sm::vec<float, 3>> o_dir;
         sm::vvec<float> o_aa;

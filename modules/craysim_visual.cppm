@@ -3,6 +3,8 @@ module;
 #include <string>
 #include <iostream>
 #include <cstdint>
+#include <vector>
+#include <array>
 
 #include <sampleConfig.h>
 #include <MulticamScene.h>
@@ -21,6 +23,7 @@ import sm.quaternion;
 
 import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
+import mplot.compoundray.ommatidium; // The mplot::Ommatidium structure
 
 export import mplot.gl.version;
 export import mplot.visual;
@@ -190,6 +193,9 @@ export namespace craysim
                 this->setSceneRotation (def_q);
             }
 
+            // We follow the agent as it moves by default.
+            this->options.set (mplot::visual_options::viewFollowsVMTranslations);
+
             this->load (gltfpath, opts);
 
             // Use a FPS profiling with a text object on screen
@@ -268,20 +274,32 @@ export namespace craysim
             this->fps_label->setupText (this->fps_profiler.fps_txt + std::string(" "));
         }
 
+        std::vector<mplot::compoundray::Ommatidium>* get_ommatidia_ptr()
+        {
+            return reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
+        }
+
+        mplot::meshgroup* get_head_mesh()
+        {
+            return this->oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&this->oces_reader.head_mesh) : nullptr;
+        }
+
         // A member fps_profiler
         mplot::fps::profiler fps_profiler;
-
         // The FPS label, accessible to client code
         mplot::VisualTextModel<glver>* fps_label;
-
         // Base path for glTF file
         std::string basepath = {};
         // Full path for glTF file
         std::string path = {};
         // The eye file path, obtained from OCES file
         std::string efpath = {};
-        // Open Compound Eye Standard reader
+        // Open Compound Eye Standard reader used to access an agent head mesh (compound-ray reads the ommatidia info)
         oces::reader oces_reader;
+
+        // Required in every craysim, I think. craysim::state? member of craysim::visual?
+        std::vector<std::array<float, 3>> ommatidiaData;
+        std::vector<Ommatidium>* ommatidia = nullptr;
 
         // Movement state (class and bitset) (flags?)
         enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };
