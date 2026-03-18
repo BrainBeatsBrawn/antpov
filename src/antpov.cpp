@@ -206,9 +206,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->twodimensional (true);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
-    //auto flip = sm::quaternion<float>{0, 0, 1, 0}; // In 2D, flip the model
     sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
-    //mflip.rotate (flip);
     eyevm2->setViewMatrix (mflip);
     eyevm2->finalize();
     mplot::compoundray::EyeVisual<glver>* ep2 = veye.addVisualModel (eyevm2);
