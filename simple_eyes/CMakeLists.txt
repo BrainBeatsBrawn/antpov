@@ -1,14 +1,6 @@
 include_directories (BEFORE "${PROJECT_SOURCE_DIR}/mathplot")
 
-# include <mplot/ScatterVisual.h>
-# include <mplot/QuiverVisual.h>
-# include <mplot/HexGridVisual.h>
-# include <mplot/LengthscaleVisual.h>
-# include "DoubleHexGridVisual.h"
-# include "AntBodyVisual.h"
-
 set(ANTEYES_VM_MODULES
-
   ${MPLOT_INCLUDE_PATH}/maths/sm/binomial
   ${MPLOT_INCLUDE_PATH}/maths/sm/nm_simplex
   ${MPLOT_INCLUDE_PATH}/maths/sm/bezcoord
@@ -18,17 +10,18 @@ set(ANTEYES_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid
   ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid_hdf
 
-  ${PROJECT_SOURCE_DIR}/modules/craysim_visual.cppm
   ${PROJECT_SOURCE_DIR}/modules/craysim_antbody.cppm
   ${PROJECT_SOURCE_DIR}/modules/craysim_doublehexgrid.cppm
 
+  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.h
+  ${MPLOT_INCLUDE_PATH}/mplot/VerticesVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/QuiverVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/HexGridVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/LengthscaleVisual.h
 )
 
-# Each C++ module file has to be listed here (as they don't have a .cppm or .ixx file suffix)
+# Each C++ module file has to be listed here (in case they don't have a .cppm or .ixx file suffix)
 set_source_files_properties (
   ${MY_MODULES}
   ${OCES_MODULES}

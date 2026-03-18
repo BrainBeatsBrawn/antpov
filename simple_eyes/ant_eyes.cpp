@@ -32,7 +32,6 @@ import mplot.quivervisual;
 import mplot.hexgridvisual;
 import mplot.lengthscalevisual;
 
-import craysim.visual;
 import craysim.antbody;
 import craysim.doublehexgridvisual;
 

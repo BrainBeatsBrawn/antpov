@@ -4,7 +4,12 @@ module;
 #include <iostream>
 #include <cstdint>
 
+#include <sampleConfig.h>
+#include <MulticamScene.h>
 #include <libEyeRenderer.h> // getCurrentEyeSamplesPerOmmatidium
+
+// scene exists at global scope in libEyeRenderer.so
+extern MulticamScene* scene;
 
 #include <mplot/keys.h>
 
@@ -12,10 +17,15 @@ export module craysim.visual;
 
 import sm.mathconst;
 import sm.vvec;
+import sm.quaternion;
 
 import mplot.tools;
+import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
+
 export import mplot.gl.version;
 export import mplot.visual;
+export import mplot.fps.profiler;
+export import oces.reader;
 
 // Reproduce controller functions for the mplot window for ease of use
 export namespace craysim
@@ -38,6 +48,7 @@ export namespace craysim
         debug_mv,         // Open a debug h5 file and run compute_mesh_movement once for debug of NavMesh
         can_exit          // If set, program can exit now
     };
+
     // Parse cmd line to find the path and set options. Return filepath of main scene gltf file and any csv path
     std::tuple<std::string, std::string, std::string> parse_inputs (std::int32_t argc, char* argv[], sm::flags<craysim::options>& opts)
     {
@@ -125,8 +136,8 @@ export namespace craysim
         return best_n;
     }
 
-    // Read a simple csv with 2D coordinates. Should also read flags.
-    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags)
+    // Read a simple csv with 2D coordinates, using first two entries on each line
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions)
     {
         std::ifstream f (path.c_str(), std::ios::in);
         if (f.is_open() == false) { return false; }
@@ -134,18 +145,9 @@ export namespace craysim
         std::vector<std::string> tokens;
         while (std::getline (f, line)) {
             sm::vec<float, 2> twodpos;
-            // Tokenize line into the coordinates and the flags
+            // Tokenize line into the coordinates
             twodpos.set_from_str (line, ",");
             positions.push_back (twodpos);
-            // Get flags from third entry
-            tokens.clear();
-            tokens = mplot::tools::stringToVector (line, ",");
-            if (tokens.size() > 2) {
-                std::uint32_t fl = std::stoi (tokens[2]);
-                antflags.push_back (fl);
-            } else {
-                antflags.push_back (0u);
-            }
         }
         return true;
     }
@@ -155,10 +157,15 @@ export namespace craysim
     {
         using mc = sm::mathconst<float>;
 
-        // Boilerplate constructor (just copy this):
-        visual (int width, int height, const std::string& title, const bool blender_axes)
+        // When the program starts, how many samples per ommatidium/element do you want?
+        static constexpr std::int32_t samples_per_omm_default = 64;
+
+        visual (int width, int height, const std::string& title, const std::string& gltfpath, sm::flags<craysim::options>& opts)
             : mplot::Visual<glver> (width, height, title)
         {
+            // Boilerplate memory alloc for compound-ray and turn off verbose logging.
+            multicamAlloc(); setVerbosity (false);
+
             this->speed = 0.5f; // 0.5 m/s max speed for our agent
             this->angularSpeed = 2.0f * mc::two_pi / 360.0f;
             this->lightingEffects (true);
@@ -168,17 +175,113 @@ export namespace craysim
             this->rotateAboutNearest (true);
             // Rotate about a scene vertical axis? true for landscapes, false for cubes/objects (Ctrl-k changes I think, at runtime)
             this->rotateAboutVertical (true);
-
+            // A blue sky background colour by default (client code can change this)
+            this->bgcolour = { 0.298f, 0.412f,  0.576f };
             // State defaults
             //this->vstate |= state::show_camframe;
-
-            if (blender_axes) {
+            if (opts.test(craysim::options::blender_axes)) {
                 this->switch_scene_vertical_axis(); // to uz up
                 this->updateCoordLabels ("X", "Y", "Z(up)");
             } else {
                 this->updateCoordLabels ("X", "Y(up)", "Z");
+                // We start rotated into a drone view initial orientation for taking pictures of the world.
+                // Into craysim::visual (with the blender_axes==true equivalent)...
+                sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
+                this->setSceneRotation (def_q);
+            }
+
+            this->load (gltfpath, opts);
+
+            // Use a FPS profiling with a text object on screen
+            this->addLabel ("0 FPS", {0.63f, -0.43f, 0.0f}, this->fps_label);
+
+            this->setup_camera();
+
+            this->setup_oces();
+        }
+
+        ~visual()
+        {
+            stop(); // stop compound-ray from running
+            multicamDealloc(); // De-allocate compound-ray memory
+        }
+
+        void setup_camera()
+        {
+            // We get the eye data path from the glTF file
+            std::int32_t ncam = static_cast<std::int32_t>(getCameraCount());
+            std::int32_t num_compound_cameras = 0;
+            std::int32_t my_compound_camera = -1;
+            for (std::int32_t ci = 0; ci < ncam; ++ci) {
+                gotoCamera (ci);
+                this->efpath = getEyeDataPath();
+                if (!this->efpath.empty()) {
+                    ++num_compound_cameras;
+                    my_compound_camera = ci;
+                }
+            }
+            if (num_compound_cameras > 1) {
+                throw std::runtime_error ("This program works for only one compound eye camera in your gltf.");
+            }
+            // Now switch to our compound ray camera and set the samples per ommatidium/element
+            if (my_compound_camera != -1) {
+                gotoCamera (my_compound_camera);
+                std::int32_t csamp = getCurrentEyeSamplesPerOmmatidium();
+                std::cout << "Current eye samples per ommatidium is " << csamp << std::endl;
+                if (csamp < 32000) { changeCurrentEyeSamplesPerOmmatidiumBy (samples_per_omm_default - csamp); }
             }
         }
+
+        void setup_oces()
+        {
+            // Use oces_reader to read in our eye data, esp. for the head
+            std::string oces_path = this->efpath;
+            mplot::tools::stripFileSuffix (oces_path);
+            oces_path += ".gltf";
+            // Now try to open oces_path
+            std::cout << "Attempt to load OCES file " << oces_path << "\n";
+            this->oces_reader.read (oces_path);
+            if (oces_reader.read_success == false) {
+                std::cout << "No associated OCES file for a head\n";
+            } else {
+                // Read the head and make a VisualModel
+                oces_reader.head_mesh.single_colour = {0.345f, 0.122f, 0.082f};
+            }
+        }
+
+        void load (const std::string& gltfpath, sm::flags<craysim::options>& opts)
+        {
+            // Load the file
+            this->path = gltfpath;
+            this->basepath = this->path;
+            std::cout << "Loading glTF file \"" << this->path << "\"..." << std::endl;
+            mplot::tools::stripUnixFile (this->basepath);
+            std::cout << "glTF dir: " << this->basepath << std::endl;
+            loadGlTFscene (this->path.c_str(), (opts.test(craysim::options::blender_axes)
+                                                ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
+            // Get the visual models from the scene
+            mplot::compoundray::scene_to_visualmodels<glver> (scene, this, false); // true for 'make_navmeshes'
+        }
+
+        void fps_label_update()
+        {
+            this->fps_label->setupText (this->fps_profiler.fps_txt + std::string(" "));
+        }
+
+        // A member fps_profiler
+        mplot::fps::profiler fps_profiler;
+
+        // The FPS label, accessible to client code
+        mplot::VisualTextModel<glver>* fps_label;
+
+        // Base path for glTF file
+        std::string basepath = {};
+        // Full path for glTF file
+        std::string path = {};
+        // The eye file path, obtained from OCES file
+        std::string efpath = {};
+        // Open Compound Eye Standard reader
+        oces::reader oces_reader;
 
         // Movement state (class and bitset) (flags?)
         enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };

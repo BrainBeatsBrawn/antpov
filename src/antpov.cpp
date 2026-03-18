@@ -17,7 +17,6 @@ import sm.hdfdata;
 import sm.random;
 
 import mplot.gl.version;
-import mplot.fps.profiler;
 import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.eyevisual;
@@ -32,16 +31,11 @@ import craysim.visual;
 import craysim.antbody;
 import craysim.random_walk;
 
-import oces.reader;
-
 // OpenGL 4.3 for Instanced VisualModels
 constexpr int32_t glver = mplot::gl::version_4_3;
 
 // scene exists at global scope in libEyeRenderer.so
 extern MulticamScene* scene;
-
-// When the program starts, how many samples per ommatidium/element do you want?
-constexpr std::int32_t samples_per_omm_default = 64;
 
 namespace antpov
 {
@@ -75,12 +69,35 @@ namespace antpov
         visibility
     };
 
+    // Read a simple csv with 2D coordinates. Should also read flags. Ah - this is ant specific
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags)
+    {
+        std::ifstream f (path.c_str(), std::ios::in);
+        if (f.is_open() == false) { return false; }
+        std::string line;
+        std::vector<std::string> tokens;
+        while (std::getline (f, line)) {
+            sm::vec<float, 2> twodpos;
+            // Tokenize line into the coordinates and the flags
+            twodpos.set_from_str (line, ",");
+            positions.push_back (twodpos);
+            // Get flags from third entry
+            tokens.clear();
+            tokens = mplot::tools::stringToVector (line, ",");
+            if (tokens.size() > 2) {
+                std::uint32_t fl = std::stoi (tokens[2]);
+                antflags.push_back (fl);
+            } else {
+                antflags.push_back (0u);
+            }
+        }
+        return true;
+    }
+
 } // namespace antpov
 
 std::int32_t main (std::int32_t argc, char* argv[])
 {
-    using mc = sm::mathconst<float>;
-
     double waittime = 0.0167; // for debug, so I can make playback slow in a simple way
 
     // craysim-common options parsing
@@ -93,29 +110,18 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Perhaps we printed options help and can now exit
     if (opts.test (craysim::options::can_exit)) { return 1; }
 
-    // Boilerplate memory alloc for compound-ray
-    multicamAlloc();
-
+    // Required in every craysim, I think. craysim::state? member of craysim::visual?
     std::vector<std::array<float, 3>> ommatidiaData;
     std::vector<Ommatidium>* ommatidia = nullptr;
 
-    // Turn off verbose logging
-    setVerbosity (false);
-    // Load the file
-    std::cout << "Loading glTF file \"" << path << "\"..." << std::endl;
-    std::string basepath = path;
-    mplot::tools::stripUnixFile (basepath);
-    std::cout << "glTF dir: " << basepath << std::endl;
-    loadGlTFscene (path.c_str(), (opts.test(craysim::options::blender_axes)
-                                  ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
+    // Create a mathplot window to render the eye/sensor. This loads in the modesl from gltf file at path
+    craysim::visual<glver> v (2000, 2000, "Scene (mathplot graphics)", path, opts);
 
-    // Create a mathplot window to render the eye/sensor
-    craysim::visual<glver> v (2000, 2000, "Scene (mathplot graphics)", opts.test(craysim::options::blender_axes));
-
-    // We start rotated into a drone view initial orientation for taking pictures of the world
-    sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
-    v.setSceneRotation (def_q);
-    v.bgcolour = {static_cast<float>(0x4c)/0xff, static_cast<float>(0x69)/0xff, static_cast<float>(0x93)/0xff, 1.0f};
+    // We get the initial camera localspace. This also serves to reset the camera pose. This is set
+    // in the GLTF file and note that it may be a LEFT HANDED coordinate system!
+    sm::mat<float, 4> ics = mplot::compoundray::getCameraSpace (scene);
+    sm::mat<float, 4> initial_camera_space;
+    initial_camera_space.translate (ics.translation()); // Right handed
 
     // A window for the 2D eye view projection
     mplot::Visual<glver> veye (920, 512, "Eye view");
@@ -127,73 +133,19 @@ std::int32_t main (std::int32_t argc, char* argv[])
     vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
-    // Use a FPS profiling with a text object on screen
-    mplot::fps::profiler fps_profiler;
-    mplot::VisualTextModel<glver>* fps_label;
-    v.addLabel ("0 FPS", {0.63f, -0.43f, 0.0f}, fps_label);
-
-    // We get the eye data path from the glTF file
-    std::string efpath("");
-    std::int32_t ncam = static_cast<std::int32_t>(getCameraCount());
-    std::int32_t num_compound_cameras = 0;
-    std::int32_t my_compound_camera = -1;
-    for (std::int32_t ci = 0; ci < ncam; ++ci) {
-        gotoCamera (ci);
-        efpath = getEyeDataPath();
-        if (!efpath.empty()) {
-            ++num_compound_cameras;
-            my_compound_camera = ci;
-        }
-    }
-    if (num_compound_cameras > 1) {
-        throw std::runtime_error ("This program works for only one compound eye camera in your gltf.");
-    }
-    // Now switch to our compound ray camera and set the samples per ommatidium/element
-    if (my_compound_camera != -1) {
-        gotoCamera (my_compound_camera);
-        std::int32_t csamp = getCurrentEyeSamplesPerOmmatidium();
-        std::cout << "Current eye samples per ommatidium is " << csamp << std::endl;
-        if (csamp < 32000) { changeCurrentEyeSamplesPerOmmatidiumBy (samples_per_omm_default - csamp); }
-    }
-
-    // We get the initial camera localspace. This also serves to reset the camera pose. This is set
-    // in the GLTF file and note that it may be a LEFT HANDED coordinate system!
-    sm::mat<float, 4> ics = mplot::compoundray::getCameraSpace (scene);
-    sm::mat<float, 4> initial_camera_space;
-    initial_camera_space.translate (ics.translation()); // Right handed
-
-    // Get the visual models from the scene
-    mplot::compoundray::scene_to_visualmodels<glver> (scene, &v, false); // true for 'make_navmeshes'
-
-    // Use oces_reader to read in our eye data, esp. for the head
-    std::string oces_path = efpath;
-    mplot::tools::stripFileSuffix (oces_path);
-    oces_path += ".gltf";
-    // Now try to open oces_path
-    std::cout << "Attempt to load OCES file " << oces_path << "\n";
-    oces::reader oces_reader (oces_path);
-    if (oces_reader.read_success == false) {
-        std::cout << "No associated OCES file for a head\n";
-    } else {
-        // Read the head and make a VisualModel
-        oces_reader.head_mesh.single_colour = {0.345f, 0.122f, 0.082f};
-    }
-
     // Create an EyeVisual 'eye' in our mathplot scene, v.
     mplot::compoundray::EyeVisual<glver>* ep0 = nullptr;
     auto eyevm = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                          reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                         oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+                                                                         v.oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&v.oces_reader.head_mesh) : nullptr);
     eyevm->set_parent (v.get_id());
     eyevm->setViewMatrix (initial_camera_space);
     eyevm->name = "EyeVisual";
     eyevm->finalize();
     ep0 = v.addVisualModel (eyevm);
 
-    // We follow the eyevisual as it moves by default
+    // We follow the eyevisual as it moves by default. More setup for craysim::visual?
     v.options.set (mplot::visual_options::viewFollowsVMTranslations);
-    // or in a future version:
-    // v.options.set (mplot::visual_options::viewFollowsVMBehind);
 
     v.setFollowedVM (ep0);
 
@@ -204,7 +156,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
                                                                           reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia),
-                                                                          oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&oces_reader.head_mesh) : nullptr);
+                                                                          v.oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&v.oces_reader.head_mesh) : nullptr);
     eyevm1->set_parent (vant.get_id());
 
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &ommatidiaData,
@@ -216,8 +168,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
     float ps_rad = 0.0001f;                  // projection sphere radius
     sm::vec<> centre = { -0.00002f, 0, 0 };  // projection sphere centre
 
-    if (oces_reader.read_success == true) {
-        sz = oces_reader.position.size();
+    if (v.oces_reader.read_success == true) {
+        sz = v.oces_reader.position.size();
         ps_rad = 0.0002f;
         centre = { -0.00056, 0.00005, -0.00005 };
     }
@@ -228,7 +180,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     sm::vec<> twod_offset2 = { -0.0004f, 0.0007f, 0.0f }; // post scale/rotate translation
     sm::vec<> twod_shift = {0,0.0006,0};
     float rotn = -sm::mathconst<float>::pi_over_8;
-    if (oces_reader.read_success == true) {
+    if (v.oces_reader.read_success == true) {
         std::cout << "Read from oces file!!\n";
         ptype = mplot::compoundray::EyeVisual<glver>::projection_type::equirectangular;
         twod_tr.translate (twod_shift);
@@ -245,9 +197,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->add_spherical_projection (ptype, twod_tr, centre, ps_rad, psrotn, 0, sz/2);
 
     // Second of eye pair (another spherical projection)
-    if (oces_reader.read_success == true) {
-        if (oces_reader.mirrors.empty() == false) {
-            centre = (oces_reader.mirrors[0] * centre).less_one_dim();
+    if (v.oces_reader.read_success == true) {
+        if (v.oces_reader.mirrors.empty() == false) {
+            centre = (v.oces_reader.mirrors[0] * centre).less_one_dim();
             sm::vec<> twod_shift_left = twod_shift;
             twod_shift_left[0] *= -1.0f;
             twod_tr.set_identity();
@@ -325,7 +277,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         while ((vmp = v.get_next_vm_accessor()) != nullptr) {
             if (vmp->name == "Landscape.003" || vmp->name == "ground_inner_high_res") {
                 land = vmp;
-                land->make_navmesh (basepath);
+                land->make_navmesh (v.basepath);
                 // normals for debug
                 auto nrm = std::make_unique<mplot::NormalsVisual<glver>> (land);
                 nrm->set_parent (v.get_id());
@@ -353,7 +305,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     if (opts.test (craysim::options::path_from_csv)) {
         //waittime = 0.25; // make it slow
-        if (craysim::read_csv (csv_path, csv_positions, csv_antflags) == false) {
+        if (antpov::read_csv (csv_path, csv_positions, csv_antflags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else {
             std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
@@ -799,39 +751,22 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.render();
     vant.render();
     veye.render();
-    std::string m_count_str = {};
-
-    mplot::fps::profiler move_fps;
-    mplot::fps::profiler mplot_fps;
-    mplot::fps::profiler cray_fps;
-    mplot::fps::profiler detect_fps;
 
     sm::hdfdata record (h5_path, std::ios::out | std::ios::trunc);
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
-        fps_profiler.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        v.fps_profiler.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
 
-        detect_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // The current camera may have changed, this subroutine deals with any changes
         subr_detect_camera_changes();
-        detect_fps.at_end();
 
-        mplot_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Now render the mathplot window
         v.render();
         // Change label after render (it needs v's context, not veye's)
         if (move_counter % 100 == 0) {
             //v.render();
-            m_count_str = std::to_string (move_counter);
-            fps_label->setupText (fps_profiler.fps_txt + std::string(" ") + m_count_str);
-#if 0
-            std::cout << "mplot FPS: " << mplot_fps.fps_txt << std::endl;
-            std::cout << "cray FPS: " << cray_fps.fps_txt << std::endl;
-            std::cout << "move FPS: " << move_fps.fps_txt << std::endl;
-            std::cout << "detect FPS: " << detect_fps.fps_txt << std::endl;
-            std::cout << "Overall FPS: " << fps_profiler.fps_txt << std::endl;
-#endif
+            v.fps_label_update();
             //vant.render();
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
@@ -842,23 +777,19 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // Deal with any movements commanded by key press events (including reset)
 
         v.setContext(); // right now key move over land needs v's context
-        mplot_fps.at_end();
 
         // tmp profile
-        move_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         if (v.vstate.test (craysim::visual<glver>::state::paused) == false) {
             if (v.vstate.test (craysim::visual<glver>::state::walk)) {
-                subr_walk_over_land (fps_profiler.fps_mean);
+                subr_walk_over_land (v.fps_profiler.fps_mean);
             } else if (opts.test (craysim::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
-                subr_csv_playback (fps_profiler.fps_mean, last_ti);
+                subr_csv_playback (v.fps_profiler.fps_mean, last_ti);
             } else {
-                subr_key_move_over_land (fps_profiler.fps_mean);
+                subr_key_move_over_land (v.fps_profiler.fps_mean);
             }
         }
         // tmp profile
-        move_fps.at_end();
 
-        cray_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed
@@ -877,7 +808,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
                 }
             }
         }
-        cray_fps.at_end();
 
         // Scale size of breadcrumbs based on distance
         float iscl = 2.0f * std::log (1.0f + v.get_d_to_rotation_centre());
@@ -885,7 +815,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         isvp->set_instance_scale (iscl);
 
         // Mark that we got to the end of the loop
-        fps_profiler.at_end();
+        v.fps_profiler.at_end();
     }
 
     if (opts.test (craysim::options::path_from_csv)) {
@@ -910,9 +840,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
         std::cout << "FO\n";
         record.add_contained_vals ("/ommatidia/focalPointOffset", o_fo);
     }
-
-    stop(); // stop compound-ray from running
-    multicamDealloc(); // De-allocate compound-ray memory
 
     return 0;
 }
