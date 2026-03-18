@@ -5,13 +5,13 @@ module;
 #include <iostream>
 #include <cmath>
 
-export module antpov.doublehexgridvisual;
+export module craysim.doublehexgridvisual;
 
 export import sm.vec;
 export import sm.hexgrid;
 export import mplot.hexgridvisual;
 
-export namespace mplot
+export namespace craysim
 {
     //! Display a grid that has two sections, each of which uses a single hexgrid, but has separate coordinates.
     template <class T, int glver = mplot::gl::version_4_1>
@@ -111,12 +111,12 @@ export namespace mplot
             }
 
             switch (this->hexVisMode) {
-            case HexVisMode::Triangles:
+            case mplot::HexVisMode::Triangles:
             {
                 this->initializeVerticesTris();
                 break;
             }
-            case HexVisMode::HexInterp:
+            case mplot::HexVisMode::HexInterp:
             default:
             {
                 this->initializeVerticesHexesInterpolated();

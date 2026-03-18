@@ -32,8 +32,9 @@ import mplot.quivervisual;
 import mplot.hexgridvisual;
 import mplot.lengthscalevisual;
 
-import antpov.doublehexgridvisual;
-import antbodyvisual;
+import craysim.visual;
+import craysim.antbody;
+import craysim.doublehexgridvisual;
 
 enum class spherical_projection
 {
@@ -90,7 +91,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     // Add a DoubleHexGridVisual view of the eye pair (only works for two_eyes == true)
     if constexpr (two_eyes == true) {
         sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
-        auto hgv = std::make_unique<mplot::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
+        auto hgv = std::make_unique<craysim::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
         hgv->set_parent (v.get_id());
         hgv->setDataCoords (&eye_coords); // pass combined coords
         hgv->setScalarData (&datatwice);          // pass combined data
@@ -199,7 +200,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     v.addVisualModel (lsv);
 
     if constexpr (show_antoinette) {
-        auto av = std::make_unique<biosim::AntBodyVisual<>>();
+        auto av = std::make_unique<craysim::AntBodyVisual<>>();
         av->set_parent (v.get_id());
         av->finalize();
         auto avp = v.addVisualModel (av);

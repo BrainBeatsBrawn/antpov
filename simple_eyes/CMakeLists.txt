@@ -18,8 +18,9 @@ set(ANTEYES_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid
   ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid_hdf
 
-  ${PROJECT_SOURCE_DIR}/include/AntBodyVisual.h
-  ${PROJECT_SOURCE_DIR}/include/DoubleHexGridVisual.h
+  ${PROJECT_SOURCE_DIR}/modules/craysim_visual.cppm
+  ${PROJECT_SOURCE_DIR}/modules/craysim_antbody.cppm
+  ${PROJECT_SOURCE_DIR}/modules/craysim_doublehexgrid.cppm
 
   ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.h
   ${MPLOT_INCLUDE_PATH}/mplot/QuiverVisual.h
@@ -48,4 +49,4 @@ add_library(mplot_fontdata2 STATIC ${MPLOT_INCLUDE_PATH}/mplot/VisualFaceAsm.cpp
 add_executable (ant_eyes ant_eyes.cpp)
 set(ANTEYES_MODULES ${MATHS_CORE_MODULES} ${MATHS_MATHPLOT_MODULES} ${MATHPLOT_CORE_MODULES} ${ANTEYES_VM_MODULES})
 target_sources(ant_eyes PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR} FILES ${ANTEYES_MODULES})
-target_link_libraries(ant_eyes ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glfw glad2 mplot_fontdata2)
+target_link_libraries(ant_eyes ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glfw glad2 mplot_fontdata2)

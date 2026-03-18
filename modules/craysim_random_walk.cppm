@@ -1,10 +1,13 @@
+/*
+ * Licence: GPL v2
+ */
 module;
 
 #include <cstdint>
 #include <memory>
 #include <cmath>
 
-export module craysim.random_outbound;
+export module craysim.random_walk;
 
 import tk.spline;
 import sm.mathconst;
@@ -17,16 +20,16 @@ export namespace craysim
 {
     // Make a randomized path to follow
     template <typename T>
-    struct random_outbound
+    struct random_walk
     {
-        random_outbound (const std::uint32_t _n_steps, const std::uint32_t _a_tau)
+        random_walk (const std::uint32_t _n_steps, const std::uint32_t _a_tau)
         {
             this->n_steps = _n_steps;
             this->a_tau = _a_tau;
             this->init();
         }
 
-        random_outbound (const std::uint32_t _n_steps, const std::uint32_t _a_tau, const T& _kappa)
+        random_walk (const std::uint32_t _n_steps, const std::uint32_t _a_tau, const T& _kappa)
         {
             this->n_steps = _n_steps;
             this->a_tau = _a_tau;

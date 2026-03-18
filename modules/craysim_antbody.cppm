@@ -2,13 +2,13 @@ module;
 
 #include <sm/config>
 
-export module antbodyvisual;
+export module craysim.antbody;
 
 export import mplot.visualmodel;
 
 import sm.mat;
 
-export namespace biosim
+export namespace craysim
 {
     // Parameters for our ant model
     const char* ant_json =
@@ -60,7 +60,7 @@ export namespace biosim
             // Try opening ant.json in the current working directory
             sm::config conf ("./ant.json");
             // If that fails, parse the built-in json
-            if (!conf.ready) { conf.parse (biosim::ant_json); }
+            if (!conf.ready) { conf.parse (craysim::ant_json); }
 
             constexpr int nseg = 16;
             constexpr int nring = 12;
