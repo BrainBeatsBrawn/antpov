@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <vector>
 #include <array>
+#include <memory>
 
 #include <sampleConfig.h>
 #include <MulticamScene.h>
@@ -26,6 +27,7 @@ import mplot.tools;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.ommatidium; // The mplot::Ommatidium structure
 import mplot.compoundray.eyevisual;
+import mplot.instancedscattervisual;
 
 export import mplot.gl.version;
 export import mplot.visual;
@@ -199,21 +201,32 @@ export namespace craysim
             this->options.set (mplot::visual_options::viewFollowsVMTranslations);
 
             this->load (gltfpath, opts);
-
             // Use a FPS profiling with a text object on screen
             this->addLabel ("0 FPS", {0.63f, -0.43f, 0.0f}, this->fps_label);
-
             this->setup_camera();
-
             this->setup_oces();
-
             this->setup_eyevisual();
+            this->setup_breadcrumbs();
         }
 
         ~visual()
         {
             stop(); // stop compound-ray from running
             multicamDealloc(); // De-allocate compound-ray memory
+        }
+
+        void load (const std::string& gltfpath, sm::flags<craysim::options>& opts)
+        {
+            // Load the file
+            this->path = gltfpath;
+            this->basepath = this->path;
+            std::cout << "Loading glTF file \"" << this->path << "\"..." << std::endl;
+            mplot::tools::stripUnixFile (this->basepath);
+            std::cout << "glTF dir: " << this->basepath << std::endl;
+            loadGlTFscene (this->path.c_str(), (opts.test(craysim::options::blender_axes)
+                                                ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
+            // Get the visual models from the scene
+            mplot::compoundray::scene_to_visualmodels<glver> (scene, this, false); // true for 'make_navmeshes'
         }
 
         void setup_camera()
@@ -259,6 +272,7 @@ export namespace craysim
             }
         }
 
+        // In-scene visualization of our compound-eye
         void setup_eyevisual()
         {
             // We get the initial camera localspace. This also serves to reset the camera pose. This is set
@@ -277,18 +291,35 @@ export namespace craysim
             this->setFollowedVM (this->eye);
         }
 
-        void load (const std::string& gltfpath, sm::flags<craysim::options>& opts)
+        // Breadcrumb trail
+        void setup_breadcrumbs()
         {
-            // Load the file
-            this->path = gltfpath;
-            this->basepath = this->path;
-            std::cout << "Loading glTF file \"" << this->path << "\"..." << std::endl;
-            mplot::tools::stripUnixFile (this->basepath);
-            std::cout << "glTF dir: " << this->basepath << std::endl;
-            loadGlTFscene (this->path.c_str(), (opts.test(craysim::options::blender_axes)
-                                                ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
-            // Get the visual models from the scene
-            mplot::compoundray::scene_to_visualmodels<glver> (scene, this, false); // true for 'make_navmeshes'
+            auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
+            isv->set_parent (this->get_id());
+            isv->max_instances = max_bc;
+            isv->radiusFixed = 0.004f;
+            isv->finalize();
+            this->isvp = this->addVisualModel (isv);
+        }
+
+        void add_breadcrumb (const sm::vec<>& bc_location,
+                             const sm::vvec<std::array<float, 3>>* bc_clr = nullptr,
+                             const sm::vvec<float>* bc_alpha = nullptr,
+                             const sm::vvec<float>* bc_scale = nullptr)
+        {
+            ++this->move_counter;
+            if (this->breadcrumb_coords.size() < this->max_bc) {
+                this->breadcrumb_coords.push_back (bc_location);
+                this->breadcrumb_data.push_back (0.0f); // dummy for now
+            } else {
+                this->breadcrumb_coords[move_counter % max_bc] = bc_location;
+                // breadcrumb_data.push_back (0.0f); // dummy for now, to be flags.
+            }
+            if (bc_clr == nullptr || bc_alpha == nullptr || bc_scale == nullptr) {
+                this->isvp->set_instance_data (this->breadcrumb_coords);
+            } else {
+                this->isvp->set_instance_data (this->breadcrumb_coords, *bc_clr, *bc_alpha, *bc_scale);
+            }
         }
 
         void fps_label_update()
@@ -328,6 +359,17 @@ export namespace craysim
 
         // An mplot::VisualModel of the compound-ray eye
         mplot::compoundray::EyeVisual<glver>* eye = nullptr;
+
+        // Visualization of a breadcrumb trail
+        mplot::InstancedScatterVisual<glver>* isvp = nullptr;
+        // State for breadcrumb trail. A move counter
+        std::uint64_t move_counter = 0u;
+        // A maximum number of breadcrumbs to show
+        std::uint64_t max_bc = 32000;
+        // Container for breadcrumb locations
+        sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
+        // Container for breadcrumb data (size, colour, alpha, etc)
+        sm::vvec<float> breadcrumb_data = {};
 
         // Movement state (class and bitset) (flags?)
         enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };

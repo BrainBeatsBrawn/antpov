@@ -24,7 +24,6 @@ import mplot.coordarrows;
 import mplot.gridvisual;
 import mplot.rodvisual;
 import mplot.vectorvisual;
-import mplot.instancedscattervisual;
 import mplot.normalsvisual;
 
 import craysim.visual;
@@ -82,7 +81,15 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->name = "ant";
     ant_ptr1->scaleViewMatrix (1000);
 
-    // 2D eye representation
+    // The ant body itself
+    auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
+    av->set_parent (v.get_id());
+    av->finalize();
+    auto ant_ptr = v.addVisualModel (av);
+    ant_ptr->name = "ant";
+    ant_ptr->setViewMatrix (v.initial_camera_space);
+
+    // 2D eye representation (goes in the other window)
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), nullptr);
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
@@ -96,27 +103,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->finalize();
     mplot::compoundray::EyeVisual<glver>* ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
-
-    // The ant body
-    auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
-    av->set_parent (v.get_id());
-    av->finalize();
-    auto ant_ptr = v.addVisualModel (av);
-    ant_ptr->name = "ant";
-    ant_ptr->setViewMatrix (v.initial_camera_space);
-
-    // Breadcrumb trail
-    std::uint64_t move_counter = 0u;
-    std::uint64_t max_bc = 32000;//00; // 32000
-    sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
-    sm::vvec<float> breadcrumb_data = {};
-
-    auto isv = std::make_unique<mplot::InstancedScatterVisual<glver>> (sm::vec<>{});
-    isv->set_parent (v.get_id());
-    isv->max_instances = max_bc;
-    isv->radiusFixed = 0.004f;
-    isv->finalize();
-    mplot::InstancedScatterVisual<glver>* isvp = v.addVisualModel (isv);
 
     // Make CoordArrows axes to show our camera's localspace (and to help find our tiny ant)
     auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
@@ -224,7 +210,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             cnl.translate (cam_nextloc);
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
 
-            ++move_counter;
+            ++v.move_counter;
         }
 
         auto[hp_scene, _ti0] = land->navmesh->find_triangle_hit (camspace, land_to_scene, 100.0f);
@@ -305,9 +291,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
         }
     };
 
-    auto subr_key_move_over_land = [&v, &ant_ptr, &antca_ptr, &move_counter,
-                                    &breadcrumb_coords, &isvp, &hoverheight, &rrg,
-                                    max_bc, land, land_to_scene, subr_reset_camspace,
+    auto subr_key_move_over_land = [&v, &ant_ptr, &antca_ptr, &hoverheight, &rrg,
+                                    land, land_to_scene, subr_reset_camspace,
                                     &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
         antca_ptr->setHide (!v.vstate.test(craysim::visual<glver>::state::show_camframe));
@@ -372,14 +357,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
 
-            move_counter++;
-            // This should be the right place to update breadcrumbs
-            if (breadcrumb_coords.size() < max_bc) {
-                breadcrumb_coords.push_back (lastloc);
-            } else {
-                breadcrumb_coords[move_counter % max_bc] = lastloc;
-            }
-            isvp->set_instance_data (breadcrumb_coords);
+            v.add_breadcrumb (lastloc);
         }
         subr_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
@@ -388,9 +366,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_walk_over_land = [&v, &ant_ptr, &antca_ptr, &rrg,
-                                &opts, &move_counter, max_bc, &breadcrumb_coords, &breadcrumb_data,
-                                &isvp, land, land_to_scene,
+    auto subr_walk_over_land = [&v, &ant_ptr, &antca_ptr, &rrg, &opts,
+                                land, land_to_scene,
                                 &hoverheight, subr_reset_camspace,
                                 &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
     {
@@ -416,20 +393,10 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
             // ti0, mv_camframe, cam_to_scene to save.
             cam_to_scene = land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, land_to_scene, hoverheight);
-            ++move_counter;
-
             tm1_ti0 = ti0_sv;
             tm1_mv_camframe = mv_camframe;
             tm1_cam_to_scene = cam_to_scene_sv;
-
-            if (breadcrumb_coords.size() < max_bc) {
-                breadcrumb_coords.push_back (cam_to_scene_sv.translation());
-                breadcrumb_data.push_back (0.0f); // dummy for now
-            } else {
-                breadcrumb_coords[move_counter % max_bc] = cam_to_scene_sv.translation();
-                // breadcrumb_data.push_back (0.0f); // dummy for now, to be flags.
-            }
-            isvp->set_instance_data (breadcrumb_coords);
+            v.add_breadcrumb (cam_to_scene_sv.translation());
 
         } catch (const std::exception& e) {
             std::string msg (e.what());
@@ -469,24 +436,23 @@ std::int32_t main (std::int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_csv_playback = [&v, &ant_ptr, &antca_ptr,
-                              &move_counter, &breadcrumb_coords, &isvp, &hoverheight, &opts,
-                              max_bc, csv_positions, bc_clr, bc_alpha, bc_scale,
+    auto subr_csv_playback = [&v, &ant_ptr, &antca_ptr, &hoverheight, &opts,
+                              csv_positions, bc_clr, bc_alpha, bc_scale,
                               land, land_to_scene, subr_reset_camspace]
     (const float fps, std::uint32_t& _last_ti)
     {
         antca_ptr->setHide (!v.vstate.test(craysim::visual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
 
-        if (csv_positions.size() > move_counter) {
+        if (csv_positions.size() > v.move_counter) {
             /*
              * With a csv path, teleport between each location (and then estimate the heading of
              * the ant). CSV positions are relative to the landscape model.
              */
             sm::vec<float> lastcamloc = cam_to_scene.translation();
 
-            sm::vec<float> nextloc = { csv_positions[move_counter][0], 0, csv_positions[move_counter][1] };
-            sm::vec<float> lastloc = { csv_positions[move_counter - 1][0], 0, csv_positions[move_counter - 1][1] };
+            sm::vec<float> nextloc = { csv_positions[v.move_counter][0], 0, csv_positions[v.move_counter][1] };
+            sm::vec<float> lastloc = { csv_positions[v.move_counter - 1][0], 0, csv_positions[v.move_counter - 1][1] };
             //std::cout << "Teleport a distance " << (lastloc - nextloc).length() << std::endl;
 
             sm::vec<float> ltstr = land_to_scene.translation(); // always the same
@@ -519,17 +485,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
                 // Rather than throwing, could just move on to next in csv?
                 // throw std::runtime_error ("Failed to find the landscape so can't teleport to that location!?!");
                 cam_to_scene = mplot::compoundray::getCameraSpace (scene);
-                std::cout << "Omit csv_positions[move_counter] = csv_positions[" << move_counter << "] = "
-                          << csv_positions[move_counter] << " (failed to find triangle hit)\n";
+                std::cout << "Omit csv_positions[v.move_counter] = csv_positions[" << v.move_counter << "] = "
+                          << csv_positions[v.move_counter] << " (failed to find triangle hit)\n";
             }
 
-            move_counter++;
-            if (breadcrumb_coords.size() < max_bc) {
-                breadcrumb_coords.push_back (lastcamloc);
-            } else {
-                breadcrumb_coords[move_counter % max_bc] = lastcamloc;
-            }
-            isvp->set_instance_data (breadcrumb_coords, bc_clr, bc_alpha, bc_scale);
+            v.add_breadcrumb (lastcamloc, &bc_clr, &bc_alpha, &bc_scale);
 
         } else {
             // else no more movements, so switch off path_from_csv mode
@@ -625,7 +585,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // Now render the mathplot window
         v.render();
         // Change label after render (it needs v's context, not veye's)
-        if (move_counter % 100 == 0) {
+        if (v.move_counter % 100 == 0) {
             //v.render();
             v.fps_label_update();
             //vant.render();
@@ -661,7 +621,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             // if csv mode, then save the data
             if (opts.test (craysim::options::path_from_csv) && opts.test (craysim::options::save_hdf5)) {
                 std::cout << "Saving frame...\n";
-                std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
+                std::string ommframe = "/ommatidiaData/frame_" + std::to_string (v.move_counter);
                 try {
                     record.add_contained_vals (ommframe.c_str(), v.ommatidiaData);
                 } catch (const std::exception& e) {
@@ -672,8 +632,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
         // Scale size of breadcrumbs based on distance
         float iscl = 2.0f * std::log (1.0f + v.get_d_to_rotation_centre());
-        //if (move_counter % 50 == 0) { std::cout << "iscl = " << iscl << std::endl; }
-        isvp->set_instance_scale (iscl);
+        //if (v.move_counter % 50 == 0) { std::cout << "iscl = " << iscl << std::endl; }
+        v.isvp->set_instance_scale (iscl);
 
         // Mark that we got to the end of the loop
         v.fps_profiler.at_end();
