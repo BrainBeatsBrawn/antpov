@@ -45,139 +45,29 @@ constexpr std::int32_t samples_per_omm_default = 64;
 
 namespace antpov
 {
-    // Your application-specific help message
-    void printHelp()
+    // Flags class, app specific options
+    enum class options : std::uint8_t
     {
-        std::cout << "USAGE:\nantpov -f <path to gltf scene>\n\n"
-                  << "\t-h\tDisplay this help information.\n"
-                  << "\t-f\tPath to a gltf scene file (absolute or relative to current "
-                  << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
-    }
-
-    // Flags class
-    enum class options : uint8_t
-    {
-        blender_axes,     // Set true to transform glTF into Blender's z-up axes
-        max_fps,          // If true, poll, instead of fps
-        path_from_csv,    // Move the ant from a sequence of 2D coordinates that give it a path
-        save_hdf5,        // If true, then save output data (path_from_csv mode only at present)
-        hidehead,         // If true, hide the 3D head/eye view in the Eye-only window
-        debug_mv,         // Open debug h5 file and run compute_mesh_movement once for debug
-        can_exit
+        hidehead          // If true, hide the 3D head/eye view in the Eye-only window
     };
-    // Parse cmd line to find the path and set options
-    std::tuple<std::string, std::string, std::string> parse_inputs (int argc, char* argv[], sm::flags<antpov::options>& opts)
+    // Parse cmd line to find the path and set app specific options. Return hoverheight
+    std::string parse_inputs (int argc, char* argv[], sm::flags<antpov::options>& opts)
     {
-        std::string path = "";
-        std::string csvpath = "";
         std::string hovh = "";
         for (int i = 0; i < argc; i++) {
             std::string arg = std::string(argv[i]);
-            if (arg == "-h") {
-                antpov::printHelp();
-                opts |= antpov::options::can_exit;
-            } else if (arg == "-f") {
-                i++;
-                path = std::string(argv[i]);
-            } else if (arg == "-H") {
+            if (arg == "-H") {
                 i++;
                 hovh = std::string(argv[i]);
-            } else if (arg == "-b") {
-                opts |= antpov::options::blender_axes;
-            } else if (arg == "-x") {
-                opts |= antpov::options::max_fps;
-            } else if (arg == "-c") {
-                opts |= antpov::options::path_from_csv;
-                i++;
-                csvpath = std::string(argv[i]);
-            } else if (arg == "-d") {
-                opts |= antpov::options::save_hdf5;
-            } else if (arg == "-g") {
-                opts |= antpov::options::debug_mv;
             } else if (arg == "-i") {
-                opts |= antpov::options::hidehead;
+                opts |= antpov::options::hidehead; // no longer used?
             }
         }
-        if (path.empty()) {
-            antpov::printHelp();
-            opts |= antpov::options::can_exit;
-        }
-        return {path, hovh, csvpath};
-    }
-
-    // Read a simple csv with 2D coordinates. Should also read flags.
-    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags)
-    {
-        std::ifstream f (path.c_str(), std::ios::in);
-        if (f.is_open() == false) { return false; }
-        std::string line;
-        std::vector<std::string> tokens;
-        while (std::getline (f, line)) {
-            sm::vec<float, 2> twodpos;
-            // Tokenize line into the coordinates and the flags
-            twodpos.set_from_str (line, ",");
-            positions.push_back (twodpos);
-            // Get flags from third entry
-            tokens.clear();
-            tokens = mplot::tools::stringToVector (line, ",");
-            if (tokens.size() > 2) {
-                std::uint32_t fl = std::stoi (tokens[2]);
-                antflags.push_back (fl);
-            } else {
-                antflags.push_back (0u);
-            }
-        }
-        return true;
-    }
-
-    // For a given samples per omm, return a sensible number of loops over which to average fps, so
-    // that fps takes around 1 sec to stabilize.
-    static constexpr std::uint32_t best_n_samples (int32_t samples_per_omm)
-    {
-        std::uint32_t best_n = 0;
-        switch (samples_per_omm) {
-        case 1:
-        case 2:
-        {
-            best_n = 1024; // about a seconds worth
-            break;
-        }
-        case 4:
-        case 8:
-        case 16:
-        case 32:
-        case 64:
-        {
-            best_n = 512;
-            break;
-        }
-        case 128:
-        case 256:
-        {
-            best_n = 256;
-            break;
-        }
-        case 512:
-        {
-            best_n = 128;
-            break;
-        }
-        case 1024:
-        case 2048:
-        {
-            best_n = 64;
-            break;
-        }
-        default:
-        {
-            best_n = 32;
-        }
-        }
-        return best_n;
+        return hovh;
     }
 
     // The flags recorded by the experimenters
-    enum class antflags : uint8_t
+    enum class antflags : std::uint8_t
     {
         bush,
         cookie,
@@ -187,20 +77,21 @@ namespace antpov
 
 } // namespace antpov
 
-int32_t main (int32_t argc, char* argv[])
+std::int32_t main (std::int32_t argc, char* argv[])
 {
     using mc = sm::mathconst<float>;
 
     double waittime = 0.0167; // for debug, so I can make playback slow in a simple way
 
-    // Program options and boolean state
-    sm::flags<antpov::options> opts;
-    auto[path, hovh, csv_path] = antpov::parse_inputs (argc, argv, opts);
-    std::string h5_path = csv_path;
-    mplot::tools::stripFileSuffix (h5_path);
-    if (h5_path.empty()) { h5_path = "trail"; }
-    h5_path += ".h5";
-    if (opts.test (antpov::options::can_exit)) { return 1; }
+    // craysim-common options parsing
+    sm::flags<craysim::options> opts;
+    auto[path, csv_path, h5_path] = craysim::parse_inputs (argc, argv, opts);
+    // app-specific options parsing
+    sm::flags<antpov::options> aopts;
+    std::string hovh = antpov::parse_inputs (argc, argv, aopts);
+
+    // Perhaps we printed options help and can now exit
+    if (opts.test (craysim::options::can_exit)) { return 1; }
 
     // Boilerplate memory alloc for compound-ray
     multicamAlloc();
@@ -215,25 +106,11 @@ int32_t main (int32_t argc, char* argv[])
     std::string basepath = path;
     mplot::tools::stripUnixFile (basepath);
     std::cout << "glTF dir: " << basepath << std::endl;
-    loadGlTFscene (path.c_str(), (opts.test(antpov::options::blender_axes)
+    loadGlTFscene (path.c_str(), (opts.test(craysim::options::blender_axes)
                                   ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
 
     // Create a mathplot window to render the eye/sensor
-    craysim::visual<glver> v (2000, 2000, "Scene (mathplot graphics)", opts.test(antpov::options::blender_axes));
-    // Choose how fast the camera should move for key press and mouse events
-    v.speed = 0.5f; // 0.5 m/s max speed for our Cataglyphis Velox
-    v.angularSpeed = 2.0f * mc::two_pi / 360.0f;
-    v.lightingEffects (true);
-    // Use a non-default zFar as we use large environments
-    v.zFar = 2400;
-    // Rotate about the nearest VisualModel
-    v.rotateAboutNearest (true);
-    // Rotate about a scene vertical axis? true for landscapes, false for cubes/objects (Ctrl-k changes I think, at runtime)
-    v.rotateAboutVertical (true);
-    if (opts.test(antpov::options::blender_axes)) {
-        v.switch_scene_vertical_axis(); // to uz up
-    }
-    v.vstate.flip (craysim::visual<glver>::state::show_camframe);
+    craysim::visual<glver> v (2000, 2000, "Scene (mathplot graphics)", opts.test(craysim::options::blender_axes));
 
     // We start rotated into a drone view initial orientation for taking pictures of the world
     sm::quaternion<float> def_q (sm::vec<float>::ux(), mc::pi_over_2); // non-blender only
@@ -257,10 +134,10 @@ int32_t main (int32_t argc, char* argv[])
 
     // We get the eye data path from the glTF file
     std::string efpath("");
-    int32_t ncam = static_cast<int32_t>(getCameraCount());
-    int32_t num_compound_cameras = 0;
-    int32_t my_compound_camera = -1;
-    for (int32_t ci = 0; ci < ncam; ++ci) {
+    std::int32_t ncam = static_cast<std::int32_t>(getCameraCount());
+    std::int32_t num_compound_cameras = 0;
+    std::int32_t my_compound_camera = -1;
+    for (std::int32_t ci = 0; ci < ncam; ++ci) {
         gotoCamera (ci);
         efpath = getEyeDataPath();
         if (!efpath.empty()) {
@@ -274,7 +151,7 @@ int32_t main (int32_t argc, char* argv[])
     // Now switch to our compound ray camera and set the samples per ommatidium/element
     if (my_compound_camera != -1) {
         gotoCamera (my_compound_camera);
-        int32_t csamp = getCurrentEyeSamplesPerOmmatidium();
+        std::int32_t csamp = getCurrentEyeSamplesPerOmmatidium();
         std::cout << "Current eye samples per ommatidium is " << csamp << std::endl;
         if (csamp < 32000) { changeCurrentEyeSamplesPerOmmatidiumBy (samples_per_omm_default - csamp); }
     }
@@ -474,9 +351,9 @@ int32_t main (int32_t argc, char* argv[])
     // most likely next triangle is the last triangle.
     std::uint32_t last_ti = std::numeric_limits<std::uint32_t>::max();
 
-    if (opts.test (antpov::options::path_from_csv)) {
+    if (opts.test (craysim::options::path_from_csv)) {
         //waittime = 0.25; // make it slow
-        if (antpov::read_csv (csv_path, csv_positions, csv_antflags) == false) {
+        if (craysim::read_csv (csv_path, csv_positions, csv_antflags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else {
             std::cout << "Read " << csv_positions.size() << " ant positions from CSV\n";
@@ -515,7 +392,7 @@ int32_t main (int32_t argc, char* argv[])
 
         sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
 
-        if (opts.test (antpov::options::path_from_csv) && !csv_positions.empty()) {
+        if (opts.test (craysim::options::path_from_csv) && !csv_positions.empty()) {
             // Initial position from first entry in the csv
             std::cout << "Set initial position from csv\n";
             sm::vec<float> nextloc = { csv_positions[0][0], 0.0f, csv_positions[0][1] };
@@ -750,7 +627,7 @@ int32_t main (int32_t argc, char* argv[])
                 land->navmesh->ti0 = ti0_sv;
             } else {
                 //cam_to_scene = cam_to_scene_sv;
-                opts.set (antpov::options::max_fps, false); // don't burn electricity after exception
+                opts.set (craysim::options::max_fps, false); // don't burn electricity after exception
                 v.vstate.set (craysim::visual<glver>::state::walk, false);
                 {
                     std::cout << "Saving compute_mesh_movement data\n";
@@ -843,7 +720,7 @@ int32_t main (int32_t argc, char* argv[])
 
         } else {
             // else no more movements, so switch off path_from_csv mode
-            opts.set (antpov::options::path_from_csv, false);
+            opts.set (craysim::options::path_from_csv, false);
         }
 
         subr_reset_camspace (cam_to_scene); // if requested
@@ -853,7 +730,7 @@ int32_t main (int32_t argc, char* argv[])
         antca_ptr->setViewMatrix (cam_to_scene);
     };
 
-    if (opts.test (antpov::options::debug_mv)) {
+    if (opts.test (craysim::options::debug_mv)) {
 
         std::cout << "Loading compute_mesh_movement data from crash file\n";
 
@@ -916,7 +793,6 @@ int32_t main (int32_t argc, char* argv[])
         }
     }
 
-
     /**
      * The main program loop
      */
@@ -934,14 +810,14 @@ int32_t main (int32_t argc, char* argv[])
     while (!v.readyToFinish()) {
 
         // Tell the fps_profiler that we're at the start of a loop
-        fps_profiler.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        fps_profiler.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
 
-        detect_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        detect_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // The current camera may have changed, this subroutine deals with any changes
         subr_detect_camera_changes();
         detect_fps.at_end();
 
-        mplot_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        mplot_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Now render the mathplot window
         v.render();
         // Change label after render (it needs v's context, not veye's)
@@ -959,7 +835,7 @@ int32_t main (int32_t argc, char* argv[])
             //vant.render();
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
-        if (opts.test (antpov::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
+        if (opts.test (craysim::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
         // Render the eye-only window
         vant.render();
         veye.render();
@@ -969,11 +845,11 @@ int32_t main (int32_t argc, char* argv[])
         mplot_fps.at_end();
 
         // tmp profile
-        move_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        move_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         if (v.vstate.test (craysim::visual<glver>::state::paused) == false) {
             if (v.vstate.test (craysim::visual<glver>::state::walk)) {
                 subr_walk_over_land (fps_profiler.fps_mean);
-            } else if (opts.test (antpov::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
+            } else if (opts.test (craysim::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
                 subr_csv_playback (fps_profiler.fps_mean, last_ti);
             } else {
                 subr_key_move_over_land (fps_profiler.fps_mean);
@@ -982,7 +858,7 @@ int32_t main (int32_t argc, char* argv[])
         // tmp profile
         move_fps.at_end();
 
-        cray_fps.at_begin (antpov::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        cray_fps.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
         // Do the compound-ray ray casting to recompute the scene
         renderFrame();
         // Access data so that a brain model could be fed
@@ -991,7 +867,7 @@ int32_t main (int32_t argc, char* argv[])
             ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
 
             // if csv mode, then save the data
-            if (opts.test (antpov::options::path_from_csv) && opts.test (antpov::options::save_hdf5)) {
+            if (opts.test (craysim::options::path_from_csv) && opts.test (craysim::options::save_hdf5)) {
                 std::cout << "Saving frame...\n";
                 std::string ommframe = "/ommatidiaData/frame_" + std::to_string (move_counter);
                 try {
@@ -1012,7 +888,7 @@ int32_t main (int32_t argc, char* argv[])
         fps_profiler.at_end();
     }
 
-    if (opts.test (antpov::options::path_from_csv)) {
+    if (opts.test (craysim::options::path_from_csv)) {
         // convert std::vector<Ommatidium>* ommatidia into vvecs that can be h5 saved
         auto ommat = reinterpret_cast<std::vector<mplot::compoundray::Ommatidium>*>(ommatidia);
         sm::vvec<sm::vec<float, 3>> o_pos;

@@ -11,12 +11,145 @@ module;
 export module craysim.visual;
 
 import sm.mathconst;
+import sm.vvec;
+
+import mplot.tools;
 export import mplot.gl.version;
 export import mplot.visual;
 
 // Reproduce controller functions for the mplot window for ease of use
 export namespace craysim
 {
+    void printHelp (const char* progname)
+    {
+        std::cout << "USAGE:\n" << progname << " -f <path to gltf scene>\n\n"
+                  << "\t-h\tDisplay this help information.\n"
+                  << "\t-f\tPath to a gltf scene file (absolute or relative to current "
+                  << "working directory, e.g. './data/axis_coloured_blocks.gltf').\n";
+    }
+
+    // Flags class
+    enum class options : std::uint32_t
+    {
+        blender_axes,     // Set true to transform glTF into Blender's z-up axes
+        max_fps,          // If true, poll, instead of fps
+        path_from_csv,    // Move the agent from a pre-defined sequence of 2D coordinates that give it a path
+        save_hdf5,        // If true, then save any output data in HDF5 (active in 'path_from_csv' mode)
+        debug_mv,         // Open a debug h5 file and run compute_mesh_movement once for debug of NavMesh
+        can_exit          // If set, program can exit now
+    };
+    // Parse cmd line to find the path and set options. Return filepath of main scene gltf file and any csv path
+    std::tuple<std::string, std::string, std::string> parse_inputs (std::int32_t argc, char* argv[], sm::flags<craysim::options>& opts)
+    {
+        std::string path = "";
+        std::string csvpath = "";
+        std::string hovh = "";
+        for (std::int32_t i = 0; i < argc; i++) {
+            std::string arg = std::string(argv[i]);
+            if (arg == "-h") {
+                craysim::printHelp (argv[0]);
+                opts |= craysim::options::can_exit;
+            } else if (arg == "-f") {
+                i++;
+                path = std::string(argv[i]);
+            } else if (arg == "-b") {
+                opts |= craysim::options::blender_axes;
+            } else if (arg == "-x") {
+                opts |= craysim::options::max_fps;
+            } else if (arg == "-c") {
+                opts |= craysim::options::path_from_csv;
+                i++;
+                csvpath = std::string(argv[i]);
+            } else if (arg == "-d") {
+                opts |= craysim::options::save_hdf5;
+            } else if (arg == "-g") {
+                opts |= craysim::options::debug_mv;
+            }
+        }
+        if (path.empty()) {
+            craysim::printHelp (argv[0]);
+            opts |= craysim::options::can_exit;
+        }
+
+        std::string h5_path = csvpath;
+        mplot::tools::stripFileSuffix (h5_path);
+        if (h5_path.empty()) { h5_path = "trail"; }
+        h5_path += ".h5";
+
+        return {path, csvpath, h5_path};
+    }
+
+    // For a given samples per omm, return a sensible number of loops over which to average fps, so
+    // that fps takes around 1 sec to stabilize.
+    constexpr std::uint32_t best_n_samples (std::int32_t samples_per_omm)
+    {
+        std::uint32_t best_n = 0;
+        switch (samples_per_omm) {
+        case 1:
+        case 2:
+        {
+            best_n = 1024; // about a seconds worth
+            break;
+        }
+        case 4:
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        {
+            best_n = 512;
+            break;
+        }
+        case 128:
+        case 256:
+        {
+            best_n = 256;
+            break;
+        }
+        case 512:
+        {
+            best_n = 128;
+            break;
+        }
+        case 1024:
+        case 2048:
+        {
+            best_n = 64;
+            break;
+        }
+        default:
+        {
+            best_n = 32;
+        }
+        }
+        return best_n;
+    }
+
+    // Read a simple csv with 2D coordinates. Should also read flags.
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags)
+    {
+        std::ifstream f (path.c_str(), std::ios::in);
+        if (f.is_open() == false) { return false; }
+        std::string line;
+        std::vector<std::string> tokens;
+        while (std::getline (f, line)) {
+            sm::vec<float, 2> twodpos;
+            // Tokenize line into the coordinates and the flags
+            twodpos.set_from_str (line, ",");
+            positions.push_back (twodpos);
+            // Get flags from third entry
+            tokens.clear();
+            tokens = mplot::tools::stringToVector (line, ",");
+            if (tokens.size() > 2) {
+                std::uint32_t fl = std::stoi (tokens[2]);
+                antflags.push_back (fl);
+            } else {
+                antflags.push_back (0u);
+            }
+        }
+        return true;
+    }
+
     template <int glver>
     struct visual final : public mplot::Visual<glver>
     {
@@ -26,10 +159,21 @@ export namespace craysim
         visual (int width, int height, const std::string& title, const bool blender_axes)
             : mplot::Visual<glver> (width, height, title)
         {
+            this->speed = 0.5f; // 0.5 m/s max speed for our agent
+            this->angularSpeed = 2.0f * mc::two_pi / 360.0f;
+            this->lightingEffects (true);
+            // Use a non-default zFar as we are likely to use large environments
+            this->zFar = 2400;
+            // Rotate about the nearest VisualModel
+            this->rotateAboutNearest (true);
+            // Rotate about a scene vertical axis? true for landscapes, false for cubes/objects (Ctrl-k changes I think, at runtime)
+            this->rotateAboutVertical (true);
+
             // State defaults
-            //this->vstate |= state::show_cones;
-            this->vstate |= state::show_camframe;
+            //this->vstate |= state::show_camframe;
+
             if (blender_axes) {
+                this->switch_scene_vertical_axis(); // to uz up
                 this->updateCoordLabels ("X", "Y", "Z(up)");
             } else {
                 this->updateCoordLabels ("X", "Y(up)", "Z");
