@@ -28,6 +28,7 @@ import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.ommatidium; // The mplot::Ommatidium structure
 import mplot.compoundray.eyevisual;
 import mplot.instancedscattervisual;
+import mplot.coordarrows;
 
 export import mplot.gl.version;
 export import mplot.visual;
@@ -207,6 +208,7 @@ export namespace craysim
             this->setup_oces();
             this->setup_eyevisual();
             this->setup_breadcrumbs();
+            this->setup_agent_coords();
         }
 
         ~visual()
@@ -302,6 +304,22 @@ export namespace craysim
             this->isvp = this->addVisualModel (isv);
         }
 
+        void setup_agent_coords()
+        {
+            // Make CoordArrows axes to show our camera's localspace (and to help find our tiny ant)
+            auto antca = std::make_unique<mplot::CoordArrows<glver>> (sm::vec<>{});
+            antca->set_parent (this->get_id());
+            antca->em = 0.0f; // labels don't work so well
+            float len = 2.0f;
+            antca->lengths = { len, len, len };
+            antca->thickness = 1.0f;
+            antca->endsphere_size = 1.2f;
+            antca->finalize();
+            this->agent_coords = this->addVisualModel (antca);
+            this->agent_coords->name = "agent";
+            this->agent_coords->setViewMatrix (this->initial_camera_space);
+        }
+
         void add_breadcrumb (const sm::vec<>& bc_location,
                              const sm::vvec<std::array<float, 3>>* bc_clr = nullptr,
                              const sm::vvec<float>* bc_alpha = nullptr,
@@ -349,17 +367,15 @@ export namespace craysim
         std::string efpath = {};
         // Open Compound Eye Standard reader used to access an agent head mesh (compound-ray reads the ommatidia info)
         oces::reader oces_reader;
-
         // Required in every craysim, I think. craysim::state? member of craysim::visual?
         std::vector<std::array<float, 3>> ommatidiaData;
         std::vector<Ommatidium>* ommatidia = nullptr;
-
         // This is the start position of the camera as loaded from the gltf
         sm::mat<float, 4> initial_camera_space;
-
         // An mplot::VisualModel of the compound-ray eye
         mplot::compoundray::EyeVisual<glver>* eye = nullptr;
-
+        // A coordinate arrow frame to show location of compound-ray eye (in case it is tiny)
+        mplot::CoordArrows<glver>* agent_coords = nullptr;
         // Visualization of a breadcrumb trail
         mplot::InstancedScatterVisual<glver>* isvp = nullptr;
         // State for breadcrumb trail. A move counter
