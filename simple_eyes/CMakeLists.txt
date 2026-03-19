@@ -10,8 +10,8 @@ set(ANTEYES_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid
   ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid_hdf
 
-  ${PROJECT_SOURCE_DIR}/modules/craysim_antbody.cppm
-  ${PROJECT_SOURCE_DIR}/modules/craysim_doublehexgrid.cppm
+  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_antbody.cppm
+  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_doublehexgrid.cppm
 
   ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.h
   ${MPLOT_INCLUDE_PATH}/mplot/VerticesVisual.h

@@ -453,16 +453,20 @@ set(MPLOT_LIBS_GL Freetype::Freetype) # NOT glfw, compound ray already includes.
 #
 # Define lists of module files
 #
+
+set (OCES_INCLUDE_PATH ${PROJECT_SOURCE_DIR}/extern/oces_viewer)
+set (CRAYSIM_INCLUDE_PATH ${PROJECT_SOURCE_DIR}/extern/craysim)
+
 # Modules in this repo
 set(MY_MODULES
-  ${PROJECT_SOURCE_DIR}/modules/tk_spline.cppm           # GPL v2
-  ${PROJECT_SOURCE_DIR}/modules/craysim_visual.cppm
-  ${PROJECT_SOURCE_DIR}/modules/craysim_random_walk.cppm # Uses tk_spline, GPL v2
-  ${PROJECT_SOURCE_DIR}/modules/craysim_antbody.cppm
+  ${CRAYSIM_INCLUDE_PATH}/modules/tk_spline.cppm           # GPL v2
+  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_visual.cppm
+  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_random_walk.cppm # Uses tk_spline, GPL v2
+  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_antbody.cppm
   ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm
 )
 # The OCES reader code
-set(OCES_MODULES ${PROJECT_SOURCE_DIR}/extern/oces_viewer/oces/reader)
+set(OCES_MODULES ${OCES_INCLUDE_PATH}/oces/reader)
 # sebsjames/maths
 set(MATHS_CORE_MODULES
   ${MPLOT_INCLUDE_PATH}/maths/sm/mathconst
