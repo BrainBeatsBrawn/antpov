@@ -18,17 +18,6 @@ import craysim.visual;
 
 export namespace antpov
 {
-    // Parse cmd line to find the path and set app specific options. Return hoverheight
-    std::string parse_inputs (int argc, char* argv[])
-    {
-        std::string hovh = "";
-        for (int i = 0; i < argc; i++) {
-            std::string arg = std::string(argv[i]);
-            if (arg == "-H") { hovh = std::string(argv[++i]); }
-        }
-        return hovh;
-    }
-
     // The flags recorded by the experimenters
     enum class antflags : std::uint8_t
     {

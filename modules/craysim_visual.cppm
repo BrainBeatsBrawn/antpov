@@ -28,6 +28,7 @@ import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.ommatidium; // The mplot::Ommatidium structure
 import mplot.compoundray.eyevisual;
 import mplot.instancedscattervisual;
+import mplot.normalsvisual;
 import mplot.coordarrows;
 
 export import mplot.gl.version;
@@ -58,7 +59,8 @@ export namespace craysim
     };
 
     // Parse cmd line to find the path and set options. Return filepath of main scene gltf file and any csv path
-    std::tuple<std::string, std::string, std::string> parse_inputs (std::int32_t argc, char* argv[], sm::flags<craysim::options>& opts)
+    std::tuple<std::string, std::string, std::string, std::string>
+    parse_inputs (std::int32_t argc, char* argv[], sm::flags<craysim::options>& opts)
     {
         std::string path = "";
         std::string csvpath = "";
@@ -69,8 +71,7 @@ export namespace craysim
                 craysim::printHelp (argv[0]);
                 opts |= craysim::options::can_exit;
             } else if (arg == "-f") {
-                i++;
-                path = std::string(argv[i]);
+                path = std::string(argv[++i]);
             } else if (arg == "-b") {
                 opts |= craysim::options::blender_axes;
             } else if (arg == "-x") {
@@ -83,6 +84,8 @@ export namespace craysim
                 opts |= craysim::options::save_hdf5;
             } else if (arg == "-g") {
                 opts |= craysim::options::debug_mv;
+            } else if (arg == "-H") {
+                hovh = std::string(argv[++i]);
             }
         }
         if (path.empty()) {
@@ -95,7 +98,7 @@ export namespace craysim
         if (h5_path.empty()) { h5_path = "trail"; }
         h5_path += ".h5";
 
-        return {path, csvpath, h5_path};
+        return {path, csvpath, h5_path, hovh};
     }
 
     // For a given samples per omm, return a sensible number of loops over which to average fps, so
@@ -340,6 +343,106 @@ export namespace craysim
             }
         }
 
+        // Get access to the landscape VisualModel by searching for a selection of model names
+        //
+        // \param search_names A comma-separated list of model names to search for. If multiple in
+        // the list are present, match the first in the list.
+        void find_landscape (const std::string& search_names)
+        {
+            constexpr bool debug_landscape = false;
+
+            std::vector<std::string> names = mplot::tools::stringToVector (search_names, ",");
+
+            mplot::VisualModel<glver>* vmp = nullptr;
+
+            // for each name in l_names
+            for (auto search_name : names) {
+
+                if (land != nullptr) { break; } // This will correctly cause exit on a second call to this function
+
+                this->init_vm_accessor(); // Using an accessor scheme to loop through all VMs in a scene
+                while ((vmp = this->get_next_vm_accessor()) != nullptr) {
+                    if (vmp->name == search_name) {
+                        this->land = vmp;
+                        this->land->make_navmesh (this->basepath);
+                        if constexpr (debug_landscape) {
+                            // Can add a NormalsVisual for debug
+                            auto nrm = std::make_unique<mplot::NormalsVisual<glver>> (land);
+                            nrm->set_parent (this->get_id());
+                            nrm->scale_factor = 0.01f;
+                            // Set options to show just the boundary edge
+                            nrm->options.set (mplot::normalsvisual_flags::show_tri_normals, true);
+                            nrm->options.set (mplot::normalsvisual_flags::show_gl_normals, false);
+                            nrm->options.set (mplot::normalsvisual_flags::show_boundary_halfedges, true);
+                            nrm->options.set (mplot::normalsvisual_flags::show_inner_halfedges, false); // Heavy lifting
+                            nrm->options.set (mplot::normalsvisual_flags::show_boundary_next, false);
+                            nrm->options.set (mplot::normalsvisual_flags::show_boundary_prev, false);
+                            nrm->nextprev_offset = sm::vec<float>::uy() * 0.01f;
+                            nrm->finalize();
+                            this->addVisualModel (nrm);
+                        }
+                        break;
+                    } // else model with that name does not match
+                }
+            }
+        }
+
+        void setup_landscape (const sm::flags<craysim::options>& opts)
+        {
+            if (this->land == nullptr) { return; } // should called find_landscape() first
+
+            std::cout << "Landscape name: " << this->land->name << " was found [" << (land->vpos_size() / 3) << " vertices]\n";
+            this->land_to_scene = land->getViewMatrix();
+            sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
+
+            if (opts.test (craysim::options::path_from_csv) && !this->csv_positions.empty()) {
+                // Initial position comes from first entry in the csv
+                std::cout << "Set initial position from csv\n";
+                sm::vec<float> nextloc = { this->csv_positions[0][0], 0.0f, this->csv_positions[0][1] };
+                nextloc -= sm::vec<>{ 0.5f, 0.0f, 0.5f }; // don't understand this on re-reading
+                std::cout << "Initial position is " << nextloc << std::endl;
+                // Change camspace based on nextloc. nextloc in landscape coords, so cam_nextloc = landscape.location + nextloc;
+                sm::vec<float> ltstr = this->land_to_scene.translation();
+                sm::vec<float> cam_nextloc = nextloc;
+                cam_nextloc[0] += ltstr[0];
+                cam_nextloc[2] += ltstr[2]; // update only x and z
+                std::cout << "cam_nextloc = land locn (" << ltstr << ") + nextloc [xz ONLY] (" << nextloc << ") = " << cam_nextloc << std::endl;
+                std::cout << "cf from-gltf camera location: " << camspace.translation() << std::endl;
+                sm::mat<float, 4> cnl;
+                cnl.translate (cam_nextloc);
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cnl));
+                ++this->move_counter;
+            }
+
+            auto[hp_scene, _ti0] = this->land->navmesh->find_triangle_hit (camspace, this->land_to_scene, 100.0f);
+            if (_ti0 != std::numeric_limits<std::uint32_t>::max()) {
+                // Set up our camera using the data obtained from find_triangle_hit()
+                sm::mat<float, 4> cam_to_scene = this->land->navmesh->position_camera (hp_scene, this->land_to_scene, this->hoverheight);
+                if (cam_to_scene != sm::mat<float, 4>::identity()) {
+                    std::cout << "Set camera pose matrix from\n" << cam_to_scene << std::endl;
+                    setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+                } else {
+                    std::cout << "cam_to_scene is identity??\n";
+                }
+            } else {
+                std::cout << "Failed to find the landscape; Camera position unchanged from glTF\n";
+            }
+
+            sm::mat<float, 4> _cam_to_scene = mplot::compoundray::getCameraSpace (scene);
+            std::cout << "Got camera pose matrix from scene:\n" << _cam_to_scene << std::endl;
+            sm::vec<float> _lastloc = _cam_to_scene.translation();
+            std::cout << "lastloc = " << _lastloc << " [this is cam_to_scene.translation()]" << std::endl;
+        }
+
+        void set_hoverheight (const std::string& cmd_line_str, const float default_height = 0.01f)
+        {
+            this->hoverheight = default_height;
+            if (!cmd_line_str.empty()) {
+                this->hoverheight = std::atof (cmd_line_str.c_str());
+                std::cout << "Set user-supplied hoverheight to " << this->hoverheight << std::endl;
+            }
+        }
+
         void fps_label_update()
         {
             this->fps_label->setupText (this->fps_profiler.fps_txt + std::string(" "));
@@ -386,6 +489,17 @@ export namespace craysim
         sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
         // Container for breadcrumb data (size, colour, alpha, etc)
         sm::vvec<float> breadcrumb_data = {};
+        // Client code gives us names of the navigation landscape. If we find the landscape, store a pointer to it with this
+        mplot::VisualModel<glver>* land = nullptr;
+        // land's viewmatrix. converts land model to scene
+        sm::mat<float, 4> land_to_scene;
+        // We can load data from a csv file for pre-defined paths
+        sm::vvec<sm::vec<float, 2>> csv_positions;
+        // When reproducing csv paths, it's useful to keep a record of the last triangle, because the
+        // most likely next triangle is the last triangle.
+        std::uint32_t last_ti = std::numeric_limits<std::uint32_t>::max();
+        // This is the height above the landscape to place the camera/agent. Set it suitably in your application.
+        float hoverheight = 0.01f;
 
         // Movement state (class and bitset) (flags?)
         enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };
