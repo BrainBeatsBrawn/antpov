@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdint>
 #include <memory>
+#include <tuple>
 #include <vector>
 #include <stdexcept>
 
