@@ -174,9 +174,11 @@ export namespace craysim
         // When the program starts, how many samples per ommatidium/element do you want?
         static constexpr std::int32_t samples_per_omm_default = 64;
 
-        visual (int width, int height, const std::string& title, const std::string& gltfpath, sm::flags<craysim::options>& opts)
+        visual (int width, int height, const std::string& title, const std::string& gltfpath, const std::string& h5path, sm::flags<craysim::options>& opts)
             : mplot::Visual<glver> (width, height, title)
         {
+            this->sim_opts = opts;
+
             // Boilerplate memory alloc for compound-ray and turn off verbose logging.
             multicamAlloc(); setVerbosity (false);
 
@@ -193,7 +195,7 @@ export namespace craysim
             this->bgcolour = { 0.298f, 0.412f,  0.576f };
             // State defaults
             //this->vstate |= state::show_camframe;
-            if (opts.test(craysim::options::blender_axes)) {
+            if (this->sim_opts.test(craysim::options::blender_axes)) {
                 this->switch_scene_vertical_axis(); // to uz up
                 this->updateCoordLabels ("X", "Y", "Z(up)");
             } else {
@@ -207,7 +209,7 @@ export namespace craysim
             // We follow the agent as it moves by default.
             this->options.set (mplot::visual_options::viewFollowsVMTranslations);
 
-            this->load (gltfpath, opts);
+            this->load (gltfpath);
             // Use a FPS profiling with a text object on screen
             this->addLabel ("0 FPS", {0.63f, -0.43f, 0.0f}, this->fps_label);
             this->setup_camera();
@@ -215,6 +217,8 @@ export namespace craysim
             this->setup_eyevisual();
             this->setup_breadcrumbs();
             this->setup_agent_coords();
+
+            this->record.init (h5path, std::ios::out | std::ios::trunc);
         }
 
         ~visual()
@@ -223,7 +227,7 @@ export namespace craysim
             multicamDealloc(); // De-allocate compound-ray memory
         }
 
-        void load (const std::string& gltfpath, sm::flags<craysim::options>& opts)
+        void load (const std::string& gltfpath)
         {
             // Load the file
             this->path = gltfpath;
@@ -231,7 +235,7 @@ export namespace craysim
             std::cout << "Loading glTF file \"" << this->path << "\"..." << std::endl;
             mplot::tools::stripUnixFile (this->basepath);
             std::cout << "glTF dir: " << this->basepath << std::endl;
-            loadGlTFscene (this->path.c_str(), (opts.test(craysim::options::blender_axes)
+            loadGlTFscene (this->path.c_str(), (this->sim_opts.test (craysim::options::blender_axes)
                                                 ? mplot::compoundray::blender_transform() : sutil::Matrix4x4::identity()));
             // Get the visual models from the scene
             mplot::compoundray::scene_to_visualmodels<glver> (scene, this, false); // true for 'make_navmeshes'
@@ -331,10 +335,7 @@ export namespace craysim
             this->rrg = std::make_unique<craysim::random_walk<float>>(_n_steps, _a_tau, _kappa);
         }
 
-        void add_breadcrumb (const sm::vec<>& bc_location,
-                             const sm::vvec<std::array<float, 3>>* bc_clr = nullptr,
-                             const sm::vvec<float>* bc_alpha = nullptr,
-                             const sm::vvec<float>* bc_scale = nullptr)
+        void add_breadcrumb (const sm::vec<>& bc_location)
         {
             ++this->move_counter;
             if (this->breadcrumb_coords.size() < this->max_bc) {
@@ -344,10 +345,10 @@ export namespace craysim
                 this->breadcrumb_coords[move_counter % max_bc] = bc_location;
                 // breadcrumb_data.push_back (0.0f); // dummy for now, to be flags.
             }
-            if (bc_clr == nullptr || bc_alpha == nullptr || bc_scale == nullptr) {
+            if (this->bc_clr.empty() || this->bc_alpha.empty() || this->bc_scale.empty()) {
                 this->isvp->set_instance_data (this->breadcrumb_coords);
             } else {
-                this->isvp->set_instance_data (this->breadcrumb_coords, *bc_clr, *bc_alpha, *bc_scale);
+                this->isvp->set_instance_data (this->breadcrumb_coords, this->bc_clr, this->bc_alpha, this->bc_scale);
             }
         }
 
@@ -395,7 +396,7 @@ export namespace craysim
             }
         }
 
-        void setup_landscape (const sm::flags<craysim::options>& opts)
+        void setup_landscape()
         {
             if (this->land == nullptr) { return; } // should called find_landscape() first
 
@@ -403,7 +404,7 @@ export namespace craysim
             this->land_to_scene = land->getViewMatrix();
             sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
 
-            if (opts.test (craysim::options::path_from_csv) && !this->csv_positions.empty()) {
+            if (this->sim_opts.test (craysim::options::path_from_csv) && !this->csv_positions.empty()) {
                 // Initial position comes from first entry in the csv
                 std::cout << "Set initial position from csv\n";
                 sm::vec<float> nextloc = { this->csv_positions[0][0], 0.0f, this->csv_positions[0][1] };
@@ -594,7 +595,7 @@ export namespace craysim
                     this->land->navmesh->ti0 = ti0_sv;
                 } else {
                     //cam_to_scene = cam_to_scene_sv;
-                    //opts.set (craysim::options::max_fps, false); // don't burn electricity after exception
+                    this->sim_opts.set (craysim::options::max_fps, false); // don't burn electricity after exception
                     this->vstate.set (craysim::visual<glver>::state::walk, false);
                     {
                         std::cout << "Saving compute_mesh_movement data\n";
@@ -623,10 +624,7 @@ export namespace craysim
             this->agent_coords->setViewMatrix (cam_to_scene);
         }
 
-        bool subr_csv_playback (const float fps,
-                                const sm::vvec<std::array<float, 3>>& bc_clr,
-                                const sm::vvec<float>& bc_alpha,
-                                const sm::vvec<float>& bc_scale)
+        bool subr_csv_playback (const float fps)
         {
             bool rtn = true;
 
@@ -678,7 +676,7 @@ export namespace craysim
                               << this->csv_positions[this->move_counter] << " (failed to find triangle hit)\n";
                 }
 
-                this->add_breadcrumb (lastcamloc, &bc_clr, &bc_alpha, &bc_scale);
+                this->add_breadcrumb (lastcamloc);
 
             } else {
                 // else no more movements, so switch off path_from_csv mode
@@ -734,6 +732,100 @@ export namespace craysim
             this->agent_coords->setViewMatrix (_cam_to_scene);
         }
 
+        void start_loop_timer()
+        {
+            this->fps_profiler.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
+        }
+
+        void end_loop_timer() { this->fps_profiler.at_end(); }
+
+        // Call this from your main loop
+        void render_and_poll (std::vector<mplot::Visual<glver>*>& other_windows,
+                              std::vector<mplot::compoundray::EyeVisual<glver>*>& other_eyes)
+        {
+            // The current camera may have changed, this subroutine deals with any changes
+            this->detect_camera_changes (other_eyes);
+
+            // Now render the mathplot window
+            this->render();
+            // Change label after render (it needs v's context, not any of the other windows)
+            if (this->move_counter % 100 == 0) { this->fps_label_update(); }
+
+            // Save some electricity while developing - limit to 60 FPS. For max speed use this->poll() (-x)
+            if (this->sim_opts.test (craysim::options::max_fps)) { this->poll(); } else { this->wait (0.0167); }
+
+            // Render the eye-only window
+            for (auto owin : other_windows) { owin->render(); }
+
+            // Deal with any movements commanded by key press events (including reset)
+
+            this->setContext(); // right now key move over land needs main window's context
+
+            // walk/csv playback/check keys for movement command
+            if (this->vstate.test (craysim::visual<glver>::state::paused) == false) {
+                if (this->vstate.test (craysim::visual<glver>::state::walk)) {
+                    this->walk_over_land (this->fps_profiler.fps_mean);
+                } else if (this->sim_opts.test (craysim::options::path_from_csv)) { // Construct path from csv file of 2D ant locations
+                    if (this->subr_csv_playback (this->fps_profiler.fps_mean) == false) {
+                        // no more movements, so switch off path_from_csv mode
+                        this->sim_opts.set (craysim::options::path_from_csv, false);
+                    }
+                } else {
+                    this->key_move_over_land (this->fps_profiler.fps_mean);
+                }
+            }
+
+            // Call the compound-ray ray casting method to recompute the compound-eye view of the scene
+            renderFrame();
+            // Access data so that a brain model could be fed
+            if (isCompoundEyeActive()) {
+                getCameraData (this->ommatidiaData);
+                this->ommatidia = &scene->m_ommVecs[scene->getCameraIndex()];
+
+                // if csv mode, then save the data
+                if (this->sim_opts.test (craysim::options::path_from_csv) && this->sim_opts.test (craysim::options::save_hdf5)) {
+                    std::cout << "Saving frame...\n";
+                    std::string ommframe = "/ommatidiaData/frame_" + std::to_string (this->move_counter);
+                    try {
+                        record.add_contained_vals (ommframe.c_str(), this->ommatidiaData);
+                    } catch (const std::exception& e) {
+                        // Probably didn't move this time.
+                    }
+                }
+            }
+
+            // Scale size of breadcrumbs based on distance
+            float iscl = 2.0f * std::log (1.0f + this->get_d_to_rotation_centre());
+            this->isvp->set_instance_scale (iscl);
+        }
+
+        // Save once-only data into the recording file (ommatidia data)
+        void complete_recording()
+        {
+            if (this->sim_opts.test (craysim::options::path_from_csv)) {
+                // convert std::vector<Ommatidium>* ommatidia into vvecs that can be h5 saved
+                auto ommat = this->get_ommatidia_ptr();
+                sm::vvec<sm::vec<float, 3>> o_pos;
+                sm::vvec<sm::vec<float, 3>> o_dir;
+                sm::vvec<float> o_aa;
+                sm::vvec<float> o_fo;
+                for (auto o : *ommat) {
+                    o_pos.push_back (o.relativePosition);
+                    o_dir.push_back (o.relativeDirection);
+                    o_aa.push_back (o.acceptanceAngleRadians);
+                    o_fo.push_back (o.focalPointOffset);
+                }
+                std::cout << "Pos\n";
+                this->record.add_contained_vals ("/ommatidia/relativePosition", o_pos);
+                std::cout << "Dir\n";
+                this->record.add_contained_vals ("/ommatidia/relativeDirection", o_dir);
+                std::cout << "AA\n";
+                this->record.add_contained_vals ("/ommatidia/acceptanceAngleRadians", o_aa);
+                std::cout << "FO\n";
+                this->record.add_contained_vals ("/ommatidia/focalPointOffset", o_fo);
+            }
+        }
+
         void set_hoverheight (const std::string& cmd_line_str, const float default_height = 0.01f)
         {
             this->hoverheight = default_height;
@@ -758,6 +850,8 @@ export namespace craysim
             return this->oces_reader.read_success ? reinterpret_cast<mplot::meshgroup*>(&this->oces_reader.head_mesh) : nullptr;
         }
 
+        // Our sim options.
+        sm::flags<craysim::options> sim_opts;
         // A member fps_profiler
         mplot::fps::profiler fps_profiler;
         // The FPS label, accessible to client code
@@ -793,6 +887,13 @@ export namespace craysim
         sm::vvec<sm::vec<float, 3>> breadcrumb_coords = {};
         // Container for breadcrumb data (size, colour, alpha, etc)
         sm::vvec<float> breadcrumb_data = {};
+        // Breadcrumb colours. May be empty. Set up in your client code
+        sm::vvec<std::array<float, 3>> bc_clr;
+        // Breadcrumb alpha values. May be empty. Set up in your client code
+        sm::vvec<float> bc_alpha;
+        // Breadcrumb scale values. May be empty. Set up in your client code
+        sm::vvec<float> bc_scale;
+
         // Client code gives us names of the navigation landscape. If we find the landscape, store a pointer to it with this
         mplot::VisualModel<glver>* land = nullptr;
         // land's viewmatrix. converts land model to scene
@@ -817,6 +918,8 @@ export namespace craysim
         sm::vec<float> tm1_mv_camframe = {};
         std::uint32_t tm1_ti0 = 0u;
 
+        // Recording object
+        sm::hdfdata record;// (h5_path, std::ios::out | std::ios::trunc);
 
 
         // Movement state (class and bitset) (flags?)
