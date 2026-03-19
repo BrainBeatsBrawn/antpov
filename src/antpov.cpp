@@ -39,74 +39,21 @@ extern MulticamScene* scene;
 
 std::int32_t main (std::int32_t argc, char* argv[])
 {
-    double waittime = 0.0167; // for debug, so I can make playback slow in a simple way
-
     // craysim-common options parsing
     sm::flags<craysim::options> opts;
-    auto[path, csv_path, h5_path, hovh] = craysim::parse_inputs (argc, argv, opts);
+    auto[gltf_path, csv_path, h5_path, hovh] = craysim::parse_inputs (argc, argv, opts);
 
     // Perhaps we printed options help and can now exit
     if (opts.test (craysim::options::can_exit)) { return 1; }
 
     // Create a craysim main window to render the eye/sensor. This loads in the models from gltf file at path
-    craysim::visual<glver> v (2000, 2000, "Compound-ray sim", path, opts);
+    craysim::visual<glver> v (2000, 2000, "Compound-ray sim", gltf_path, opts);
     // Set the agent hoverheight from our inputs if necessary
     v.set_hoverheight (hovh, 0.002f); // 2 mm is good for C. velox model
-
-    // A window for the 2D eye view projection
-    mplot::Visual<glver> veye (920, 512, "Eye view");
-    veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
-    veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-0.972577} });
-
-    // A window for the Ant body view
-    mplot::Visual<glver> vant (920, 920, "Ant view");
-    vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
-    vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
-
-    // Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), v.get_head_mesh());
-    eyevm1->set_parent (vant.get_id());
-    eyevm1->name = "Ant Eyes";
-    // Visualization options ant body
-    eyevm1->show_3d = true;
-    eyevm1->finalize();
-    mplot::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
-    // Scale this model up, so it's not tiny like the one in the scene
-    ep1->scaleViewMatrix (1000);
-    // The ant body for the separate window
-    auto av1 = std::make_unique<craysim::AntBodyVisual<glver>>();
-    av1->set_parent (vant.get_id());
-    av1->finalize();
-    auto ant_ptr1 = vant.addVisualModel (av1);
-    ant_ptr1->name = "ant";
-    ant_ptr1->scaleViewMatrix (1000);
-
-    // 2D eye representation (goes in the other window)
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), nullptr);
-    eyevm2->set_parent (veye.get_id());
-    eyevm2->name = "2D Ant Eyes";
-    antpov::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
-    eyevm2->show_3d = false;
-    eyevm2->twodimensional (true);
-    eyevm2->show_sphere = false;
-    eyevm2->show_rays = false;
-    sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
-    eyevm2->setViewMatrix (mflip);
-    eyevm2->finalize();
-    mplot::compoundray::EyeVisual<glver>* ep2 = veye.addVisualModel (eyevm2);
-    ep2->scaleViewMatrix (1000);
-
-    // An ant body to go in the scene
-    auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
-    av->set_parent (v.get_id());
-    av->finalize();
-    auto ant_ptr = v.addVisualModel (av);
-    ant_ptr->name = "ant";
-    ant_ptr->setViewMatrix (v.initial_camera_space);
-
+    // Find the model from the glTF that you want to be the landscape
     v.find_landscape ("Landscape.003,ground_inner_high_res");
 
-    // App-specific csv reading (comes between find_landscape and setup_landscape)
+    // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
     sm::vvec<std::uint32_t> csv_antflags;
     if (opts.test (craysim::options::path_from_csv)) {
         // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
@@ -131,68 +78,68 @@ std::int32_t main (std::int32_t argc, char* argv[])
             bc_scale[i] = 0.5f;
         }
     }
-
+    // Once CSV has be read (if you are using that feature) do some setup on the landscape
     v.setup_landscape (opts);
+
+    // APP-SPECIFIC A window for the 2D eye view projection
+    mplot::Visual<glver> veye (920, 512, "Eye view");
+    veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
+    veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-0.972577} });
+
+    // APP-SPECIFIC A window for the Ant body view
+    mplot::Visual<glver> vant (920, 920, "Ant view");
+    vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
+    vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
+
+    // APP-SPECIFIC Ant body, plotted in its own window; first the eyes for the body
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), v.get_head_mesh());
+    eyevm1->set_parent (vant.get_id());
+    eyevm1->name = "Ant Eyes";
+    // Visualization options ant body
+    eyevm1->show_3d = true;
+    eyevm1->finalize();
+    mplot::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
+    // Scale this model up, so it's not tiny like the one in the scene
+    ep1->scaleViewMatrix (1000);
+    // The ant body for the separate window
+    auto av1 = std::make_unique<craysim::AntBodyVisual<glver>>();
+    av1->set_parent (vant.get_id());
+    av1->finalize();
+    mplot::VisualModel<glver>* ant_ptr1 = vant.addVisualModel (av1);
+    ant_ptr1->name = "ant";
+    ant_ptr1->scaleViewMatrix (1000);
+
+    // APP-SPECIFIC 2D eye representation (goes in the other window)
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), nullptr);
+    eyevm2->set_parent (veye.get_id());
+    eyevm2->name = "2D Ant Eyes";
+    antpov::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
+    eyevm2->show_3d = false;
+    eyevm2->twodimensional (true);
+    eyevm2->show_sphere = false;
+    eyevm2->show_rays = false;
+    sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
+    eyevm2->setViewMatrix (mflip);
+    eyevm2->finalize();
+    mplot::compoundray::EyeVisual<glver>* ep2 = veye.addVisualModel (eyevm2);
+    ep2->scaleViewMatrix (1000);
+
+    // Put all our 'other eyes' in a container, so that if the eye needs reinit, this can be applied.
+    std::vector<mplot::compoundray::EyeVisual<glver>*> other_eyes = { ep1, ep2 };
+
+    // APP-SPECIFIC An ant body to go in the scene
+    auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
+    av->set_parent (v.get_id());
+    av->finalize();
+    v.agent_body = v.addVisualModel (av);
+    v.agent_body->name = "ant";
+    v.agent_body->setViewMatrix (v.initial_camera_space);
 
     // Random route generation object
     craysim::random_walk<float> rrg(1500, 150, 100);
 
-    // We keep a track of the eye size. Used in subr_detect_camera_changes
-    std::size_t last_eye_size = 0u;
-
-    // For debug saving:
-    sm::mat<float, 4> tm1_cam_to_scene;
-    sm::vec<float> tm1_mv_camframe = {};
-    std::uint32_t tm1_ti0 = 0u;
-
-    std::uint32_t render_counter = 0u;
-    auto subr_detect_camera_changes = [&v, &last_eye_size, &ep1, &ep2, &render_counter] ()
-    {
-        std::size_t curr_eye_size = last_eye_size;
-        // Detect changes in the camera and update eye model as necessary
-        if (v.ommatidiaData.size() == 0) {
-            if (isCompoundEyeActive()) { getCameraData (v.ommatidiaData); }
-        } // else no need to re-get data
-
-        // Update eyevm model (or just update colours)
-        v.eye->ommatidia = v.get_ommatidia_ptr();
-        ep1->ommatidia = v.get_ommatidia_ptr();
-        ep2->ommatidia = v.get_ommatidia_ptr();
-
-        static constexpr std::uint32_t render_every = 1u; // set to 1 for max update, 60 to reduce compute
-        if (v.ommatidia != nullptr) {
-            curr_eye_size = v.ommatidia->size();
-            if (curr_eye_size != last_eye_size) {
-                if (render_counter % render_every == 0u) { v.eye->reinit(); }
-                ep1->reinit();
-                ep2->reinit();
-                last_eye_size = curr_eye_size;
-            } else {
-                if (render_counter % render_every == 0u) { v.eye->reinitColours(); }
-                ep1->reinitColours(); // 4x faster to just reinitColours
-                ep2->reinitColours();
-            }
-            ++render_counter;
-        }
-    };
-
-    // Helper subroutine used by all the movement subroutines
-    auto subr_reset_camspace = [&v] (sm::mat<float, 4>& cam_to_scene)
-    {
-        // reset to initial camera space if requested
-        if (v.vstate.test (craysim::visual<glver>::state::campose_reset_request) == true) {
-            v.stop(); // cancel any active movements
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (v.initial_camera_space));
-            sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
-            auto[hp_scene, _ti0] = v.land->navmesh->find_triangle_hit (camspace, v.land_to_scene);
-            cam_to_scene = v.land->navmesh->position_camera (hp_scene, v.land_to_scene, v.hoverheight);
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-            v.vstate.reset (craysim::visual<glver>::state::campose_reset_request);
-        }
-    };
-
-    auto subr_key_move_over_land = [&v, &ant_ptr, &rrg, subr_reset_camspace,
-                                    &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0] (const float fps)
+    // Currently APP-SPECIFIC (ant_ptr, rrg) but ant_ptr could be VisualModel* argument and rrg was really just me experimenting - doesn't belong in here
+    auto subr_key_move_over_land = [&v, &rrg] (const float fps)
     {
         v.agent_coords->setHide (!v.vstate.test(craysim::visual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -222,9 +169,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
             try {
                 cam_to_scene = v.land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, v.land_to_scene, v.hoverheight);
 
-                tm1_ti0 = ti0_sv;
-                tm1_mv_camframe = mv_camframe;
-                tm1_cam_to_scene = cam_to_scene_sv;
+                v.tm1_ti0 = ti0_sv;
+                v.tm1_mv_camframe = mv_camframe;
+                v.tm1_cam_to_scene = cam_to_scene_sv;
 
             } catch (const std::exception& e) {
                 std::string msg (e.what());
@@ -236,9 +183,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
                     std::cout << "key-command move was not possible...\n";
                     {
                         std::cout << "Saving compute_mesh_movement data\n";
-                        std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << tm1_mv_camframe << std::endl;
+                        std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << v.tm1_mv_camframe << std::endl;
                         std::cout << "cam_to_scene_sv is\n" << cam_to_scene_sv
-                                  << "\nand tm1_cam_to_scene:\n" << tm1_cam_to_scene << std::endl;
+                                  << "\nand v.tm1_cam_to_scene:\n" << v.tm1_cam_to_scene << std::endl;
                         sm::hdfdata dsv ("./antpov.h5", std::ios::out | std::ios::trunc);
                         dsv.add_contained_vals ("/mv_camframe", mv_camframe);
                         dsv.add_contained_vals ("/cam_to_scene", cam_to_scene_sv.arr);
@@ -246,9 +193,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
                         dsv.add_val ("/hoverheight", v.hoverheight);
                         dsv.add_val ("/ti0", ti0_sv);
                         // Also save t-1 values:
-                        dsv.add_contained_vals ("/tm1_mv_camframe", tm1_mv_camframe);
-                        dsv.add_contained_vals ("/tm1_cam_to_scene", tm1_cam_to_scene.arr);
-                        dsv.add_val ("/tm1_ti0", tm1_ti0);
+                        dsv.add_contained_vals ("/tm1_mv_camframe", v.tm1_mv_camframe);
+                        dsv.add_contained_vals ("/tm1_cam_to_scene", v.tm1_cam_to_scene.arr);
+                        dsv.add_val ("/tm1_ti0", v.tm1_ti0);
                     }
                     throw e;
                 }
@@ -258,15 +205,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
             v.add_breadcrumb (lastloc);
         }
-        subr_reset_camspace (cam_to_scene); // if requested
+        v.check_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
         v.eye->setViewMatrix (cam_to_scene);
-        ant_ptr->setViewMatrix (cam_to_scene);
+        v.agent_body->setViewMatrix (cam_to_scene);
         v.agent_coords->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_walk_over_land = [&v, &ant_ptr, &rrg, &opts, subr_reset_camspace,
-                                &tm1_cam_to_scene, &tm1_mv_camframe, &tm1_ti0](const float fps)
+    auto subr_walk_over_land = [&v, &rrg, &opts](const float fps)
     {
         v.agent_coords->setHide (!v.vstate.test(craysim::visual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -290,9 +236,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
             // ti0, mv_camframe, cam_to_scene to save.
             cam_to_scene = v.land->navmesh->compute_mesh_movement (mv_camframe, cam_to_scene, v.land_to_scene, v.hoverheight);
-            tm1_ti0 = ti0_sv;
-            tm1_mv_camframe = mv_camframe;
-            tm1_cam_to_scene = cam_to_scene_sv;
+            v.tm1_ti0 = ti0_sv;
+            v.tm1_mv_camframe = mv_camframe;
+            v.tm1_cam_to_scene = cam_to_scene_sv;
             v.add_breadcrumb (cam_to_scene_sv.translation());
 
         } catch (const std::exception& e) {
@@ -308,9 +254,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
                 v.vstate.set (craysim::visual<glver>::state::walk, false);
                 {
                     std::cout << "Saving compute_mesh_movement data\n";
-                    std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << tm1_mv_camframe << std::endl;
+                    std::cout << "mv_camframe: " << mv_camframe << " and tm1_mv_camframe: " << v.tm1_mv_camframe << std::endl;
                     std::cout << "cam_to_scene_sv is\n" << cam_to_scene_sv
-                              << "\nand tm1_cam_to_scene:\n" << tm1_cam_to_scene << std::endl;
+                              << "\nand tm1_cam_to_scene:\n" << v.tm1_cam_to_scene << std::endl;
                     sm::hdfdata dsv ("./antpov.h5", std::ios::out | std::ios::trunc);
                     dsv.add_contained_vals ("/mv_camframe", mv_camframe);
                     dsv.add_contained_vals ("/cam_to_scene", cam_to_scene_sv.arr);
@@ -318,22 +264,23 @@ std::int32_t main (std::int32_t argc, char* argv[])
                     dsv.add_val ("/hoverheight", v.hoverheight);
                     dsv.add_val ("/ti0", ti0_sv);
                     // Also save t-1 values:
-                    dsv.add_contained_vals ("/tm1_mv_camframe", tm1_mv_camframe);
-                    dsv.add_contained_vals ("/tm1_cam_to_scene", tm1_cam_to_scene.arr);
-                    dsv.add_val ("/tm1_ti0", tm1_ti0);
+                    dsv.add_contained_vals ("/tm1_mv_camframe", v.tm1_mv_camframe);
+                    dsv.add_contained_vals ("/tm1_cam_to_scene", v.tm1_cam_to_scene.arr);
+                    dsv.add_val ("/tm1_ti0", v.tm1_ti0);
                 }
                 throw e;
             }
         }
         setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
-        subr_reset_camspace (cam_to_scene); // if requested
+        v.check_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
         v.eye->setViewMatrix (cam_to_scene);
-        ant_ptr->setViewMatrix (cam_to_scene);
+        v.agent_body->setViewMatrix (cam_to_scene);
         v.agent_coords->setViewMatrix (cam_to_scene);
     };
 
-    auto subr_csv_playback = [&v, &ant_ptr, &opts, bc_clr, bc_alpha, bc_scale, subr_reset_camspace] (const float fps, std::uint32_t& _last_ti)
+    // APP-SPECIFIC due to bc_clr, bc_alpha, bc_scale but these could be args
+    auto subr_csv_playback = [&v, &opts, bc_clr, bc_alpha, bc_scale] (const float fps, std::uint32_t& _last_ti)
     {
         v.agent_coords->setHide (!v.vstate.test(craysim::visual<glver>::state::show_camframe));
         sm::mat<float, 4> cam_to_scene = mplot::compoundray::getCameraSpace (scene);
@@ -390,13 +337,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
             opts.set (craysim::options::path_from_csv, false);
         }
 
-        subr_reset_camspace (cam_to_scene); // if requested
+        v.check_reset_camspace (cam_to_scene); // if requested
         // Update the view matrix of eye and eye localspace axes
         v.eye->setViewMatrix (cam_to_scene);
-        ant_ptr->setViewMatrix (cam_to_scene);
+        v.agent_body->setViewMatrix (cam_to_scene);
         v.agent_coords->setViewMatrix (cam_to_scene);
     };
 
+    // Should go into craysim::visual
     if (opts.test (craysim::options::debug_mv)) {
 
         std::cout << "Loading compute_mesh_movement data from crash file\n";
@@ -413,20 +361,20 @@ std::int32_t main (std::int32_t argc, char* argv[])
         dsv.read_contained_vals ("/land_to_scene", _land_to_scene.arr);
         dsv.read_val ("/hoverheight", _hoverheight);
         dsv.read_val ("/ti0", _ti0);
-        dsv.read_contained_vals ("/tm1_mv_camframe", tm1_mv_camframe);
-        dsv.read_contained_vals ("/tm1_cam_to_scene", tm1_cam_to_scene.arr);
-        dsv.read_val ("/tm1_ti0", tm1_ti0);
+        dsv.read_contained_vals ("/tm1_mv_camframe", v.tm1_mv_camframe);
+        dsv.read_contained_vals ("/tm1_cam_to_scene", v.tm1_cam_to_scene.arr);
+        dsv.read_val ("/tm1_ti0", v.tm1_ti0);
 
         try {
-            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (tm1_cam_to_scene));
-            v.eye->setViewMatrix (tm1_cam_to_scene);
-            ant_ptr->setViewMatrix (tm1_cam_to_scene);
-            v.agent_coords->setViewMatrix (tm1_cam_to_scene);
+            setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (v.tm1_cam_to_scene));
+            v.eye->setViewMatrix (v.tm1_cam_to_scene);
+            v.agent_body->setViewMatrix (v.tm1_cam_to_scene);
+            v.agent_coords->setViewMatrix (v.tm1_cam_to_scene);
 
             std::cout << "First compute_mesh_movement from saved data:\n";
 
-            v.land->navmesh->ti0 = tm1_ti0;
-            sm::mat<float, 4> _cam_to_scene_1 = v.land->navmesh->compute_mesh_movement (tm1_mv_camframe, tm1_cam_to_scene, _land_to_scene, _hoverheight);
+            v.land->navmesh->ti0 = v.tm1_ti0;
+            sm::mat<float, 4> _cam_to_scene_1 = v.land->navmesh->compute_mesh_movement (v.tm1_mv_camframe, v.tm1_cam_to_scene, _land_to_scene, _hoverheight);
 
             std::cout << "\ncompute_mesh_movement for time t-1 returned cam_to_scene:\n" << _cam_to_scene_1 << "\n";
 
@@ -444,7 +392,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             // Set the new position for camera and ant models
             setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (_cam_to_scene));
             v.eye->setViewMatrix (_cam_to_scene);
-            ant_ptr->setViewMatrix (_cam_to_scene);
+            v.agent_body->setViewMatrix (_cam_to_scene);
             v.agent_coords->setViewMatrix (_cam_to_scene);
 
         } catch (const std::exception& e) {
@@ -474,7 +422,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         v.fps_profiler.at_begin (craysim::best_n_samples (getCurrentEyeSamplesPerOmmatidium()));
 
         // The current camera may have changed, this subroutine deals with any changes
-        subr_detect_camera_changes();
+        v.detect_camera_changes (other_eyes);
 
         // Now render the mathplot window
         v.render();
@@ -485,7 +433,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
             //vant.render();
         }
         // Save some electricity while developing - limit to 60 FPS. For max speed use v.poll() (-x)
-        if (opts.test (craysim::options::max_fps)) { v.poll(); } else { v.wait (waittime); }
+        if (opts.test (craysim::options::max_fps)) { v.poll(); } else { v.wait (0.0167); }
+
+
         // Render the eye-only window
         vant.render();
         veye.render();

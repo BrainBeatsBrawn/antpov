@@ -434,6 +434,49 @@ export namespace craysim
             std::cout << "lastloc = " << _lastloc << " [this is cam_to_scene.translation()]" << std::endl;
         }
 
+        // Reset the camera location
+        void check_reset_camspace (sm::mat<float, 4>& cam_to_scene)
+        {
+            // reset to initial camera space if requested
+            if (this->vstate.test (state::campose_reset_request) == true) {
+                this->stop(); // cancel any active movements
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (this->initial_camera_space));
+                sm::mat<float, 4> camspace = mplot::compoundray::getCameraSpace (scene);
+                auto[hp_scene, _ti0] = this->land->navmesh->find_triangle_hit (camspace, this->land_to_scene);
+                cam_to_scene = this->land->navmesh->position_camera (hp_scene, this->land_to_scene, this->hoverheight);
+                setCameraPoseMatrix (mplot::compoundray::mat44_to_Matrix4x4 (cam_to_scene));
+                this->vstate.reset (state::campose_reset_request);
+            }
+        }
+
+        // Detect changes in the compound-ray camera, and update all our EyeVisuals accordingly
+        void detect_camera_changes (std::vector<mplot::compoundray::EyeVisual<glver>*>& other_eyes)
+        {
+            std::size_t curr_eye_size = this->last_eye_size;
+            // Detect changes in the camera and update eye model as necessary
+            if (this->ommatidiaData.size() == 0) {
+                if (isCompoundEyeActive()) { getCameraData (this->ommatidiaData); }
+            } // else no need to re-get data
+
+            // Update eyevm model (or just update colours)
+            this->eye->ommatidia = this->get_ommatidia_ptr();
+            for (auto oe : other_eyes) { oe->ommatidia = this->get_ommatidia_ptr(); }
+
+            static constexpr std::uint32_t render_every = 1u; // set to 1 for max update, 60 to reduce compute
+            if (this->ommatidia != nullptr) {
+                curr_eye_size = this->ommatidia->size();
+                if (curr_eye_size != this->last_eye_size) {
+                    if (this->render_counter % render_every == 0u) { this->eye->reinit(); }
+                    for (auto oe : other_eyes) { oe->reinit(); }
+                    this->last_eye_size = curr_eye_size;
+                } else {
+                    if (this->render_counter % render_every == 0u) { this->eye->reinitColours(); }
+                    for (auto oe : other_eyes) { oe->reinitColours(); } // 4x faster to just reinitColours
+                }
+                ++this->render_counter;
+            }
+        }
+
         void set_hoverheight (const std::string& cmd_line_str, const float default_height = 0.01f)
         {
             this->hoverheight = default_height;
@@ -475,10 +518,14 @@ export namespace craysim
         std::vector<Ommatidium>* ommatidia = nullptr;
         // This is the start position of the camera as loaded from the gltf
         sm::mat<float, 4> initial_camera_space;
+
         // An mplot::VisualModel of the compound-ray eye
         mplot::compoundray::EyeVisual<glver>* eye = nullptr;
-        // A coordinate arrow frame to show location of compound-ray eye (in case it is tiny)
+        // You may have a VisualModel of an 'agent body' to go another with your eye's EyeVisual
+        mplot::VisualModel<glver>* agent_body = nullptr;
+        // A coordinate arrow frame to show location of compound-ray eye/agent_body (in case they are tiny)
         mplot::CoordArrows<glver>* agent_coords = nullptr;
+
         // Visualization of a breadcrumb trail
         mplot::InstancedScatterVisual<glver>* isvp = nullptr;
         // State for breadcrumb trail. A move counter
@@ -500,6 +547,17 @@ export namespace craysim
         std::uint32_t last_ti = std::numeric_limits<std::uint32_t>::max();
         // This is the height above the landscape to place the camera/agent. Set it suitably in your application.
         float hoverheight = 0.01f;
+        // We keep a track of the eye size. Used in detect_camera_changes
+        std::size_t last_eye_size = 0u;
+        // A count of renders is required in detect_camera_changes
+        std::uint32_t render_counter = 0u;
+
+        // For debug saving
+        sm::mat<float, 4> tm1_cam_to_scene;
+        sm::vec<float> tm1_mv_camframe = {};
+        std::uint32_t tm1_ti0 = 0u;
+
+
 
         // Movement state (class and bitset) (flags?)
         enum class move_sense : uint16_t { forward, backward, left, right, up, down, rotUp, rotDown, rotLeft, rotRight, rotRollLeft, rotRollRight, zoomIn, zoomOut };
