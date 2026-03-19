@@ -1,4 +1,4 @@
-# Ant POV sim (made with mathplot, compound-ray and oces_viewer)
+# Ant POV sim (made with mathplot, compound-ray, craysim and oces_viewer)
 
 A program to show an ant's point of view in a model environment
 
@@ -27,6 +27,10 @@ on Ubuntu 25+ or download and build cmake from the cmake.org download
 page (it's an easy, reliable compile).
 
 Also the mathplot dependencies (wrt branch dev/modules)
+
+## Submodules
+
+Ant POV sim uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [sebsjames/craysim](https://github.com/sebsjames/craysim), and [sebsjames/oces_viewer](https://github.com/sebsjames/oces_viewer). sub-submodules are [Taywee/args](https://github.com/Taywee/args) , [nlohmann/json](https://github.com/nlohmann/json) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to [compound-ray]()
 
 ## Build
 
