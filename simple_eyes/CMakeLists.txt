@@ -1,17 +1,17 @@
 include_directories (BEFORE "${PROJECT_SOURCE_DIR}/mathplot")
 
 set(ANTEYES_VM_MODULES
-  ${MPLOT_INCLUDE_PATH}/maths/sm/binomial
-  ${MPLOT_INCLUDE_PATH}/maths/sm/nm_simplex
-  ${MPLOT_INCLUDE_PATH}/maths/sm/bezcoord
-  ${MPLOT_INCLUDE_PATH}/maths/sm/bezcurve
-  ${MPLOT_INCLUDE_PATH}/maths/sm/bezcurvepath
-  ${MPLOT_INCLUDE_PATH}/maths/sm/hex
-  ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid
-  ${MPLOT_INCLUDE_PATH}/maths/sm/hexgrid_hdf
+  ${MATHS_MODULE_PATH}/sm/binomial
+  ${MATHS_MODULE_PATH}/sm/nm_simplex
+  ${MATHS_MODULE_PATH}/sm/bezcoord
+  ${MATHS_MODULE_PATH}/sm/bezcurve
+  ${MATHS_MODULE_PATH}/sm/bezcurvepath
+  ${MATHS_MODULE_PATH}/sm/hex
+  ${MATHS_MODULE_PATH}/sm/hexgrid
+  ${MATHS_MODULE_PATH}/sm/hexgrid_hdf
 
-  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_antbody.cppm
-  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_doublehexgrid.cppm
+  ${CRAYSIM_MODULE_PATH}/modules/craysim_antbody.cppm
+  ${CRAYSIM_MODULE_PATH}/modules/craysim_doublehexgrid.cppm
 
   ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.h
   ${MPLOT_INCLUDE_PATH}/mplot/VerticesVisual.h

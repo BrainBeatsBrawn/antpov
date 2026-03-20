@@ -7,3 +7,9 @@
 [submodule "extern/craysim"]
 	path = extern/craysim
 	url = https://github.com/sebsjames/craysim.git
+[submodule "extern/tinygltf"]
+	path = extern/tinygltf
+	url = git@github.com:sebsjames/tinygltf
+[submodule "extern/maths"]
+	path = extern/maths
+	url = git@github.com:sebsjames/maths

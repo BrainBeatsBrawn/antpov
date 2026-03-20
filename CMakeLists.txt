@@ -1,95 +1,66 @@
 #
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# craysim_minimal example CMakeLists.txt file. Use this as a template
+# for craysim based simulators.
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#  * Neither the name of NVIDIA CORPORATION nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-# ########################################################################
-#
-# This code has been edited by Blayze Millward:
-# - The CMAKE_MODULE_PATH has been changed to "${CMAKE_SOURCE_DIR}/CMake"
-#   from "${CMAKE_SOURCE_DIR}/../SDK/CMake" to make the folder placeable
-#   anywhere
-# - Some initial comments have been removed for brevity
-# - Gets multithreading libraries ~ln. 203, adds them to sample executable
-#   paths in OPTIX_add_sample_executable function
-#
-# This CMakeListst.txt file has been further modified by Seb James to
-# make it compile just a single program that links to Blayze's
-# libEyeRenderer3.so, which is built by Seb's fork of compound-ray
-# (https://github.com/optseb/compound-ray)
-#
-# This CMake project is based on the NVIDIA OptiX SDK sample code, refer to
-# that for further understanding of their design choices and cmake folder
-# structure. What follows below is largely un-edited (alterations are listed
-# above):
-
-# The basic flow of execution of this file is to do the following.
-#
-# 1. Setup the project and other global settings.  This involves processing some helper
-#    scripts.
-#
-# 2. Look for external dependencies, CUDA, and OptiX.
-#
-# 3. Process all the subdirectories' CMakeLists.txt files.  These files create all the
-#    executable and library targets that are used to build the SDK.
-#
-# 4. As a convenience on Windows, copy the OptiX dlls into the build directories, so OptiX
-#    doesn't have to be in the path to run the samples.
-#
-# 5. Set a CMake variable that indicates we have configured for the first time.  This
-#    allows us to override and set varibles' defaults while allowing them to be modified
-#    later.
-
-# If you have any questions, don't feel shy about posting to the OptiX forums:
-# https://devtalk.nvidia.com/default/board/90/
 
 cmake_minimum_required(VERSION 3.28.5 FATAL_ERROR)
 
-# This sets up the name of our project.  For our purposes the main thing this controls is
-# the name of the VS solution file.
 project(antpov LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
-if( POLICY CMP0072 )
-  # FindOpenGL prefers GLVND by default when available
-  cmake_policy(SET CMP0072 NEW)
-endif()
+# Put binaries directly in the build dir
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
-if( POLICY CMP0074 )
-  # find_package uses <PackageName>_ROOT variables.
-  cmake_policy(SET CMP0074 NEW)
-endif()
+# It appears to be critical to set this for some component of the model. Without it, I see an error like:
+# antpov: /home/seb/src/antpov/extern/tinygltf/tiny_gltf.h:347: \
+#  const Value &tinygltf::Value::Get(const std::string &) const: Assertion `IsObject()' failed.
+# Aborted (core dumped)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release"
+    CACHE STRING "Choose build type from: Debug Release RelWithDebInfo MinSizeRel." FORCE)
+endif(NOT CMAKE_BUILD_TYPE)
 
-# Mathplot uses OpenGL
-find_package(OpenGL)
+# The file FindOptiX.cmake is provided by craysim
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/craysim/CMake" ${CMAKE_MODULE_PATH})
 
-# Use a packaged GLFW
+# Path to the NVidia OptiX SDK directory e.g. ~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
+set(OptiX_INSTALL_DIR "${PROJECT_SOURCE_DIR}/../" CACHE PATH "Path to OptiX installed location.")
+
+# Find the libraries which will be needed in addition to compound-ray (libEyeRenderer3.so)
 find_package(glfw3 3.2...3.4 REQUIRED)
+find_package(OpenGL)
+find_package(OpenMP) # (OpenMP may be used to build navmesh)
+find_package(Freetype REQUIRED)
+find_package(HDF5 REQUIRED)
+find_package(OptiX REQUIRED)
+find_package(compound-ray)
+
+# Where is mathplot? (allows headers and modules to be found)
+set(MPLOT_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot" CACHE PATH "The path to mathplot")
+
+# Assume a gcc compiler (or a gcc mimic like Clang). OpenGL 4.3 required so no Apple.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -O3 -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors")
+# Tell clang to be quiet about brace initialisers:
+if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-braces")
+endif()
+
+if(OpenMP_FOUND)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
+# Additional GL compiler flags.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGL3_PROTOTYPES -DGL_GLEXT_PROTOTYPES")
+
+# Tell the program where the morph fonts are, to compile them into the binary
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMPLOT_FONTS_DIR=\"\\\"${MPLOT_INCLUDE_PATH}/fonts\\\"\"")
+
+if(HDF5_FOUND)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${HDF5_DEFINITIONS}")
+endif()
+
 # find_package(glfw3...) does not set any 'GLFW_LIBS' variable, so set one manually
 if(UNIX)
   set(GLFW_LIB_NAME glfw)
@@ -97,404 +68,78 @@ else()
   set(GLFW_LIB_NAME glfw3)
 endif()
 
-# Add paths to our CMake code to the module path, so they can be found automatically by
-# CMake.
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
-
-# Set the default build to Release.  Note this doesn't do anything for the VS
-# default build target which defaults to Debug when you first start it.
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-      "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel."
-      FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
-
-# Tells CMake to build all the libraries as shared libraries by default.  This can be
-# overrided by individual libraries later.
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-
-##########
-# Process our custom setup scripts here.
-
-# Enable C++11. Needs to be done before the include of ConfigCompilerFlags.cmake below.
-#set(GCC_LIBSTDCPP11 ON)
-
-# Include all CMake Macros.
-include (Macros)
-# Determine information about the compiler
-include (CompilerInfo)
-# Check for specific machine/compiler options.
-include (ConfigCompilerFlags)
-
-# Turn off the warning that NVCC issues when generating PTX from our CUDA samples.  This
-# is a custom extension to the FindCUDA code distributed by CMake.
-option(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING
-       "Suppress the \"Advisory: Cannot tell what pointer points to, assuming global memory space\" warning nvcc makes." ON)
-
-# For Xcode 5, gcc is actually clang, so we have to tell CUDA to treat the compiler as
-# clang, so that it doesn't mistake it for something else.
-if(USING_CLANG_C)
-  set(CUDA_HOST_COMPILER "clang" CACHE FILEPATH "Host side compiler used by NVCC")
-endif()
-
-# CUDA 8 is broken for generating dependencies during configure
-option(CUDA_GENERATE_DEPENDENCIES_DURING_CONFIGURE
-       "Generate dependencies during configure time instead of only during build time." OFF)
-
-# Find at least a 5.0 version of CUDA.
-find_package(CUDA 5.0 REQUIRED)
-
-# Present the CUDA_64_BIT_DEVICE_CODE on the default set of options.
-mark_as_advanced(CLEAR CUDA_64_BIT_DEVICE_CODE)
-
-set(BUFFER_TYPE "BUFFER_TYPE_ZERO_COPY" CACHE STRING "Which type of buffer to use for OutputBuffer (not used here)")
-add_definitions("-D${BUFFER_TYPE}")
-
-set(ARCH_INT "60" CACHE STRING "sm and compute architecture integer for compiling NVCC and NVRTC. Defaults to '60', which aligns with all Pascal architecture processors. See docs/indepth-install-notes.md for further details.")
-
-# Add some useful default arguments to the NVCC and NVRTC flags. This is an example of
-# how we use PASSED_FIRST_CONFIGURE.  Once you have configured, this variable is TRUE
-# and following block of code will not be executed leaving you free to edit the values
-# as much as you wish from the GUI or from ccmake.
-
-list(FIND CUDA_NVCC_FLAGS "-arch" index)
-if(index EQUAL -1)
-  list(APPEND CUDA_NVCC_FLAGS "-arch sm_${ARCH_INT}")
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
-endif()
-set(flag "--use_fast_math")
-list(FIND CUDA_NVCC_FLAGS ${flag} index)
-if(index EQUAL -1)
-  list(APPEND CUDA_NVCC_FLAGS ${flag})
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
-endif()
-
-set(flag "-lineinfo")
-list(FIND CUDA_NVCC_FLAGS ${flag} index)
-if(index EQUAL -1)
-  list(APPEND CUDA_NVCC_FLAGS ${flag})
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
-endif()
-
-if(CUDA_VERSION VERSION_LESS "3.0")
-  set(flag "--keep")
-  list(FIND CUDA_NVCC_FLAGS ${flag} index)
-  if(index EQUAL -1)
-    list(APPEND CUDA_NVCC_FLAGS ${flag})
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
-  endif()
-endif()
-
-if(APPLE)
-  # Undef'ing __BLOCKS__ for OSX builds.  This is due to a name clash between OSX 10.6
-  # C headers and CUDA headers
-  set(flag "-U__BLOCKS__")
-  list(FIND CUDA_NVCC_FLAGS ${flag} index)
-  if(index EQUAL -1)
-    list(APPEND CUDA_NVCC_FLAGS ${flag})
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
-  endif()
-endif()
-
-#if(CMAKE_CXX_STANDARD EQUAL 11)
-set(EYE_RENDERER_NVRTC_CXX "-std=c++11")
-#else()
-#  set(EYE_RENDERER_NVRTC_CXX "")
-#endif()
-set(CUDA_NVRTC_FLAGS ${EYE_RENDERER_NVRTC_CXX} "-arch compute_${ARCH_INT} -use_fast_math -lineinfo -default-device -rdc true -D__x86_64" CACHE STRING "Semi-colon delimit multiple arguments." FORCE)
-
-mark_as_advanced(CUDA_NVRTC_FLAGS)
-
-# This passes a preprocessor definition to cl.exe when processing CUDA code.
-if(USING_WINDOWS_CL)
-  list(APPEND CUDA_NVCC_FLAGS --compiler-options /D_USE_MATH_DEFINES)
-endif()
-
-# Put all the runtime stuff in the same directory.  By default, CMake puts each targets'
-# output into their own directory.  We want all the targets to be put in the same
-# directory, and we can do this by setting these variables.
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-
-# Create a flag for mac which will allow apps to add the local cuda toolkit
-# install path to the app's rpath.
-if(APPLE)
-  set( CUDA_TOOLKIT_RPATH_FLAG "-Wl,-rpath,${CUDA_TOOLKIT_ROOT_DIR}/lib" )
-endif()
-
-# The location of your compound-ray repository? Or make compound-ray install?
-
-# Locate the NVRT distribution.  Search the SDK first, then look in the system.
-set(OptiX_INSTALL_DIR "${CMAKE_SOURCE_DIR}/../" CACHE PATH "Path to OptiX installed location.")
-
-# Search for the OptiX libraries and include files.
-find_package(OptiX REQUIRED)
-
-# Get the multithreading libraries.
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-
-# Add the path to the OptiX headers to our include paths.
-include_directories("${OptiX_INCLUDE}" "${CMAKE_CURRENT_SOURCE_DIR}/cuda")
-
-# Select whether to use NVRTC or NVCC to generate PTX
-set(CUDA_NVRTC_ENABLED OFF CACHE BOOL "Use NVRTC to compile PTX at run-time instead of NVCC at build-time")
-
-# This code is built on some "samples" examples from NVidia/NVidia Optix.
-set(SAMPLES_PTX_DIR "${CMAKE_BINARY_DIR}/lib/ptx")
-set(SAMPLES_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(CUDA_GENERATED_OUTPUT_DIR ${SAMPLES_PTX_DIR})
-if (WIN32)
-  string(REPLACE "/" "\\\\" SAMPLES_PTX_DIR ${SAMPLES_PTX_DIR})
-else (WIN32)
-  if ( USING_GNU_C AND NOT APPLE)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DM_PI=3.14159265358979323846" )
-  endif()
-endif (WIN32)
-set(SAMPLES_CUDA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cuda")
-set(SAMPLES_SUPPORT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../SDK/support")
-#  include paths relative to the sample path
-set(SAMPLES_RELATIVE_INCLUDE_DIRS "\\
-  \"cuda\", \\
-  \"sutil\", \\
-  \".\", ")
-
-# NVRTC absolute include paths to the headers used to build the samples
-set(SAMPLES_ABSOLUTE_INCLUDE_DIRS "\\
-  \"${OPTIX_INCLUDE_DIR}\", \\
-  \"${CUDA_INCLUDE_DIRS}\", ")
-
-# Build a null-terminated option list for NVRTC
-set(CUDA_NVRTC_OPTIONS)
-foreach(flag ${CUDA_NVRTC_FLAGS})
-  set(CUDA_NVRTC_OPTIONS "${CUDA_NVRTC_OPTIONS} \\\n  \"${flag}\",")
-endforeach()
-set(CUDA_NVRTC_OPTIONS "${CUDA_NVRTC_OPTIONS}")
-
-configure_file(sampleConfig.h.in sampleConfig.h @ONLY)
-
-# we have build/sampleConfig.h build/include/sse_support.h to include, but leave out
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_BINARY_DIR}/include" ${CMAKE_CURRENT_BINARY_DIR} ${CUDA_INCLUDE_DIRS})
-
-#########################################################
-# OPTIX_add_sample_executable
-#
-# Convience function for adding samples to the code.  You can copy the contents of this
-# funtion into your individual project if you wish to customize the behavior.  Note that
-# in CMake, functions have their own scope, whereas macros use the scope of the caller.
-function(OPTIX_add_sample_executable target_name_base target_name_var)
-
-  set( target_name ${target_name_base} )
-  set( ${target_name_var} ${target_name} PARENT_SCOPE )
-
-  # These calls will group PTX and CUDA files into their own directories in the Visual
-  # Studio projects.
-  if (NOT CUDA_NVRTC_ENABLED)
-    source_group("PTX Files"  REGULAR_EXPRESSION ".+\\.ptx$")
-  endif()
-  source_group("CUDA Files" REGULAR_EXPRESSION ".+\\.cu$")
-
-  # Separate the sources from the CMake and CUDA options fed to the macro.  This code
-  # comes from the CUDA_COMPILE_PTX macro found in FindCUDA.cmake.  We are copying the
-  # code here, so that we can use our own name for the target.  target_name is used in the
-  # creation of the output file names, and we want this to be unique for each target in
-  # the SDK.
-  CUDA_GET_SOURCES_AND_OPTIONS(source_files cmake_options options ${ARGN})
-
-  if(CUDA_NVRTC_ENABLED)
-    # Isolate OBJ target files. NVCC should only process these files and leave PTX targets for NVRTC
-    set(cu_obj_source_files)
-    foreach(file ${source_files})
-      get_source_file_property(_cuda_source_format ${file} CUDA_SOURCE_PROPERTY_FORMAT)
-      if(${_cuda_source_format} MATCHES "OBJ")
-        list(APPEND cu_obj_source_files ${file})
-      endif()
-    endforeach()
-    # Create the rules to build the OBJ from the CUDA files.
-    CUDA_WRAP_SRCS( ${target_name} OBJ generated_files ${cu_obj_source_files} ${cmake_options} OPTIONS ${options} )
-  else()
-    # Create the rules to build the PTX and OBJ from the CUDA files.
-    CUDA_WRAP_SRCS( ${target_name} PTX generated_files ${source_files} ${cmake_options} OPTIONS ${options} )
-  endif()
-
-  add_executable(${target_name} ${source_files} ${generated_files} ${cmake_options})
-  target_link_libraries(${target_name} Threads::Threads ${GLFW_LIB_NAME} sutil_7_sdk)
-  set_target_properties(${target_name} PROPERTIES COMPILE_DEFINITIONS OPTIX_SAMPLE_NAME_DEFINE=${target_name})
-
-  if(UNIX AND NOT APPLE)
-    # Force using RPATH instead of RUNPATH on Debian
-    target_link_libraries( ${target_name} "-Wl,--disable-new-dtags" )
-  endif()
-
-  if(USING_GNU_CXX)
-    target_link_libraries( ${target_name} m ) # Explicitly link against math library
-  endif()
-endfunction()
-
-#########################################################
-#
-# A function used here to generate an Optix + C++ modules executable
-#
-function(add_modules_exe target_name_base target_name_var)
-
-  set( target_name ${target_name_base} )
-  set( ${target_name_var} ${target_name} PARENT_SCOPE )
-
-  # Parse the rest of the args, which are all multiValueArgs
-  set(multiValueArgs SOURCES MODULES OPTIONS CMAKE_OPTIONS)
-  cmake_parse_arguments(PARSE_ARGV 0 arg
-    "${options}" "${oneValueArgs}" "${multiValueArgs}"
-  )
-
-  # These calls will group PTX and CUDA files into their own directories in the Visual
-  # Studio projects.
-  if (NOT CUDA_NVRTC_ENABLED)
-    source_group("PTX Files"  REGULAR_EXPRESSION ".+\\.ptx$")
-  endif()
-  source_group("CUDA Files" REGULAR_EXPRESSION ".+\\.cu$")
-
-  if(CUDA_NVRTC_ENABLED)
-    # Isolate OBJ target files. NVCC should only process these files and leave PTX targets for NVRTC
-    set(cu_obj_source_files)
-    foreach(file ${arg_SOURCES})
-      get_source_file_property(_cuda_source_format ${file} CUDA_SOURCE_PROPERTY_FORMAT)
-      if(${_cuda_source_format} MATCHES "OBJ")
-        list(APPEND cu_obj_source_files ${file})
-      endif()
-    endforeach()
-    # Create the rules to build the OBJ from the CUDA files.
-    CUDA_WRAP_SRCS( ${target_name} OBJ generated_files ${cu_obj_source_files} ${arg_CMAKE_OPTIONS} OPTIONS ${arg_OPTIONS} )
-  else()
-    # Create the rules to build the PTX and OBJ from the CUDA files.
-    CUDA_WRAP_SRCS( ${target_name} PTX generated_files ${arg_SOURCES} ${arg_CMAKE_OPTIONS} OPTIONS ${arg_OPTIONS} )
-  endif()
-
-  add_executable(${target_name} ${arg_SOURCES} ${generated_files} ${arg_CMAKE_OPTIONS})
-
-  # We'll have to pass in MODULES_FILES or something
-  target_sources(${target_name} PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
-    FILES ${arg_MODULES}
-  )
-
-  target_link_libraries(${target_name} Threads::Threads ${GLFW_LIB_NAME} sutil_7_sdk)
-  set_target_properties(${target_name} PROPERTIES COMPILE_DEFINITIONS OPTIX_SAMPLE_NAME_DEFINE=${target_name})
-
-  if(UNIX AND NOT APPLE)
-    # Force using RPATH instead of RUNPATH on Debian
-    target_link_libraries( ${target_name} "-Wl,--disable-new-dtags" )
-  endif()
-
-  if(USING_GNU_CXX)
-    target_link_libraries( ${target_name} m ) # Explicitly link against math library
-  endif()
-endfunction()
-
-##############################################################
-
-#
-# Mathplot incantations, as this example uses morph headers
-#
-
-# mathplot uses c++-20 language features
-set(CMAKE_CXX_STANDARD 20)
-
-# Add the host definition to CXXFLAGS along with other switches, depending on OS/Compiler
-if (APPLE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wfatal-errors -g -O3")
-else()
-  # This assumes a gcc compiler (or a gcc mimic like Clang) // -Wfatal-errors
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -O3 -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors")
-endif()
-
-# Tell clang to be quiet about brace initialisers:
-if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-braces")
-endif()
-
-# Add OpenMP flags here, if necessary
-find_package(OpenMP)
-if(OpenMP_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-endif()
-
-# Additional GL compiler flags.
-#
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGL3_PROTOTYPES -DGL_GLEXT_PROTOTYPES")
-if(APPLE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGL_SILENCE_DEPRECATION")
-endif()
-
-# Find the libraries which will be needed in addition to those required by compound-ray
-find_package(Freetype REQUIRED)
-find_package(HDF5 REQUIRED)
-if(HDF5_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${HDF5_DEFINITIONS}")
-  include_directories(${HDF5_INCLUDE_DIR})
-endif()
-
-# Define collections of includes that have to be made for mathplot
-set(MPLOT_INC_GL ${OPENGL_INCLUDE_DIR} ${FREETYPE_INCLUDE_DIRS})
-include_directories(${MPLOT_INC_GL})
-# Assuming that you installed mathplot in-tree (i.e. 'next to' schnakenberg.cpp).
-set(MPLOT_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot" CACHE PATH "The path to mathplot")
-# Tell the program where the morph fonts are, to compile them into the binary
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMPLOT_FONTS_DIR=\"\\\"${MPLOT_INCLUDE_PATH}/fonts\\\"\"")
-set(SM_INCLUDE_PATH "${MPLOT_INCLUDE_PATH}/maths" CACHE PATH "The path to maths/sm")
-include_directories(BEFORE ${MPLOT_INCLUDE_PATH}/include) # Allows GL3/gl3.h to be found
-include_directories(BEFORE ${MPLOT_INCLUDE_PATH} ${SM_INCLUDE_PATH}) # Allows mplot/Header.h to be found
-
 set(MPLOT_LIBS_CORE ${HDF5_C_LIBRARIES})
-set(MPLOT_LIBS_GL Freetype::Freetype) # NOT glfw, compound ray already includes. OpenGL::GL should be dynamically loaded by glad in libEyeRenderer3.so
-#
-# mathplot incantations complete
-#
+set(MPLOT_LIBS_GL ${GLFW_LIB_NAME} Freetype::Freetype)
 
 #
-# Define lists of module files
+# Include paths for module compilation
 #
 
-set (OCES_INCLUDE_PATH ${PROJECT_SOURCE_DIR}/extern/oces_viewer)
-set (CRAYSIM_INCLUDE_PATH ${PROJECT_SOURCE_DIR}/extern/craysim)
+# mathplot includes
+include_directories(
+  ${HDF5_INCLUDE_DIR}
+  ${OPENGL_INCLUDE_DIR} ${FREETYPE_INCLUDE_DIRS} ${MPLOT_INCLUDE_PATH}/mplot/glad
+  ${MPLOT_INCLUDE_PATH}
+)
+
+# Maths include path. Allows #include <sm/config> (the only non-modules maths header at the moment)
+include_directories(${PROJECT_SOURCE_DIR}/extern/maths)
+
+# Add the path to the OptiX headers to our include paths. This is
+# required to compile craysim.virtual, which includes compound-ray
+# headers, which refer to some OptiX data structures
+include_directories("${OptiX_INCLUDE}")
+
+# allows #include <tinygltf/tiny_gltf.h> (an oces dependency)
+include_directories ("${PROJECT_SOURCE_DIR}/extern")
+
+#
+# Define lists of module files to build
+#
+
+set(EXTERN_DIR ${PROJECT_SOURCE_DIR}/extern)
+set(OCES_MODULE_PATH ${EXTERN_DIR}/oces_viewer)
+set(CRAYSIM_MODULE_PATH ${EXTERN_DIR}/craysim)
+set(MATHS_MODULE_PATH ${EXTERN_DIR}/maths)
 
 # Modules in this repo
 set(MY_MODULES
-  ${CRAYSIM_INCLUDE_PATH}/modules/tk_spline.cppm           # GPL v2
-  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_visual.cppm
-  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_random_walk.cppm # Uses tk_spline, GPL v2
-  ${CRAYSIM_INCLUDE_PATH}/modules/craysim_antbody.cppm
+  ${CRAYSIM_MODULE_PATH}/modules/tk_spline.cppm           # GPL v2
+  ${CRAYSIM_MODULE_PATH}/modules/craysim_random_walk.cppm # Uses tk_spline, GPL v2
+  ${CRAYSIM_MODULE_PATH}/modules/craysim_visual.cppm      # Uses random_walk, GPL v2
+  ${CRAYSIM_MODULE_PATH}/modules/craysim_antbody.cppm
   ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm
 )
 # The OCES reader code
-set(OCES_MODULES ${OCES_INCLUDE_PATH}/oces/reader)
+set(OCES_MODULES ${OCES_MODULE_PATH}/oces/reader)
 # sebsjames/maths
 set(MATHS_CORE_MODULES
-  ${MPLOT_INCLUDE_PATH}/maths/sm/mathconst
-  ${MPLOT_INCLUDE_PATH}/maths/sm/constexpr_math
-  ${MPLOT_INCLUDE_PATH}/maths/sm/polysolve
-  ${MPLOT_INCLUDE_PATH}/maths/sm/bessel_i0
-  ${MPLOT_INCLUDE_PATH}/maths/sm/trait_tests
-  ${MPLOT_INCLUDE_PATH}/maths/sm/range
-  ${MPLOT_INCLUDE_PATH}/maths/sm/random
-  ${MPLOT_INCLUDE_PATH}/maths/sm/vec
-  ${MPLOT_INCLUDE_PATH}/maths/sm/vvec
-  ${MPLOT_INCLUDE_PATH}/maths/sm/quaternion
-  ${MPLOT_INCLUDE_PATH}/maths/sm/mat
+  ${MATHS_MODULE_PATH}/sm/mathconst
+  ${MATHS_MODULE_PATH}/sm/constexpr_math
+  ${MATHS_MODULE_PATH}/sm/polysolve
+  ${MATHS_MODULE_PATH}/sm/bessel_i0
+  ${MATHS_MODULE_PATH}/sm/trait_tests
+  ${MATHS_MODULE_PATH}/sm/range
+  ${MATHS_MODULE_PATH}/sm/random
+  ${MATHS_MODULE_PATH}/sm/vec
+  ${MATHS_MODULE_PATH}/sm/vvec
+  ${MATHS_MODULE_PATH}/sm/quaternion
+  ${MATHS_MODULE_PATH}/sm/mat
 )
 set(MATHS_MATHPLOT_MODULES
-  ${MPLOT_INCLUDE_PATH}/maths/sm/scale
-  ${MPLOT_INCLUDE_PATH}/maths/sm/hdfdata
-  ${MPLOT_INCLUDE_PATH}/maths/sm/winder
-  ${MPLOT_INCLUDE_PATH}/maths/sm/grid
-  ${MPLOT_INCLUDE_PATH}/maths/sm/algo
-  ${MPLOT_INCLUDE_PATH}/maths/sm/histo
-  ${MPLOT_INCLUDE_PATH}/maths/sm/geometry
-  ${MPLOT_INCLUDE_PATH}/maths/sm/geometry_polyhedra
-  ${MPLOT_INCLUDE_PATH}/maths/sm/flags
-  ${MPLOT_INCLUDE_PATH}/maths/sm/centroid
-  ${MPLOT_INCLUDE_PATH}/maths/sm/util
-  ${MPLOT_INCLUDE_PATH}/maths/sm/base64
-  ${MPLOT_INCLUDE_PATH}/maths/sm/crc32
+  ${MATHS_MODULE_PATH}/sm/scale
+  ${MATHS_MODULE_PATH}/sm/hdfdata
+  ${MATHS_MODULE_PATH}/sm/winder
+  ${MATHS_MODULE_PATH}/sm/grid
+  ${MATHS_MODULE_PATH}/sm/algo
+  ${MATHS_MODULE_PATH}/sm/histo
+  ${MATHS_MODULE_PATH}/sm/geometry
+  ${MATHS_MODULE_PATH}/sm/geometry_polyhedra
+  ${MATHS_MODULE_PATH}/sm/flags
+  ${MATHS_MODULE_PATH}/sm/centroid
+  ${MATHS_MODULE_PATH}/sm/util
+  ${MATHS_MODULE_PATH}/sm/base64
+  ${MATHS_MODULE_PATH}/sm/crc32
 )
 # sebsjames/mathplot
 set(MATHPLOT_CORE_MODULES
@@ -544,17 +189,6 @@ set(ANTPOV_VM_MODULES
 set(FIDUCIALS_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.h
 )
-
-# Extra link for cuda toolkit in /usr/local
-link_directories(/usr/local/cuda/lib64)
-
-# By CMake magic, this sorts out include directories including (e.g.)
-# /usr/local/include/compound-ray and gives us a link target which is
-# compound-ray::EyeRenderer3
-find_package (compound-ray)
-
-# We have a local include directory
-include_directories (${PROJECT_SOURCE_DIR}/include)
 
 # Compile stuff in subdirectories
 add_subdirectory(src)
