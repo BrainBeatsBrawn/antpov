@@ -30,7 +30,7 @@ Also the mathplot dependencies (wrt branch dev/modules)
 
 ## Submodules
 
-Ant POV sim uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [sebsjames/craysim](https://github.com/sebsjames/craysim), and [sebsjames/oces_viewer](https://github.com/sebsjames/oces_viewer). sub-submodules are [Taywee/args](https://github.com/Taywee/args) , [nlohmann/json](https://github.com/nlohmann/json) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/sebsjames/compound-ray)
+Ant POV sim uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [sebsjames/craysim](https://github.com/sebsjames/craysim), [sebsjames/oces_viewer](https://github.com/sebsjames/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/sebsjames/compound-ray)
 
 ## Build
 
@@ -56,7 +56,7 @@ make
 Now you can run the program
 
 ```bash
-./build/bin/antpov -f ./data/natural_env.gltf
+./build/antpov -f ./data/natural_env.gltf
 ```
 
 Author: Seb James
