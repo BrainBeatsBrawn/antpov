@@ -1,24 +1,24 @@
 include_directories (BEFORE "${PROJECT_SOURCE_DIR}/mathplot")
 
 set(ANTEYES_VM_MODULES
-  ${MATHS_MODULE_PATH}/sm/binomial
-  ${MATHS_MODULE_PATH}/sm/nm_simplex
-  ${MATHS_MODULE_PATH}/sm/bezcoord
-  ${MATHS_MODULE_PATH}/sm/bezcurve
-  ${MATHS_MODULE_PATH}/sm/bezcurvepath
-  ${MATHS_MODULE_PATH}/sm/hex
-  ${MATHS_MODULE_PATH}/sm/hexgrid
-  ${MATHS_MODULE_PATH}/sm/hexgrid_hdf
+  ${MATHS_MODULE_PATH}/sm/binomial.cppm
+  ${MATHS_MODULE_PATH}/sm/nm_simplex.cppm
+  ${MATHS_MODULE_PATH}/sm/bezcoord.cppm
+  ${MATHS_MODULE_PATH}/sm/bezcurve.cppm
+  ${MATHS_MODULE_PATH}/sm/bezcurvepath.cppm
+  ${MATHS_MODULE_PATH}/sm/hex.cppm
+  ${MATHS_MODULE_PATH}/sm/hexgrid.cppm
+  ${MATHS_MODULE_PATH}/sm/hexgrid_hdf.cppm
 
   ${CRAYSIM_MODULE_PATH}/modules/craysim_antbody.cppm
   ${CRAYSIM_MODULE_PATH}/modules/craysim_doublehexgrid.cppm
 
-  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.h
-  ${MPLOT_INCLUDE_PATH}/mplot/VerticesVisual.h
-  ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.h
-  ${MPLOT_INCLUDE_PATH}/mplot/QuiverVisual.h
-  ${MPLOT_INCLUDE_PATH}/mplot/HexGridVisual.h
-  ${MPLOT_INCLUDE_PATH}/mplot/LengthscaleVisual.h
+  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/VerticesVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/QuiverVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/HexGridVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/LengthscaleVisual.cppm
 )
 
 # Each C++ module file has to be listed here (in case they don't have a .cppm or .ixx file suffix)

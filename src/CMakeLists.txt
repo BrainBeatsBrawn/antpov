@@ -1,8 +1,3 @@
-# All #includes in test programs have to be #include <mplot/header.h>
-#include_directories(BEFORE ${PROJECT_SOURCE_DIR})
-#include_directories (BEFORE "${PROJECT_SOURCE_DIR}/extern/oces_viewer")
-#include_directories (BEFORE "${PROJECT_SOURCE_DIR}/extern/oces_viewer/extern")
-
 # Each C++ module file has to be listed here (as they don't have a .cppm or .ixx file suffix)
 set_source_files_properties (
   ${MY_MODULES}
