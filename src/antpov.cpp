@@ -97,7 +97,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), nullptr);
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
-    antpov::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
+    craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
     eyevm2->show_3d = false;
     eyevm2->twodimensional (true);
     eyevm2->show_sphere = false;
