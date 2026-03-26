@@ -82,9 +82,6 @@ include_directories(
   ${MPLOT_INCLUDE_PATH}
 )
 
-# Maths include path. Allows #include <sm/config> (the only non-modules maths header at the moment)
-include_directories(${PROJECT_SOURCE_DIR}/extern/maths)
-
 # Add the path to the OptiX headers to our include paths. This is
 # required to compile craysim.virtual, which includes compound-ray
 # headers, which refer to some OptiX data structures
@@ -115,6 +112,7 @@ set(OCES_MODULES ${OCES_MODULE_PATH}/oces/reader)
 # sebsjames/maths
 set(MATHS_CORE_MODULES
   ${MATHS_MODULE_PATH}/sm/mathconst.cppm
+  ${MATHS_MODULE_PATH}/sm/config.cppm
   ${MATHS_MODULE_PATH}/sm/constexpr_math.cppm
   ${MATHS_MODULE_PATH}/sm/polysolve.cppm
   ${MATHS_MODULE_PATH}/sm/bessel_i0.cppm

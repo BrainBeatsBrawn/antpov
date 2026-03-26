@@ -45,6 +45,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             throw std::runtime_error ("Failed to read CSV file");
         } else { std::cout << "Read " << v.csv_positions.size() << " ant positions from CSV\n"; }
     }
+    v.max_bc = 32000; // enough to show a whole path from csv
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
     v.bc_clr.resize (csv_antflags.size());
