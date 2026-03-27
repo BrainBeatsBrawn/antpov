@@ -80,7 +80,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
         sv->set_parent (v.get_id());
         sv->setDataCoords (&sphere_coords);
         sv->setScalarData (&data);
-        sv->radiusFixed = hg.getd() * hex_d_prop;
+        sv->radiusFixed = hg.get_d() * hex_d_prop;
         sv->colourScale = clr_scale;
         sv->cm.setType (mplot::ColourMapType::Jet);
         sv->finalize();
@@ -106,7 +106,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
         sv->set_parent (v.get_id());
         sv->setDataCoords (&sphere_coords2);
         sv->setScalarData (&data);
-        sv->radiusFixed = hg.getd() * hex_d_prop;
+        sv->radiusFixed = hg.get_d() * hex_d_prop;
         sv->colourScale = clr_scale;
         sv->cm.setType (mplot::ColourMapType::Jet);
         sv->finalize();
@@ -225,9 +225,9 @@ int main (int argc, char** argv)
     sm::hexgrid hg(hex_d, hex_span, 0.0f);
     // the argument is the circlular boundary radius (0.5 * pi * r_sph) should wrap up to half way round sphere
     if constexpr (proj == spherical_projection::splodge) {
-        hg.setCircularBoundary (0.85f * r_sph);
+        hg.set_circular_boundary (0.85f * r_sph);
     } else {
-        hg.setCircularBoundary (0.5f * mc::pi * r_sph);
+        hg.set_circular_boundary (0.5f * mc::pi * r_sph);
     }
 
     // hg has d_x and d_y. Can make up a new container of 3D locations for each hex.
