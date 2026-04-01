@@ -22,17 +22,16 @@ constexpr int32_t glver = mplot::gl::version_4_3;
 
 std::int32_t main (std::int32_t argc, char* argv[])
 {
-    // craysim-common options parsing
-    sm::flags<craysim::options> opts;
-    auto[gltf_path, csv_path, h5_path, hovh] = craysim::parse_inputs (argc, argv, opts);
+    craysim::parsed_inputs prog_opts = craysim::parse_inputs (argc, argv);
+    if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
 
     // Perhaps we printed options help and can now exit
-    if (opts.test (craysim::options::can_exit)) { return 1; }
+    if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
 
     // Create a craysim main window to render the eye/sensor. This loads in the models from gltf file at path
-    craysim::visual<glver> v (2000, 2000, "Compound-ray sim", gltf_path, h5_path, opts);
+    craysim::visual<glver> v (2000, 2000, "Compound-ray sim", prog_opts);
     // Set the agent hoverheight from our inputs if necessary
-    v.set_hoverheight (hovh, 0.002f); // 2 mm is good for C. velox model
+    v.set_hoverheight (prog_opts.hovh, 0.002f); // 2 mm is good for C. velox model
     // Find the model from the glTF that you want to be the landscape
     v.find_landscape ("Landscape.003,ground_inner_high_res");
 
@@ -41,7 +40,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
         // Note that v.csv_positions is populated.
-        if (antpov::read_csv (csv_path, v.csv_positions, csv_antflags) == false) {
+        if (antpov::read_csv (prog_opts.csv_path, v.csv_positions, csv_antflags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else { std::cout << "Read " << v.csv_positions.size() << " ant positions from CSV\n"; }
     }
@@ -78,7 +77,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
     // APP-SPECIFIC. Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), v.get_head_mesh());
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_data, v.get_ommatidia_ptr(), v.get_head_mesh());
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
     eyevm1->show_3d = true;
@@ -95,7 +94,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->scaleViewMatrix (1000);
 
     // APP-SPECIFIC. 2D eye representation (goes in the other window)
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidiaData, v.get_ommatidia_ptr(), nullptr);
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_data, v.get_ommatidia_ptr(), nullptr);
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
     craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
@@ -128,17 +127,17 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // APP-SPECIFIC. Put all our 'other windows' in a container, which we pass in to render_and_poll()
-    std::vector<mplot::Visual<glver>*> other_windows = { &vant, &veye };
+    v.other_windows = { &vant, &veye };
     // Similar for our other eyes
-    std::vector<mplot::compoundray::EyeVisual<glver>*> other_eyes = { ep1, ep2 };
+    v.other_eyes = { ep1, ep2 };
 
     // The main program loop
     while (!v.readyToFinish()) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
 
-        v.render_and_poll (other_windows, other_eyes); // Does all the render computations
+        v.render_and_poll(); // Does all the render computations
 
-        // Here is where you would work on the data for the last view in v.ommatidiaData;
+        // Here is where you would work on the data for the last view in v.ommatidia_data;
 
         v.end_loop_timer(); // Mark that we got to the end of the loop
     }
