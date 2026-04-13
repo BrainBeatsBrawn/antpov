@@ -107,8 +107,10 @@ include(${PROJECT_SOURCE_DIR}/extern/mathplot/cmake/module_definitions.cmake)
 setup_module_variables_for_mathplot_maths (${PROJECT_SOURCE_DIR}/extern/maths)
 setup_module_variables_for_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot)
 # craysim module defs
-#include(${PROJECT_SOURCE_DIR}/extern/craysim/cmake/module_definitions.cmake)
-#setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim)
+include(${PROJECT_SOURCE_DIR}/extern/craysim/cmake/module_definitions.cmake)
+setup_module_variables_for_craysim_maths (${PROJECT_SOURCE_DIR}/extern/maths)
+setup_module_variables_for_craysim_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot)
+setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim)
 
 set(EXTERN_DIR ${PROJECT_SOURCE_DIR}/extern)
 set(OCES_MODULE_PATH ${EXTERN_DIR}/oces_viewer)
@@ -118,14 +120,7 @@ set(MATHPLOT_MODULE_PATH ${EXTERN_DIR}/mathplot)
 
 # Modules in this repo
 set(MY_MODULES
-  ${CRAYSIM_MODULE_PATH}/modules/tk_spline.cppm           # GPL v2
-  ${CRAYSIM_MODULE_PATH}/modules/craysim_random_walk.cppm # Uses tk_spline, GPL v2
-  ${CRAYSIM_MODULE_PATH}/modules/craysim_visual.cppm      # Uses random_walk, GPL v2
-  ${CRAYSIM_MODULE_PATH}/modules/craysim_antbody.cppm
   ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm
-  ${MATHS_MODULE_PATH}/sm/config.cppm                     # reqd by craysim
-  ${MATHS_MODULE_PATH}/sm/hdfdata.cppm                    # reqd by craysim
-  ${MATHPLOT_MODULE_PATH}/mplot/fps/profiler.cppm         # reqd by craysim
 )
 
 # The OCES reader code
