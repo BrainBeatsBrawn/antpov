@@ -25,9 +25,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     craysim::parsed_inputs prog_opts = craysim::parse_inputs (argc, argv);
     if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
 
-    // Perhaps we printed options help and can now exit
-    if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
-
     // Create a craysim main window to render the eye/sensor. This loads in the models from gltf file at path
     craysim::visual<glver> v (2000, 2000, "Compound-ray sim", prog_opts);
     // Set the agent hoverheight from our inputs if necessary
