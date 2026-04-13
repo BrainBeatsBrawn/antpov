@@ -61,8 +61,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
             v.bc_scale[i] = 0.5f;
         }
     }
-    // Once CSV has be read (if you are using that feature) do some setup on the landscape
+    // Once CSV has been read (if you are using that feature) do some setup on the landscape
     v.setup_landscape();
+
+    // From cmd line output (after ctrl-z) set the initial view
+    v.setSceneTrans (sm::vec<float,3>{ float{0.682335}, float{0.47893}, float{-8.38334} });
+    v.setSceneRotation (sm::quaternion<float>{ float{0.73946}, float{0.6732}, float{0.00036425}, float{0.000331613} });
+
     // Enable random walking. n_steps, a_tau, kappa are the params
     v.setup_random_walk (1500, 150, 100);
 
