@@ -69,7 +69,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.setSceneRotation (sm::quaternion<float>{ float{0.73946}, float{0.6732}, float{0.00036425}, float{0.000331613} });
 
     // Enable random walking. n_steps, a_tau, kappa are the params
-    v.setup_random_walk (1500, 150, 100);
+    v.setup_random_walk (1500, 150, 100.0f, 0.05f);
 
     // APP-SPECIFIC. A window for the 2D eye view projection
     mplot::Visual<glver> veye (920, 512, "Eye view");
