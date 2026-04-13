@@ -114,37 +114,24 @@ setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim)
 
 set(EXTERN_DIR ${PROJECT_SOURCE_DIR}/extern)
 set(OCES_MODULE_PATH ${EXTERN_DIR}/oces_viewer)
-set(CRAYSIM_MODULE_PATH ${EXTERN_DIR}/craysim)
-set(MATHS_MODULE_PATH ${EXTERN_DIR}/maths)
-set(MATHPLOT_MODULE_PATH ${EXTERN_DIR}/mathplot)
 
 # Modules in this repo
-set(MY_MODULES
-  ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm
-)
+set(MY_MODULES ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm)
 
 # The OCES reader code
 set(OCES_MODULES ${OCES_MODULE_PATH}/oces/reader)
 
-# Define a list of the VisualModel modules that we require in antpov
+# Define a list of the additional VisualModel modules that we make use of in antpov
 set(ANTPOV_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/GraphVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/GridVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/RodVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/VectorVisual.cppm
-  ${MPLOT_INCLUDE_PATH}/mplot/VerticesVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/SphereVisual.cppm
-  ${MPLOT_INCLUDE_PATH}/mplot/NormalsVisual.cppm
-  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/interop.cppm
-  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/Ommatidium.cppm
-  ${MPLOT_INCLUDE_PATH}/mplot/compoundray/EyeVisual.cppm
-  ${MPLOT_INCLUDE_PATH}/mplot/InstancedScatterVisual.cppm
 )
 
 # Define a list of the VisualModel modules that we require in fiducials
-set(FIDUCIALS_VM_MODULES
-  ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm
-)
+set(FIDUCIALS_VM_MODULES ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm)
 
 # Compile stuff in subdirectories
 add_subdirectory(src)
