@@ -10,6 +10,9 @@ set(ANTEYES_VM_MODULES
   ${MATHS_MODULE_PATH}/sm/hexgrid.cppm
   ${MATHS_MODULE_PATH}/sm/hexgrid_hdf.cppm
 
+  ${MATHS_MODULE_PATH}/sm/hdfdata.cppm # should come in with a var called CRAYSIM_MODULES
+  ${MATHS_MODULE_PATH}/sm/config.cppm
+
   ${CRAYSIM_MODULE_PATH}/modules/craysim_antbody.cppm
   ${CRAYSIM_MODULE_PATH}/modules/craysim_doublehexgrid.cppm
 
@@ -23,11 +26,9 @@ set(ANTEYES_VM_MODULES
 
 # Each C++ module file has to be listed here (in case they don't have a .cppm or .ixx file suffix)
 set_source_files_properties (
-  ${MY_MODULES}
-  ${OCES_MODULES}
-  ${MATHS_CORE_MODULES}
-  ${MATHS_MATHPLOT_MODULES}
-  ${MATHPLOT_CORE_MODULES}
+  ${MPLOT_MATHS_CORE_MODULES}
+  ${MPLOT_MATHS_VISUALMODEL_MODULES}
+  ${MPLOT_CORE_MODULES}
   ${ANTEYES_VM_MODULES}
   PROPERTIES LANGUAGE CXX
 )
@@ -40,6 +41,7 @@ add_library(glad2 STATIC ${MPLOT_INCLUDE_PATH}/mplot/glad/gl.c)
 add_library(mplot_fontdata2 STATIC ${MPLOT_INCLUDE_PATH}/mplot/VisualFaceAsm.cpp)
 
 add_executable (ant_eyes ant_eyes.cpp)
-set(ANTEYES_MODULES ${MATHS_CORE_MODULES} ${MATHS_MATHPLOT_MODULES} ${MATHPLOT_CORE_MODULES} ${ANTEYES_VM_MODULES})
+set(ANTEYES_MODULES ${MPLOT_MATHS_CORE_MODULES} ${MPLOT_MATHS_VISUALMODEL_MODULES} ${MPLOT_CORE_MODULES} ${ANTEYES_VM_MODULES})
+list(REMOVE_DUPLICATES ANTEYES_MODULES)
 target_sources(ant_eyes PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR} FILES ${ANTEYES_MODULES})
 target_link_libraries(ant_eyes ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glfw glad2 mplot_fontdata2)
