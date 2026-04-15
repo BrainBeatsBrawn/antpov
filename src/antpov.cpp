@@ -32,6 +32,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Find the model from the glTF that you want to be the landscape
     v.find_landscape ("Landscape.003,ground_inner_high_res");
 
+    v.frame_tau = 0.3;
+
     // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
     sm::vvec<std::uint32_t> csv_antflags;
     if (v.sim_opts.test (craysim::options::path_from_csv)) {

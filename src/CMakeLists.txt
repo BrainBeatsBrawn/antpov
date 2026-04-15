@@ -45,3 +45,19 @@ target_sources(antpov
   FILES ${ANTPOV_MODULES}
 )
 target_link_libraries(antpov ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glad mplot_fontdata)
+
+# Ant direction processing test
+set(DIRNS_MODULES
+  ${MPLOT_MATHS_CORE_MODULES}
+  ${MPLOT_CORE_MODULES}
+  ${MPLOT_MATHS_VISUALMODEL_MODULES}
+  ${MPLOT_INCLUDE_PATH}/mplot/GraphVisual.cppm
+  ${MY_MODULES}
+)
+list(REMOVE_DUPLICATES DIRNS_MODULES)
+add_executable(dirns dirns.cpp)
+target_sources(dirns
+  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
+  FILES ${DIRNS_MODULES}
+)
+target_link_libraries(dirns ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)

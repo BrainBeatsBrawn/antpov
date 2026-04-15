@@ -9,9 +9,7 @@ export module antpov.helpers;
 
 import sm.vvec;
 import sm.vec;
-
 import mplot.tools;
-import mplot.compoundray.eyevisual;
 
 export namespace antpov
 {
