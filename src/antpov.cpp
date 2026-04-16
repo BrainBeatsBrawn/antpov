@@ -18,7 +18,7 @@ import craysim.antbody;
 import antpov.helpers;
 
 // OpenGL 4.3 for Instanced VisualModels
-constexpr int32_t glver = mplot::gl::version_4_3;
+constexpr std::int32_t glver = mplot::gl::version_4_3;
 
 std::int32_t main (std::int32_t argc, char* argv[])
 {
