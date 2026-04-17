@@ -42,6 +42,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
         if (antpov::read_csv (prog_opts.csv_path, v.csv_positions, csv_antflags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else { std::cout << "Read " << v.csv_positions.size() << " ant positions from CSV\n"; }
+
+        // Now process the positions to generate directions.
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path from csv
     // Turn antflags into colour info, all at the start:

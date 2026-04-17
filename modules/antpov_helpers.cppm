@@ -4,11 +4,14 @@ module;
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <cmath>
+#include <tuple>
 
 export module antpov.helpers;
 
 import sm.vvec;
 import sm.vec;
+import sm.algo;
 import mplot.tools;
 
 export namespace antpov
@@ -19,7 +22,8 @@ export namespace antpov
         bush,
         cookie,
         shadow,
-        visibility
+        visibility,
+        direction_uncertain
     };
 
     // Read a simple csv with 2D coordinates. Should also read flags. Ah - this is ant specific
@@ -45,6 +49,99 @@ export namespace antpov
             }
         }
         return true;
+    }
+
+    /*
+     * Process the 2D positions into 2D antflags and directions
+     *
+     * \param positions input. the coordinates or each agent location
+     *
+     * \param antflags input/output. existing antflags, which may be updated with 'direction uncertain'
+     *
+     * \param dirns output. the computed agent directions
+     *
+     * \param block input. number of elements per block. A parameter
+     *
+     * \param max_delta_phi input. A threshold parameter
+     *
+     * \return tuple containing pos_orig (original positions for debug vis) and dirn_orig (original directions for debug vis)
+     */
+    std::tuple<sm::vvec<sm::vec<float, 2>>, sm::vvec<sm::vec<float, 2>>>
+    process_positions (const sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags,
+                       sm::vvec<sm::vec<float, 2>>& dirns,
+                       const std::uint32_t block = 3, const float max_delta_phi = 2.8f)
+    {
+        // Find our instantaneous directions using the next datum
+
+        sm::vvec<float> phi (positions.size(), 0.0f); // Absolute angle of direction
+        sm::vvec<float> dphi (positions.size(), 0.0f); // angle change from one movement to the next
+
+        for (std::uint32_t i = 0; i < positions.size() - 1; ++i) {
+
+            dirns[i] = positions[i+1] - positions[i];
+            phi[i] = dirns[i].angle(); // initially -pi to pi
+
+            if (i > 0) {
+                dphi[i] = dirns[i].angle (dirns[i-1]);
+                if (std::isnan (dphi[i])) {
+                    dphi[i] = 0.0f;
+                    phi[i] = phi[i - 1];
+                } // caused if dirns[i] or [i-1] had zero length
+            }
+        }
+
+        // Analyse the angle change during blocks of movements. If angle change is greater than
+        // threshold then we're milling about.
+
+        // Should we replace uncertain directions?
+        constexpr bool replace_uncertain_directions = true;
+        sm::vvec<sm::vec<float, 2>> pos_orig;
+        sm::vvec<sm::vec<float, 2>> dirn_orig;
+
+        sm::vvec<float> blk_angles (block, 0.0f);
+        std::uint32_t blk_needs_update = std::numeric_limits<std::uint32_t>::max();
+        for (std::uint32_t i = 0; i < positions.size(); ++i) {
+
+            // Get mean vector for block starting at i
+            sm::vec<float, 2> dav = {};
+            for (std::uint32_t j = 0; j < block; ++j) {
+                dav += dirns[i + j];
+                blk_angles[j] = dirns[i + j].angle();
+            }
+            dav /= block; // dav is now the direction average
+
+            blk_angles -= dav.angle(); // subtract mean angle from blk_angles...
+            for (std::uint32_t j = 0; j < block; ++j) { sm::algo::minus_pi_to_pi (blk_angles[j]); } // and offset, so they cluster around 0
+
+            // Is the span of the range of angles in the block above threshold?
+            if (blk_angles.range().span() > max_delta_phi) { // then mark this block as 'direction uncertain'
+                if constexpr (replace_uncertain_directions) {
+                    blk_needs_update = i;
+                }
+                for (std::uint32_t j = 0; j < block && i + j < positions.size(); ++j) {
+                    antflags[i] |= 16u; // mark as 'direction uncertain'
+                    if constexpr (replace_uncertain_directions) {
+                        pos_orig.push_back (positions[i + j]); // now these are 'original'
+                        dirn_orig.push_back (dirns[i + j]);
+                        // Want to replace dirns[i + j] with the average of the start direction and the
+                        // direction at the start of the next direction-certain block. That means storing the
+                        // start direction and coming back to update.
+                    }
+                }
+                i += block - 1; // because this block is direction-uncertain, jump all the way to the next block, instead of just ++i
+            } else {
+                if constexpr (replace_uncertain_directions) {
+                    // This is a 'good block' so update any preceding bad blocks
+                    if (blk_needs_update < std::numeric_limits<std::uint32_t>::max()) {
+                        auto newdirn = (dirns[blk_needs_update] + dirns[i]) * 0.5f;
+                        for (std::uint32_t j = blk_needs_update; j < i; ++j) { dirns[j] = newdirn; }
+                        blk_needs_update = std::numeric_limits<std::uint32_t>::max();
+                    }
+                }
+            }
+        }
+
+        return { pos_orig, dirn_orig };
     }
 
 } // namespace antpov
