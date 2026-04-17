@@ -32,28 +32,34 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Find the model from the glTF that you want to be the landscape
     v.find_landscape ("Landscape.003,ground_inner_high_res");
 
-    v.frame_tau = 0.3;
+    v.frame_tau = 2;
 
     // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
-    sm::vvec<std::uint32_t> csv_antflags;
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
         // Note that v.csv_positions is populated.
-        if (antpov::read_csv (prog_opts.csv_path, v.csv_positions, csv_antflags) == false) {
+        if (antpov::read_csv (prog_opts.csv_path, v.csv_positions, v.csv_flags) == false) {
             throw std::runtime_error ("Failed to read CSV file");
         } else { std::cout << "Read " << v.csv_positions.size() << " ant positions from CSV\n"; }
 
         // Now process the positions to generate directions.
+        v.csv_dirns.resize (v.csv_positions.size(), sm::vec<float, 2>{});
+        std::uint32_t block = 3;
+        float max_delta_phi = 2.8f;
+        // maybe process_positions belongs in craysim.visual?
+        antpov::process_positions (v.csv_positions, v.csv_flags, v.csv_dirns, block, max_delta_phi);
+        // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path from csv
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
-    v.bc_clr.resize (csv_antflags.size());
-    v.bc_alpha.resize (csv_antflags.size());
-    v.bc_scale.resize (csv_antflags.size());
-    for (std::uint32_t i = 0; i < csv_antflags.size(); ++i) {
-        aflags = csv_antflags[i];
+    v.bc_clr.resize (v.csv_flags.size());
+    v.bc_alpha.resize (v.csv_flags.size());
+    v.bc_scale.resize (v.csv_flags.size());
+    for (std::uint32_t i = 0; i < v.csv_flags.size(); ++i) {
+        aflags = v.csv_flags[i];
         v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
+        if (aflags.test (antpov::antflags::direction_uncertain)) { v.bc_clr[i] = mplot::colour::crimson; }
         if (i % 4 == 0) {
             v.bc_alpha[i] = 1.0f;
             v.bc_scale[i] = 1.0f;
@@ -140,6 +146,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // The main program loop
     while (!v.readyToFinish()) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
+
+        // Greyscale the eyes when unsure of direction
+        ep2->greyscale ((v.csv_flags[v.move_counter] & 16u) == 16u ? true : false);
 
         v.render_and_poll(); // Does all the render computations
 

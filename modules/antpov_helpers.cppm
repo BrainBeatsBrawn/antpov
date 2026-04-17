@@ -119,7 +119,7 @@ export namespace antpov
                     blk_needs_update = i;
                 }
                 for (std::uint32_t j = 0; j < block && i + j < positions.size(); ++j) {
-                    antflags[i] |= 16u; // mark as 'direction uncertain'
+                    antflags[i + j] |= 16u; // mark as 'direction uncertain'
                     if constexpr (replace_uncertain_directions) {
                         pos_orig.push_back (positions[i + j]); // now these are 'original'
                         dirn_orig.push_back (dirns[i + j]);

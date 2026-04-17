@@ -48,24 +48,26 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Set up quiver dataset style
     mplot::DatasetStyle dsq (mplot::stylepolicy::markers);
     dsq.markerstyle = mplot::markerstyle::quiver_fromcoord;
-    dsq.markersize /= 16;
+    dsq.markersize /= 128;
     dsq.quiver_colourmap.setType (mplot::ColourMapType::Jet);
     dsq.quiver_flagset.reset (mplot::quiver_flags::colour_fixed);
     dsq.quiver_flagset.set (mplot::quiver_flags::thickness_fixed);
     dsq.quiver_flagset.reset (mplot::quiver_flags::show_zeros);
     dsq.quiver_flagset.reset (mplot::quiver_flags::marker_sphere);
-    dsq.linewidth /= 10;
+    dsq.linewidth /= 80;
     // Create the graph
     sm::vec<float> offset = { -1.5f, -1.0f, 0.0f };
     auto gv = std::make_unique<mplot::GraphVisual<float, glver>> (offset);
     gv->set_parent (v.get_id());
     gv->setsize (3, 2);
     gv->setdata (positions, dirns, clr, dsq);
+#if 0
     if (!pos_orig.empty()) {
         dsq.quiver_flagset.set (mplot::quiver_flags::colour_fixed);
         dsq.linecolour = mplot::colour::purple;
         gv->setdata (pos_orig, dirn_orig, dsq);
     }
+#endif
     gv->finalize();
     v.addVisualModel (gv);
 
