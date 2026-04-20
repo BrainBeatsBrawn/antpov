@@ -32,7 +32,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Find the model from the glTF that you want to be the landscape
     v.find_landscape ("Landscape.003,ground_inner_high_res");
 
-    v.frame_tau = 2;
+    v.frame_tau = 0.017;
 
     // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
@@ -43,11 +43,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
         } else { std::cout << "Read " << v.csv_positions.size() << " ant positions from CSV\n"; }
 
         // Now process the positions to generate directions.
-        v.csv_dirns.resize (v.csv_positions.size(), sm::vec<float, 2>{});
         std::uint32_t block = 3;
         float max_delta_phi = 2.8f;
         // maybe process_positions belongs in craysim.visual?
-        antpov::process_positions (v.csv_positions, v.csv_flags, v.csv_dirns, block, max_delta_phi);
+        sm::vvec<sm::vec<float, 2>> dirns (v.csv_positions.size(), sm::vec<float, 2>{}); // dummy, unused
+        antpov::process_positions<false> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path from csv

@@ -32,7 +32,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
      * Process the positions
      */
     sm::vvec<sm::vec<float, 2>> dirns (positions.size(), sm::vec<float, 2>{});
-    const auto[pos_orig, dirn_orig] = antpov::process_positions (positions, antflags, dirns, block, max_delta_phi);
+    const auto[pos_orig, dirn_orig] = antpov::process_positions<false> (positions, antflags, dirns, block, max_delta_phi);
 
     // Get colour from antflags
     sm::vvec<float> clr (positions.size(), 0.0f);
@@ -43,18 +43,19 @@ std::int32_t main (std::int32_t argc, char* argv[])
     /*
      * Plot the results
      */
+    float sz = 4.0f;
 
     mplot::Visual<glver> v(1024, 768, "Ant direction analysis");
     // Set up quiver dataset style
     mplot::DatasetStyle dsq (mplot::stylepolicy::markers);
     dsq.markerstyle = mplot::markerstyle::quiver_fromcoord;
-    dsq.markersize /= 128;
+    dsq.markersize /= sz * 8.0f;
     dsq.quiver_colourmap.setType (mplot::ColourMapType::Jet);
     dsq.quiver_flagset.reset (mplot::quiver_flags::colour_fixed);
     dsq.quiver_flagset.set (mplot::quiver_flags::thickness_fixed);
     dsq.quiver_flagset.reset (mplot::quiver_flags::show_zeros);
     dsq.quiver_flagset.reset (mplot::quiver_flags::marker_sphere);
-    dsq.linewidth /= 80;
+    dsq.linewidth /= sz * 5.0f;
     // Create the graph
     sm::vec<float> offset = { -1.5f, -1.0f, 0.0f };
     auto gv = std::make_unique<mplot::GraphVisual<float, glver>> (offset);
@@ -64,7 +65,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
 #if 0
     if (!pos_orig.empty()) {
         dsq.quiver_flagset.set (mplot::quiver_flags::colour_fixed);
-        dsq.linecolour = mplot::colour::purple;
+        dsq.linecolour = mplot::colour::springgreen;
         gv->setdata (pos_orig, dirn_orig, dsq);
     }
 #endif

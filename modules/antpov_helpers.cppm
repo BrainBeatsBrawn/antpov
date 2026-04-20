@@ -54,6 +54,9 @@ export namespace antpov
     /*
      * Process the 2D positions into 2D antflags and directions
      *
+     * \tparam replace_uncertain_directions If true, then attempt to replace uncertain directions
+     * with an average direction. If false, simply mark the uncertainty
+     *
      * \param positions input. the coordinates or each agent location
      *
      * \param antflags input/output. existing antflags, which may be updated with 'direction uncertain'
@@ -66,6 +69,7 @@ export namespace antpov
      *
      * \return tuple containing pos_orig (original positions for debug vis) and dirn_orig (original directions for debug vis)
      */
+    template <bool replace_uncertain_directions = true>
     std::tuple<sm::vvec<sm::vec<float, 2>>, sm::vvec<sm::vec<float, 2>>>
     process_positions (const sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags,
                        sm::vvec<sm::vec<float, 2>>& dirns,
@@ -93,8 +97,6 @@ export namespace antpov
         // Analyse the angle change during blocks of movements. If angle change is greater than
         // threshold then we're milling about.
 
-        // Should we replace uncertain directions?
-        constexpr bool replace_uncertain_directions = true;
         sm::vvec<sm::vec<float, 2>> pos_orig;
         sm::vvec<sm::vec<float, 2>> dirn_orig;
 
@@ -139,6 +141,23 @@ export namespace antpov
                     }
                 }
             }
+        }
+
+        // Post-process antflags uncertainty - blur it, then re-signum it, so that clusters of uncertainty become larger
+
+        // Convert flags to floats
+        sm::vvec<float> uncer (positions.size(), 0.0f);
+        for (std::uint32_t i = 0; i < uncer.size(); ++i) {
+            uncer[i] = (antflags[i] & 16u) == 16u ? 1.0f : 0.0f;
+        }
+        // Perform the convolution then signum
+        sm::vvec<float> kern (5, 0.0f); // 5 is a parameter really
+        kern.set_from (1.0f / kern.size());
+        uncer.convolve_inplace (kern);
+        uncer.signum_inplace();
+        // Convert floats back to flags
+        for (std::uint32_t i = 0; i < uncer.size(); ++i) {
+            if (uncer[i] > 0.0f) { antflags[i] |= 16u; }
         }
 
         return { pos_orig, dirn_orig };
