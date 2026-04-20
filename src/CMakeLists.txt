@@ -61,3 +61,29 @@ target_sources(dirns
   FILES ${DIRNS_MODULES}
 )
 target_link_libraries(dirns ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+
+# Flow vis for ant tracking
+set(FLOW_VIS_MODULES
+  ${MPLOT_MATHS_CORE_MODULES}
+  ${MPLOT_CORE_MODULES}
+  ${MPLOT_MATHS_HEXGRID_MODULES}
+  ${MPLOT_MATHS_VISUALMODEL_MODULES}
+  ${SM_CONFIG_MODULES}
+  ${PROJECT_SOURCE_DIR}/modules/FlowProcessorBase.cppm
+  ${PROJECT_SOURCE_DIR}/modules/FlowProcessor.cppm
+  ${PROJECT_SOURCE_DIR}/modules/FlowProcessorDyn.cppm
+  ${PROJECT_SOURCE_DIR}/modules/FlowParameters.cppm
+  ${PROJECT_SOURCE_DIR}/modules/FlowConfig.cppm
+  ${PROJECT_SOURCE_DIR}/modules/flowexample.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/HexGridVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/GridVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/VectorVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/HSVWheelVisual.cppm
+)
+list(REMOVE_DUPLICATES FLOW_VIS_MODULES)
+add_executable(flow_vis flow_vis.cpp)
+target_sources(flow_vis
+  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
+  FILES ${FLOW_VIS_MODULES}
+)
+target_link_libraries(flow_vis ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
