@@ -287,6 +287,8 @@ export namespace perception
         FlowProcessor & operator=(FlowProcessor<img_w, img_h, F> &&)      = delete;
         ///@}
 
+        virtual ~FlowProcessor() {}
+
         /**
          * \brief Update input and have it processed
          *
