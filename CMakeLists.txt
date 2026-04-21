@@ -98,6 +98,7 @@ include_directories ("${PROJECT_SOURCE_DIR}/extern")
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot/cmake" ${CMAKE_MODULE_PATH})
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/maths/cmake" ${CMAKE_MODULE_PATH})
 # we have already added extern/craysim/cmake to the module path.
+set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/oces_viewer/cmake" ${CMAKE_MODULE_PATH})
 
 # Include maths module defs
 include(${PROJECT_SOURCE_DIR}/extern/maths/cmake/module_definitions.cmake)
@@ -111,15 +112,16 @@ include(${PROJECT_SOURCE_DIR}/extern/craysim/cmake/module_definitions.cmake)
 setup_module_variables_for_craysim_maths (${PROJECT_SOURCE_DIR}/extern/maths)
 setup_module_variables_for_craysim_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot)
 setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim)
-
-set(EXTERN_DIR ${PROJECT_SOURCE_DIR}/extern)
-set(OCES_MODULE_PATH ${EXTERN_DIR}/oces_viewer)
+# OCES
+include(${PROJECT_SOURCE_DIR}/extern/oces_viewer/cmake/module_definitions.cmake)
+setup_module_variables_for_oces_reader_maths (${PROJECT_SOURCE_DIR}/extern/maths)
+setup_module_variables_for_oces_reader (${PROJECT_SOURCE_DIR}/extern/oces_viewer)
 
 # Modules in this repo
 set(MY_MODULES ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm)
 
 # The OCES reader code
-set(OCES_MODULES ${OCES_MODULE_PATH}/oces/reader)
+set(OCES_MODULES ${OCES_READER_MATHS_MODULES} ${OCES_READER_MODULES})
 
 # Define a list of the additional VisualModel modules that we make use of in antpov
 set(ANTPOV_VM_MODULES
