@@ -1,0 +1,37 @@
+{
+    "description" : "Edge mode parameters",
+    "apply_input_compression" : false,
+    "apply_edge_detection" : true,
+    "apply_edge_compression" : true,
+    "apply_smoothing" : true,
+    "apply_pooling" : false,
+    "apply_rhd_gating" : true,
+    "apply_pr_squashing" : false,
+
+    "pair1" : true,
+    "pair2" : false,
+    "pair3" : true,
+    "pair4" : false,
+    "sensor_distance" : 2,
+
+    "ic_tanhm" : 3,
+    "si_sd_scale" : 20,
+    "si_tau" : 100,
+
+    "eic_value" : 1,
+    "eic_threshold" : 0.05,
+    "eic_signal_feedin" : 0.1,
+
+    "pr_a_tau" : 8,
+    "pr_b_tau" : 16.6,
+
+    "pr_squash_m" : 3,
+
+    "dly_f_tau" : 5,
+    "dly_s_tau" : 15,
+
+    "rhd_filt_thresh" : 0.004,
+
+    "div_scale" : 1,
+    "div_offset" : 0.001
+}

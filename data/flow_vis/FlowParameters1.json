@@ -1,0 +1,32 @@
+{
+    "description" : "Non-edge mode parameters",
+    "apply_input_compression" : true,
+    "apply_edge_detection" : false,
+    "apply_smoothing" : true,
+    "apply_pooling" : true,
+    "apply_rhd_gating" : false,
+    "apply_pr_squashing" : true,
+
+    "pair1" : true,
+    "pair2" : false,
+    "pair3" : true,
+    "pair4" : false,
+
+    "sensor_distance" : 4,
+
+    "ic_tanhm" : 3,
+    "si_sd_scale" : 10,
+    "si_tau" : 50,
+
+    "pr_a_tau" : 0.6,
+    "pr_b_tau" : 2.5,
+    "pr_squash_m" : 3,
+
+    "dly_f_tau" : 2,
+    "dly_s_tau" : 30,
+
+    "rhd_filt_thresh" : 0.004,
+
+    "div_scale" : 1,
+    "div_offset" : 0.001
+}

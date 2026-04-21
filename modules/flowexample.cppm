@@ -30,12 +30,9 @@ export namespace flowexample
 {
     constexpr int gl_version = mplot::gl::version_4_6;
 
-    constexpr int img_w = 256;
-    constexpr int img_h = 65;
+    constexpr int img_w = 1920;
+    constexpr int img_h = 1080;
     constexpr int img_sz = img_w * img_h;
-    constexpr int first_png = 460;
-    constexpr int last_png = 2067;
-    constexpr int num_pngs = last_png - first_png + 1;
 
     /**
      * \brief A struct for optic flow output, in visualizable form
@@ -112,6 +109,31 @@ export namespace flowexample
             for (size_t i = 0; i < flow_2d.pool3_sz; ++i) {
                 this->pool3[i][0] = flow_2d.pool3[i][0];
                 this->pool3[i][1] = flow_2d.pool3[i][1];
+            }
+        }
+
+        // Helper to copy array of vecs to vvec of vecs (for viz)
+        void copy_in (perception::FlowProcessor<img_w, img_h, float>* flow_2d)
+        {
+            // fmain
+            for (size_t i = 0; i < flow_2d->img_sz; ++i) {
+                this->fmain[i][0] = flow_2d->out[i][0];
+                this->fmain[i][1] = flow_2d->out[i][1];
+            }
+            // pool1
+            for (size_t i = 0; i < flow_2d->pool1_sz; ++i) {
+                this->pool1[i][0] = flow_2d->pool1[i][0];
+                this->pool1[i][1] = flow_2d->pool1[i][1];
+            }
+            // pool2
+            for (size_t i = 0; i < flow_2d->pool2_sz; ++i) {
+                this->pool2[i][0] = flow_2d->pool2[i][0];
+                this->pool2[i][1] = flow_2d->pool2[i][1];
+            }
+            // pool3
+            for (size_t i = 0; i < flow_2d->pool3_sz; ++i) {
+                this->pool3[i][0] = flow_2d->pool3[i][0];
+                this->pool3[i][1] = flow_2d->pool3[i][1];
             }
         }
     };
@@ -322,17 +344,29 @@ export namespace flowexample
     struct FlowVisual final : public mplot::Visual<gl_version>
     {
         /// Boilerplate constructor calls Visual constructor
-        FlowVisual(int width, int height, const std::string & title) : mplot::Visual<gl_version>(width, height, title) {}
+        FlowVisual(int width, int height, const std::string & title) : mplot::Visual<gl_version>(width, height, title)
+        {
+            this->addLabel ("0", {0.0f, -0.46f, 0.0f}, this->framenum_label);
+        }
         /// If true, pause the flow processing
         bool paused = false;
-        /// If true and if in paused mode, step forward one timestep in the camera input
-        bool stepfwd = false;
+        /// Time direction
+        bool stepfwd = true;
+        /// If paused, step one frame
+        bool stepone = true;
         /// In turbo mode, do more frames per second
         bool turbo = false;
+        /// The frame number
+        mplot::VisualTextModel<gl_version>* framenum_label;
+        int current_frame = 0;
+        void framenum_label_update()
+        {
+            this->framenum_label->setupText (std::to_string (this->current_frame));
+        }
 
     protected:
         /// Add our key event handling in this extension of mplot::Visual::key_callback_extra
-        void key_callback_extra(int key, int scancode, int action, int mods) override
+        void key_callback_extra (int key, int scancode, int action, int mods) override
         {
             // get round compiler errors for unused scancode/mods args
             if constexpr (false) {std::cout << "scancode: " << scancode << " mods " << mods << std::endl;}
@@ -343,10 +377,16 @@ export namespace flowexample
             // T key means toggle turbo
             if (key == mplot::key::t && action == mplot::keyaction::press) {
                 this->turbo = this->turbo ? false : true;
+                if (this->turbo) { std::cout << "TURBO!" << std::endl; }
             }
             // Right arrow key to step forward
-            if (key == mplot::key::right && action == mplot::keyaction::press && this->paused) {
+            if (key == mplot::key::right && action == mplot::keyaction::press) {
                 this->stepfwd = true;
+                this->stepone = true;
+            }
+            if (key == mplot::key::left && action == mplot::keyaction::press) {
+                this->stepfwd = false;
+                this->stepone = true;
             }
             // Add app-specific help output:
             if (key == mplot::key::h && action == mplot::keyaction::press) {
