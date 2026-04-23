@@ -46,12 +46,15 @@ export namespace antpov
             // Get flags from third entry
             tokens.clear();
             tokens = mplot::tools::stringToVector (line, ",");
-            if (tokens.size() > 5) {
-                std::uint32_t fl = std::stoi (tokens[2]) + 2 * std::stoi (tokens[3])+ 4 * std::stoi (tokens[4])+ 8 * std::stoi (tokens[5]);
-                antflags.push_back (fl);
-            } else {
-                antflags.push_back (0u);
-            }
+            std::uint32_t fl = 0u;
+            if (tokens.size() == 6) {
+                // We have flags as four columns: 1,0,1,0
+                fl = std::stoi (tokens[2]) + 2 * std::stoi (tokens[3])+ 4 * std::stoi (tokens[4])+ 8 * std::stoi (tokens[5]);
+            } else if (tokens.size() == 3) {
+                // We have flags compressed into a single integer, so 1,0,1,0 would become 10 (decimal)
+                fl = std::stoi (tokens[2]);
+            } // else fl is 0u
+            antflags.push_back (fl);
         }
         return true;
     }
