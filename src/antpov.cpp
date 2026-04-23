@@ -153,9 +153,18 @@ std::int32_t main (std::int32_t argc, char* argv[])
     while (!v.readyToFinish()) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
 
-        // Greyscale the eyes when we're in a section that was marked invisible
-        ep2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
-
+        if (v.move_counter < v.csv_flags.size()) {
+            // Greyscale the eyes when we're in a section that was marked invisible
+            ep2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+            // Also the ant head/eyes and body
+            ep1->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+            ant_ptr1->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+        } else {
+            ep2->greyscale (false);
+            // Also the ant head/eyes and body
+            ep1->greyscale (false);
+            ant_ptr1->greyscale (false);
+        }
         v.render_and_poll(); // Does all the render computations
 
         // Here is where you would work on the data for the last view in v.ommatidia_data;
