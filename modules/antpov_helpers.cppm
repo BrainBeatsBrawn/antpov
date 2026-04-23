@@ -77,7 +77,7 @@ export namespace antpov
      *
      * \return tuple containing pos_orig (original positions for debug vis) and dirn_orig (original directions for debug vis)
      */
-    template <bool replace_uncertain_directions = true>
+    template <bool replace_uncertain_directions = false, bool fix_positions_with_invisibility_flag = false>
     std::tuple<sm::vvec<sm::vec<float, 2>>, sm::vvec<sm::vec<float, 2>>>
     process_positions (sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags,
                        sm::vvec<sm::vec<float, 2>>& dirns,
@@ -88,17 +88,24 @@ export namespace antpov
         sm::vvec<float> phi (positions.size(), 0.0f); // Absolute angle of direction
         sm::vvec<float> dphi (positions.size(), 0.0f); // angle change from one movement to the next
 
-        // Zeroth task is to use antflags::invisible to ignore some positions
-        constexpr bool fix_positions_with_invisibility_flag = false;
-        if constexpr (fix_positions_with_invisibility_flag) {
+        if constexpr (fix_positions_with_invisibility_flag == true) {
+            // use antflags::invisible to interpolate between visible locations
             for (std::uint32_t i = 1; i < positions.size(); ++i) {
                 if ((antflags[i] & 8u) == 8u) {
-                    // Invisible, so use last position
-                    //std::cout << "Invisible! copy positions[" << i-1 << "]: " << positions[i-1] << " to i = " << i<< "\n";
-                    positions[i] = positions[i-1];
-                } else {
-                    //std::cout << "Visible!" << std::endl;
-                }
+                    // positions[i] is invisible. Find the next *visible* position before interpolating
+                    for (std::uint32_t j = i; j < positions.size(); ++j) {
+                        if ((antflags[j] & 8u) != 8u) {
+                            // Ant is visible again. Update positions from i to j by linear interpolation
+                            sm::vec<float, 2> v = positions[j] - positions[i-1];
+                            float intvl = static_cast<float>(j - i + 1);
+                            for (std::uint32_t k = i; k < j; ++k) {
+                                positions[k] = positions[i-1] + (v * ((static_cast<float>(k - i)) / intvl));
+                            }
+                            i = j - 1;
+                            break;
+                        }
+                    }
+                } // else positions[i] is visible, move to next
             }
         }
 

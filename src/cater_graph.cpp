@@ -37,7 +37,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
      */
     sm::vvec<std::uint32_t> antflags_ = antflags;
     sm::vvec<sm::vec<float, 2>> dirns (positions.size(), sm::vec<float, 2>{});
-    const auto[pos_orig, dirn_orig] = antpov::process_positions<false> (positions, antflags_, dirns, block, max_delta_phi);
+    const auto[pos_orig, dirn_orig] = antpov::process_positions<false, true> (positions, antflags_, dirns, block, max_delta_phi);
 
     // Get colour from antflags to plot visibility/invisibility
     sm::vvec<float> clr (positions.size(), 0.2f);

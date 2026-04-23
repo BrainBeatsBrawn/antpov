@@ -47,7 +47,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         float max_delta_phi = 2.8f;
         // maybe process_positions belongs in craysim.visual?
         sm::vvec<sm::vec<float, 2>> dirns (v.csv_positions.size(), sm::vec<float, 2>{}); // dummy, unused
-        antpov::process_positions<false> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
+        antpov::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path from csv
@@ -59,7 +59,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     for (std::uint32_t i = 0; i < v.csv_flags.size(); ++i) {
         aflags = v.csv_flags[i];
         v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
-        if (aflags.test (antpov::antflags::direction_uncertain)) { v.bc_clr[i] = mplot::colour::crimson; }
+        if (aflags.test (antpov::antflags::direction_uncertain)) {
+            v.bc_clr[i] = mplot::colour::crimson;
+        } else if (aflags.test (antpov::antflags::invisible)) {
+            v.bc_clr[i] = mplot::colour::grey60;
+        } else if (aflags.test (antpov::antflags::bush)) {
+            v.bc_clr[i] = mplot::colour::springgreen3;
+        }
         if (i % 4 == 0) {
             v.bc_alpha[i] = 1.0f;
             v.bc_scale[i] = 1.0f;
@@ -147,8 +153,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
     while (!v.readyToFinish()) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
 
-        // Greyscale the eyes when unsure of direction
-        ep2->greyscale ((v.csv_flags[v.move_counter] & 16u) == 16u ? true : false);
+        // Greyscale the eyes when we're in a section that was marked invisible
+        ep2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
 
         v.render_and_poll(); // Does all the render computations
 
