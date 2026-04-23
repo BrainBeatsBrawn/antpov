@@ -22,7 +22,7 @@ export namespace antpov
         bush,
         cookie,
         shadow,
-        visibility,
+        invisible,
         direction_uncertain
     };
 
@@ -36,13 +36,18 @@ export namespace antpov
         while (std::getline (f, line)) {
             sm::vec<float, 2> twodpos;
             // Tokenize line into the coordinates and the flags
-            twodpos.set_from_str (line, ",");
+            try {
+                twodpos.set_from_str (line, ","); // may throw
+            } catch (const std::exception& e) {
+                std::cout << "Failed to read csv line " << line << std::endl;
+                continue;
+            }
             positions.push_back (twodpos);
             // Get flags from third entry
             tokens.clear();
             tokens = mplot::tools::stringToVector (line, ",");
-            if (tokens.size() > 2) {
-                std::uint32_t fl = std::stoi (tokens[2]);
+            if (tokens.size() > 5) {
+                std::uint32_t fl = std::stoi (tokens[2]) + 2 * std::stoi (tokens[3])+ 4 * std::stoi (tokens[4])+ 8 * std::stoi (tokens[5]);
                 antflags.push_back (fl);
             } else {
                 antflags.push_back (0u);
@@ -71,7 +76,7 @@ export namespace antpov
      */
     template <bool replace_uncertain_directions = true>
     std::tuple<sm::vvec<sm::vec<float, 2>>, sm::vvec<sm::vec<float, 2>>>
-    process_positions (const sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags,
+    process_positions (sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags,
                        sm::vvec<sm::vec<float, 2>>& dirns,
                        const std::uint32_t block = 3, const float max_delta_phi = 2.8f)
     {
@@ -79,6 +84,20 @@ export namespace antpov
 
         sm::vvec<float> phi (positions.size(), 0.0f); // Absolute angle of direction
         sm::vvec<float> dphi (positions.size(), 0.0f); // angle change from one movement to the next
+
+        // Zeroth task is to use antflags::invisible to ignore some positions
+        constexpr bool fix_positions_with_invisibility_flag = false;
+        if constexpr (fix_positions_with_invisibility_flag) {
+            for (std::uint32_t i = 1; i < positions.size(); ++i) {
+                if ((antflags[i] & 8u) == 8u) {
+                    // Invisible, so use last position
+                    //std::cout << "Invisible! copy positions[" << i-1 << "]: " << positions[i-1] << " to i = " << i<< "\n";
+                    positions[i] = positions[i-1];
+                } else {
+                    //std::cout << "Visible!" << std::endl;
+                }
+            }
+        }
 
         for (std::uint32_t i = 0; i < positions.size() - 1; ++i) {
 

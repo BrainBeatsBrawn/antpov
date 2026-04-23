@@ -62,6 +62,20 @@ target_sources(dirns
 )
 target_link_libraries(dirns ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
 
+add_executable(cater_paths cater_paths.cpp)
+target_sources(cater_paths
+  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
+  FILES ${DIRNS_MODULES}
+)
+target_link_libraries(cater_paths ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+
+add_executable(cater_graph cater_graph.cpp)
+target_sources(cater_graph
+  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
+  FILES ${DIRNS_MODULES}
+)
+target_link_libraries(cater_graph ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+
 # Flow vis for ant tracking
 set(FLOW_VIS_MODULES
   ${MPLOT_MATHS_CORE_MODULES}
