@@ -1,0 +1,11 @@
+{
+    "Description" : "Film directions - scripted camera movements/transitions",
+
+    "directions" : [
+        {
+            "time" : 100,
+            "type" : "translation",
+            ""
+        }
+    ]
+}
