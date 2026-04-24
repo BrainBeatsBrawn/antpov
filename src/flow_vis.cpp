@@ -13,7 +13,6 @@
 #include <sstream>
 #include <vector>
 #include <array>
-#include <chrono>
 #include <memory>
 #include <iostream>
 #include <format>
@@ -32,9 +31,6 @@ import mplot.hsvwheelvisual;
 
 int main(int argc, char ** argv)
 {
-    using namespace std::chrono;
-    using sc = std::chrono::steady_clock;
-
     /*
      * Load Data
      */
