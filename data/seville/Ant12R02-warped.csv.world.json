@@ -20,7 +20,14 @@
             "transform_time" : 1.5
         },
         {
-            "event_time" : 1500,
+            "event_time" : 1000,
+            "event_type" : "timed_rotation",
+            "axis" : [ 0,0,1 ],
+            "angle_degrees" : 45,
+            "transform_time" : 2
+        },
+        {
+            "event_time" : 3500,
             "event_type" : "sceneview",
             "sceneview" : [ -0.535615, -0.165732, 0.828039, 0, -2.6077e-07, 0.980552, 0.196257, 0, -0.844462, 0.105118, -0.525198, 0, -0.256063, -3.976, -5.60106, 1  ]
         }
