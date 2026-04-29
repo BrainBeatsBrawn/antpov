@@ -4,6 +4,7 @@
 #include <tuple>
 #include <vector>
 #include <stdexcept>
+#include <format>
 
 import sm.flags;
 import sm.vvec;
@@ -26,7 +27,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
 
     // Create a craysim main window to render the eye/sensor. This loads in the models from gltf file at path
-    craysim::visual<glver> v (2000, 2000, "Compound-ray sim", prog_opts);
+    craysim::visual<glver> v (1920, 1080, "AntPOV", prog_opts);
     // Set the agent hoverheight from our inputs if necessary
     v.set_hoverheight (prog_opts.hovh, 0.002f); // 2 mm is good for C. velox model
     // Find the model from the glTF that you want to be the landscape
@@ -166,6 +167,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
             ant_ptr1->greyscale (false);
         }
         v.render_and_poll(); // Does all the render computations
+
+        // Save frames
+        if (prog_opts.make_movie) {
+            v.saveImage (std::format ("./movies/scene/{:06d}.png", v.move_counter));
+            vant.saveImage (std::format ("./movies/ant/{:06d}.png", v.move_counter));
+            veye.saveImage (std::format ("./movies/eyes/{:06d}.png", v.move_counter));
+        }
 
         // Here is where you would work on the data for the last view in v.ommatidia_data;
 

@@ -8,48 +8,10 @@
             "sceneview" : [ 0.998969, -0.0453809, 0.000960412, 0, -2.09548e-08, 0.0211581, 0.999776, 0, -0.045391, -0.998745, 0.0211364, 0, 1.76547, 0.130643, -38.407, 1 ]
         },
         {
-            "event_time" : 300,
+            "event_time" : 10,
             "event_type" : "timed_translation",
             "translation" : [ 0, 0, 25 ],
             "transform_time" : 2.5
         },
-        {
-            "event_time" : 550,
-            "event_type" : "timed_translation",
-            "translation" : [ -2, 0, 0 ],
-            "transform_time" : 1.5
-        },
-        {
-            "event_time" : 1000,
-            "event_type" : "timed_rotation",
-            "about_vert_angle_degrees" : 0,
-            "tilt_angle_degrees" : 50,
-            "transform_time" : 2
-        },
-        {
-            "event_time" : 1200,
-            "event_type" : "timed_rotation",
-            "about_vert_angle_degrees" : 140,
-            "tilt_angle_degrees" : 0,
-            "transform_time" : 2
-        },
-        {
-            "event_time" : 1400,
-            "event_type" : "timed_rotation",
-            "about_vert_angle_degrees" : 0,
-            "tilt_angle_degrees" : 30,
-            "transform_time" : 1
-        },
-        {
-            "event_time" : 1600,
-            "event_type" : "timed_translation",
-            "translation" : [ 0, 0, 10 ],
-            "transform_time" : 1
-        },
-        {
-            "event_time" : 5000,
-            "event_type" : "sceneview",
-            "sceneview" : [ -0.535615, -0.165732, 0.828039, 0, -2.6077e-07, 0.980552, 0.196257, 0, -0.844462, 0.105118, -0.525198, 0, -0.256063, -3.976, -5.60106, 1  ]
-        }
     ]
 }
