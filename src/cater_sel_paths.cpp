@@ -69,7 +69,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Now visualise with a GridVisual
     auto gv1 = std::make_unique<mplot::GridVisual<float, std::uint32_t, float, glver>>(&g1, offset);
     gv1->set_parent (v.get_id());
-    gv1->gridVisMode = mplot::GridVisMode::Pixels;
+    gv1->gridVisMode = mplot::GridVisMode::Triangles;
     gv1->setVectorData (&image_data_tlbr);
     gv1->cm.setType (mplot::ColourMapType::RGB); // inverse greyscale is good for a monochrome image
     gv1->zScale.set_params (0, 0); // As it's an image, we don't want relief, so set the zScale to have a zero gradient
