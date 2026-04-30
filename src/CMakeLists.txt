@@ -69,6 +69,14 @@ target_sources(cater_paths
 )
 target_link_libraries(cater_paths ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
 
+add_executable(cater_sel_paths cater_sel_paths.cpp)
+target_sources(cater_sel_paths
+  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
+  FILES ${DIRNS_MODULES} ${MPLOT_INCLUDE_PATH}/mplot/GridVisual.cppm
+
+)
+target_link_libraries(cater_sel_paths ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+
 add_executable(cater_graph cater_graph.cpp)
 target_sources(cater_graph
   PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
