@@ -52,27 +52,35 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path from csv
+    v.breadcrumb_every = 10;
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
     v.bc_clr.resize (v.csv_flags.size());
     v.bc_alpha.resize (v.csv_flags.size());
     v.bc_scale.resize (v.csv_flags.size());
-    for (std::uint32_t i = 0; i < v.csv_flags.size(); ++i) {
-        aflags = v.csv_flags[i];
-        v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
-        if (aflags.test (antpov::antflags::direction_uncertain)) {
-            v.bc_clr[i] = mplot::colour::crimson;
-        } else if (aflags.test (antpov::antflags::invisible)) {
-            v.bc_clr[i] = mplot::colour::grey60;
-        } else if (aflags.test (antpov::antflags::bush)) {
-            v.bc_clr[i] = mplot::colour::springgreen3;
-        }
-        if (i % 4 == 0) {
-            v.bc_alpha[i] = 1.0f;
-            v.bc_scale[i] = 1.0f;
-        } else {
-            v.bc_alpha[i] = 0.7f;
-            v.bc_scale[i] = 0.5f;
+    std::uint32_t i = 0;
+    for (std::uint32_t j = 0; j < v.csv_flags.size(); ++j) {
+        if (j % v.breadcrumb_every == 0u) {
+            aflags = v.csv_flags[j];
+            // Out/back colour selection
+            //v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
+            // Or just a 'base ant index' colour:
+            v.bc_clr[i] = mplot::colour::springgreen2; // To change for each dataset
+            if (aflags.test (antpov::antflags::direction_uncertain)) {
+                v.bc_clr[i] = mplot::colour::grey40;
+            } else if (aflags.test (antpov::antflags::invisible)) {
+                v.bc_clr[i] = mplot::colour::grey60;
+            } else if (aflags.test (antpov::antflags::bush)) {
+                v.bc_clr[i] = mplot::colour::darkgreen;
+            }
+            if (i % 2 == 0) {
+                v.bc_alpha[i] = 1.0f;
+                v.bc_scale[i] = 1.0f;
+            } else {
+                v.bc_alpha[i] = 1.0f;
+                v.bc_scale[i] = 1.0f;
+            }
+            ++i;
         }
     }
     // Once CSV has been read (if you are using that feature) do some setup on the landscape
