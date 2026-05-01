@@ -12,6 +12,7 @@ import sm.vvec;
 import mplot.gl.version;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.eyevisual;
+import mplot.tools;
 
 import craysim.visual;
 import craysim.antbody;
@@ -37,11 +38,28 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
+        // Check if path encodes several paths
+        std::vector<std::string> cpaths = mplot::tools::stringToVector (prog_opts.csv_path, ",");
         // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
         // Note that v.csv_positions is populated.
-        if (antpov::read_csv (prog_opts.csv_path, v.csv_positions, v.csv_flags) == false) {
-            throw std::runtime_error ("Failed to read CSV file");
-        } else { std::cout << "Read " << v.csv_positions.size() << " ant positions from CSV\n"; }
+        std::uint32_t antid = 0u;
+        for (auto cpath : cpaths) {
+            std::cout << "Reading csv path " << cpath << std::endl;
+            if (cpath.find ("Ant12") != std::string::npos) {
+                antid = 12;
+            } else if (cpath.find ("Ant11") != std::string::npos) {
+                antid = 11;
+            } else if (cpath.find ("Ant06") != std::string::npos) {
+                antid = 6;
+            } else if (cpath.find ("Ant03") != std::string::npos) {
+                antid = 3;
+            }
+
+            std::uint64_t existing = v.csv_positions.size();
+            if (antpov::read_csv (cpath, v.csv_positions, v.csv_flags, antid) == false) {
+                throw std::runtime_error ("Failed to read CSV file");
+            } else { std::cout << "Read " << (v.csv_positions.size() - existing) << " ant positions from CSV\n"; }
+        }
 
         // Now process the positions to generate directions.
         std::uint32_t block = 3;
@@ -51,21 +69,31 @@ std::int32_t main (std::int32_t argc, char* argv[])
         antpov::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
         // for each antflag, set dirn uncertain flag
     }
-    v.setup_breadcrumbs (32000); // enough to show a whole path from csv
+    v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
     v.breadcrumb_every = 10;
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
-    v.bc_clr.resize (v.csv_flags.size());
-    v.bc_alpha.resize (v.csv_flags.size());
-    v.bc_scale.resize (v.csv_flags.size());
+    v.bc_clr.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
+    v.bc_alpha.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
+    v.bc_scale.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
     std::uint32_t i = 0;
+    std::cout << "CSV TIME\n";
     for (std::uint32_t j = 0; j < v.csv_flags.size(); ++j) {
         if (j % v.breadcrumb_every == 0u) {
             aflags = v.csv_flags[j];
-            // Out/back colour selection
-            //v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
-            // Or just a 'base ant index' colour:
-            v.bc_clr[i] = mplot::colour::springgreen2; // To change for each dataset
+            // Use a 'base ant index' colour:
+            if (aflags.test (antpov::antflags::ant3)) {
+                v.bc_clr[i] = mplot::colour::dodgerblue3;
+            } else if (aflags.test (antpov::antflags::ant6)) {
+                v.bc_clr[i] = mplot::colour::springgreen2;
+            } else if (aflags.test (antpov::antflags::ant11)) {
+                v.bc_clr[i] = mplot::colour::maroon2;
+            } else if (aflags.test (antpov::antflags::ant12)) {
+                v.bc_clr[i] = mplot::colour::darkorange2;
+            } else {
+                // Default to Out/back colour selection (ant0)
+                v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
+            }
             if (aflags.test (antpov::antflags::direction_uncertain)) {
                 v.bc_clr[i] = mplot::colour::grey40;
             } else if (aflags.test (antpov::antflags::invisible)) {

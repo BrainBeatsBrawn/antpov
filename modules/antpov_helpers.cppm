@@ -17,17 +17,36 @@ import mplot.tools;
 export namespace antpov
 {
     // The flags recorded by the experimenters
-    enum class antflags : std::uint8_t
+    enum class antflags : std::uint32_t
     {
-        bush,
-        cookie,
-        shadow,
-        invisible,
-        direction_uncertain
+        bush,                 // 1
+        cookie,               // 2
+        shadow,               // 4
+        invisible,            // 8
+        direction_uncertain,  // 0x10
+        unused0,              // 0x20
+        unused1,              // 0x40
+        unused2,              // 0x80
+        ant0,                 // 0x100
+        ant1,                 // 0x200
+        ant2,                 // 0x400
+        ant3,
+        ant4,
+        ant5,
+        ant6,
+        ant7,
+        ant8,
+        ant9,
+        ant10,
+        ant11,
+        ant12,
+        ant13,
+        ant14,
+        ant15
     };
 
     // Read a simple csv with 2D coordinates. Should also read flags. Ah - this is ant specific
-    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags)
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags, const std::uint32_t ant_index = 0)
     {
         std::ifstream f (path.c_str(), std::ios::in);
         if (f.is_open() == false) { return false; }
@@ -54,6 +73,10 @@ export namespace antpov
                 // We have flags compressed into a single integer, so 1,0,1,0 would become 10 (decimal)
                 fl = std::stoi (tokens[2]);
             } // else fl is 0u
+
+            // put ant index into bit position 8 and up
+            fl |= (1u << (8u + ant_index));
+
             antflags.push_back (fl);
         }
         return true;
