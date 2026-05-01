@@ -94,7 +94,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         mplot::colour::dodgerblue3,   // Ant 3
         mplot::colour::crimson,       // Ant 4
         mplot::colour::mediumpurple1, // Ant 5
-        mplot::colour::brick,         // Ant 6
+        mplot::colour::springgreen2,  // Ant 6 // brick was close to original but indistinct
         mplot::colour::plum1,         // Ant 7
         mplot::colour::purple3,       // Ant 8
         mplot::colour::yellow3,       // Ant 9
@@ -170,7 +170,15 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
         mplot::DatasetStyle ds (mplot::stylepolicy::markers);
         if constexpr (true) {
-            ds.datalabel = std::format ("Ant{:02d}R{:02d}", antidx, routeidx);
+            if (routeidx == 9999) {
+                ds.datalabel = std::format ("Ant{:02d}ZVOP", antidx);
+            } else if (routeidx == 8888) {
+                ds.datalabel = std::format ("Ant{:02d}ZVSF", antidx);
+            } else if (routeidx == 999) {
+                ds.datalabel = std::format ("Ant{:02d}ZVF", antidx);
+            } else {
+                ds.datalabel = std::format ("Ant{:02d}R{:02d}", antidx, routeidx);
+            }
             ds.setcolour (ai_colours [antidx]);
         } else {
             if (routeidx == 9999) {
