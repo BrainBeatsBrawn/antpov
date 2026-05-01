@@ -24,3 +24,14 @@ list(REMOVE_DUPLICATES ANTEYES_MODULES)
 
 target_sources(ant_eyes PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR} FILES ${ANTEYES_MODULES})
 target_link_libraries(ant_eyes ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glfw glad2 mplot_fontdata2)
+
+add_executable (make_cyl_eye make_cyl_eye.cpp)
+
+# Mathplot and craysim modules are used
+set(CYLEYE_MODULES
+  ${MPLOT_MATHS_CORE_MODULES}
+)
+list(REMOVE_DUPLICATES CYLEYE_MODULES)
+
+target_sources(make_cyl_eye PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR} FILES ${CYLEYE_MODULES})
+target_link_libraries(make_cyl_eye ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glfw glad2 mplot_fontdata2)

@@ -8,11 +8,13 @@
 
 import sm.flags;
 import sm.vvec;
+import sm.grid;
 
 import mplot.gl.version;
 import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
 import mplot.compoundray.eyevisual;
 import mplot.tools;
+import mplot.gridvisual;
 
 import craysim.visual;
 import craysim.antbody;
@@ -70,6 +72,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
+    v.bc_mult = 2.0f;
     v.breadcrumb_every = 10;
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
@@ -77,7 +80,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.bc_alpha.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
     v.bc_scale.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
     std::uint32_t i = 0;
-    std::cout << "CSV TIME\n";
     for (std::uint32_t j = 0; j < v.csv_flags.size(); ++j) {
         if (j % v.breadcrumb_every == 0u) {
             aflags = v.csv_flags[j];
@@ -126,7 +128,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
     veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-0.972577} });
 
-    // APP-SPECIFIC. A window for the Ant body view
+    // APP-SPECIFIC. A window for the Ant body view (or cylindrical eye)
     mplot::Visual<glver> vant (920, 920, "Ant view");
     vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
@@ -148,20 +150,45 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->name = "ant";
     ant_ptr1->scaleViewMatrix (1000);
 
+    //std::cout << "v.efpath = " << v.efpath << std::endl;
+
+    mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
+    mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
+
+    sm::vec<float, 2> dx = { 0.002f, 0.001f };
+    sm::vec<float, 2> nul = { 0.0f, 0.0f };
+    std::uint32_t cyl_w = 360; // must match cyl.eye
+    std::uint32_t cyl_h = 90;
+    sm::grid g1(cyl_w, cyl_h, dx, nul, sm::griddomainwrap::horizontal, sm::gridorder::bottomleft_to_topright);
+
     // APP-SPECIFIC. 2D eye representation (goes in the other window)
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_data, v.get_ommatidia_ptr(), nullptr);
-    eyevm2->set_parent (veye.get_id());
-    eyevm2->name = "2D Ant Eyes";
-    craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
-    eyevm2->show_3d = false;
-    eyevm2->twodimensional (true);
-    eyevm2->show_sphere = false;
-    eyevm2->show_rays = false;
-    sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
-    eyevm2->setViewMatrix (mflip);
-    eyevm2->finalize();
-    mplot::compoundray::EyeVisual<glver>* ep2 = veye.addVisualModel (eyevm2);
-    ep2->scaleViewMatrix (1000);
+    if (v.efpath.find ("cyl.eye") != std::string::npos) {
+        // 2D cylindrical representation. Make a GridVisual.
+        auto gv1 = std::make_unique<mplot::GridVisual<float, std::uint32_t, float, glver>>(&g1, sm::vec<>{});
+        gv1->set_parent (veye.get_id());
+        gv1->gridVisMode = mplot::GridVisMode::Pixels;
+        gv1->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_data));
+        gv1->cm.setType (mplot::ColourMapType::RGB);
+        gv1->zScale.set_params (0, 0); // As it's an image, we don't want relief, so set the zScale to have a zero gradient
+        gv1->twodimensional (true);
+        gv1->finalize();
+        gv1p = veye.addVisualModel (gv1);
+        gv1p->scaleViewMatrix (10);
+    } else {
+        auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_data, v.get_ommatidia_ptr(), nullptr);
+        eyevm2->set_parent (veye.get_id());
+        eyevm2->name = "2D Ant Eyes";
+        craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
+        eyevm2->show_3d = false;
+        eyevm2->twodimensional (true);
+        eyevm2->show_sphere = false;
+        eyevm2->show_rays = false;
+        sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
+        eyevm2->setViewMatrix (mflip);
+        eyevm2->finalize();
+        ep2 = veye.addVisualModel (eyevm2);
+        ep2->scaleViewMatrix (1000);
+    }
 
     // APP-SPECIFIC. An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
@@ -184,7 +211,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // APP-SPECIFIC. Put all our 'other windows' in a container, which we pass in to render_and_poll()
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
-    v.other_eyes = { ep1, ep2 };
+    if (ep2 == nullptr) {
+        v.other_eyes = { ep1 };
+    } else {
+        v.other_eyes = { ep1, ep2 };
+    }
 
     // The main program loop
     while (!v.readyToFinish()) {
@@ -192,18 +223,25 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
         if (v.move_counter < v.csv_flags.size()) {
             // Greyscale the eyes when we're in a section that was marked invisible
-            ep2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+            if (ep2 != nullptr) {
+                ep2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+            }
             // Also the ant head/eyes and body
             ep1->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
             ant_ptr1->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
         } else {
-            ep2->greyscale (false);
+            if (ep2 != nullptr) { ep2->greyscale (false); }
             // Also the ant head/eyes and body
             ep1->greyscale (false);
             ant_ptr1->greyscale (false);
         }
         v.render_and_poll(); // Does all the render computations
-
+        if (gv1p != nullptr) {
+            //gv1p->reinitColours();
+            gv1p->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_data));
+            gv1p->reinit();
+            gv1p->render();
+        }
         // Save frames
         if (prog_opts.make_movie) {
             v.saveImage (std::format ("./movies/scene/{:06d}.png", v.move_counter));
