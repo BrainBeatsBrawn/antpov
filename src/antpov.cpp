@@ -134,7 +134,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
     // APP-SPECIFIC. Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_data, v.get_ommatidia_ptr(), v.get_head_mesh());
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh());
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
     eyevm1->show_3d = true;
@@ -150,8 +150,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->name = "ant";
     ant_ptr1->scaleViewMatrix (1000);
 
-    //std::cout << "v.efpath = " << v.efpath << std::endl;
-
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
     mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
 
@@ -162,33 +160,37 @@ std::int32_t main (std::int32_t argc, char* argv[])
     sm::grid g1(cyl_w, cyl_h, dx, nul, sm::griddomainwrap::horizontal, sm::gridorder::bottomleft_to_topright);
 
     // APP-SPECIFIC. 2D eye representation (goes in the other window)
-    if (v.efpath.find ("cyl.eye") != std::string::npos) {
-        // 2D cylindrical representation. Make a GridVisual.
+    if (v.efpaths.size() > 1 &&
+        v.efpaths[1].find ("cyl.eye") != std::string::npos) {
+        // We have a 2D cylindrical representation in camera 1. Make a GridVisual.
         auto gv1 = std::make_unique<mplot::GridVisual<float, std::uint32_t, float, glver>>(&g1, sm::vec<>{});
         gv1->set_parent (veye.get_id());
         gv1->gridVisMode = mplot::GridVisMode::Pixels;
-        gv1->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_data));
+        gv1->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_datas[1]));
         gv1->cm.setType (mplot::ColourMapType::RGB);
         gv1->zScale.set_params (0, 0); // As it's an image, we don't want relief, so set the zScale to have a zero gradient
         gv1->twodimensional (true);
         gv1->finalize();
         gv1p = veye.addVisualModel (gv1);
         gv1p->scaleViewMatrix (10);
-    } else {
-        auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_data, v.get_ommatidia_ptr(), nullptr);
-        eyevm2->set_parent (veye.get_id());
-        eyevm2->name = "2D Ant Eyes";
-        craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
-        eyevm2->show_3d = false;
-        eyevm2->twodimensional (true);
-        eyevm2->show_sphere = false;
-        eyevm2->show_rays = false;
-        sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
-        eyevm2->setViewMatrix (mflip);
-        eyevm2->finalize();
-        ep2 = veye.addVisualModel (eyevm2);
-        ep2->scaleViewMatrix (1000);
     }
+
+    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{},
+                                                                          &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
+                                                                          nullptr);
+    eyevm2->set_parent (veye.get_id());
+    eyevm2->name = "2D Ant Eyes";
+    craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
+    eyevm2->show_3d = false;
+    eyevm2->twodimensional (true);
+    eyevm2->show_sphere = false;
+    eyevm2->show_rays = false;
+    sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
+    eyevm2->setViewMatrix (mflip);
+    eyevm2->finalize();
+    ep2 = veye.addVisualModel (eyevm2);
+    ep2->scaleViewMatrix (1000);
+
 
     // APP-SPECIFIC. An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
@@ -238,7 +240,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         v.render_and_poll(); // Does all the render computations
         if (gv1p != nullptr) {
             //gv1p->reinitColours();
-            gv1p->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_data));
+            gv1p->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_datas[1]));
             gv1p->reinit();
             gv1p->render();
         }
