@@ -38,6 +38,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     v.frame_tau = 0.017;
 
+    // Set light source position suitable for Seville
+    v.diffuse_position = { 5, 5, -15 };
+
     // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Check if path encodes several paths
