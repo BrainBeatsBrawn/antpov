@@ -41,7 +41,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Set light source position suitable for Seville
     v.diffuse_position = { 5, 5, -15 };
 
-    // APP-SPECIFIC csv reading (comes between find_landscape and setup_landscape)
+    // csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Check if path encodes several paths
         std::vector<std::string> cpaths = mplot::tools::stringToVector (prog_opts.csv_path, ",");
@@ -126,17 +126,17 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Enable random walking. n_steps, a_tau, kappa are the params
     v.setup_random_walk (1500, 150, 100.0f, 0.05f);
 
-    // APP-SPECIFIC. A window for the 2D eye view projection
+    // A window for the 2D eye view projection
     mplot::Visual<glver> veye (920, 512, "Eye view");
     veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
     veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-0.972577} });
 
-    // APP-SPECIFIC. A window for the Ant body view (or cylindrical eye)
+    // A window for the Ant body view (or cylindrical eye)
     mplot::Visual<glver> vant (920, 920, "Ant view");
     vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
-    // APP-SPECIFIC. Ant body, plotted in its own window; first the eyes for the body
+    // Ant body, plotted in its own window; first the eyes for the body
     auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh());
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
@@ -148,6 +148,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // The ant body for the separate window
     auto av1 = std::make_unique<craysim::AntBodyVisual<glver>>();
     av1->set_parent (vant.get_id());
+    av1->draw_antennae = false;
+    av1->draw_body = false;
     av1->finalize();
     mplot::VisualModel<glver>* ant_ptr1 = vant.addVisualModel (av1);
     ant_ptr1->name = "ant";
@@ -156,28 +158,30 @@ std::int32_t main (std::int32_t argc, char* argv[])
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
     mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
 
-    sm::vec<float, 2> dx = { 0.002f, 0.001f };
+    sm::vec<float, 2> dx = { 0.0035f, 0.003f };
     sm::vec<float, 2> nul = { 0.0f, 0.0f };
     std::uint32_t cyl_w = 360; // must match cyl.eye
     std::uint32_t cyl_h = 90;
     sm::grid g1(cyl_w, cyl_h, dx, nul, sm::griddomainwrap::horizontal, sm::gridorder::bottomleft_to_topright);
 
-    // APP-SPECIFIC. 2D eye representation (goes in the other window)
-    if (v.efpaths.size() > 1 &&
-        v.efpaths[1].find ("cyl.eye") != std::string::npos) {
+    constexpr bool twodee = true;
+
+    // Showing a cylindrical representation, if it is present
+    if (v.efpaths.size() > 1 && v.efpaths[1].find ("cyl.eye") != std::string::npos) {
         // We have a 2D cylindrical representation in camera 1. Make a GridVisual.
-        auto gv1 = std::make_unique<mplot::GridVisual<float, std::uint32_t, float, glver>>(&g1, sm::vec<>{});
+        auto gv1 = std::make_unique<mplot::GridVisual<float, std::uint32_t, float, glver>>(&g1, sm::vec<>{-g1.width_of_pixels() / 2.0f, 1, 0});
         gv1->set_parent (veye.get_id());
-        gv1->gridVisMode = mplot::GridVisMode::Pixels;
+        gv1->gridVisMode = mplot::GridVisMode::RectInterp;
         gv1->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_datas[1]));
         gv1->cm.setType (mplot::ColourMapType::RGB);
         gv1->zScale.set_params (0, 0); // As it's an image, we don't want relief, so set the zScale to have a zero gradient
-        gv1->twodimensional (true);
+        gv1->twodimensional (twodee);
         gv1->finalize();
         gv1p = veye.addVisualModel (gv1);
-        gv1p->scaleViewMatrix (10);
+        gv1p->scaleViewMatrix (1);
     }
 
+    // 2D eye representation (goes in the other window)
     auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{},
                                                                           &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
                                                                           nullptr);
@@ -185,7 +189,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->name = "2D Ant Eyes";
     craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
     eyevm2->show_3d = false;
-    eyevm2->twodimensional (true);
+    eyevm2->twodimensional (twodee);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
     sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
@@ -195,7 +199,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2->scaleViewMatrix (1000);
 
 
-    // APP-SPECIFIC. An ant body to go in the scene
+    // An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
     av->set_parent (v.get_id());
     av->finalize();
@@ -203,7 +207,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.agent_body->name = "ant";
     v.agent_body->setViewMatrix (v.initial_camera_space);
 
-    // APP-SPECIFIC how we replay a crashed movement for debug
+    // how we replay a crashed movement for debug
     if (v.sim_opts.test (craysim::options::debug_mv)) {
         try {
             v.do_crashed_movement ();
@@ -213,7 +217,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         }
     }
 
-    // APP-SPECIFIC. Put all our 'other windows' in a container, which we pass in to render_and_poll()
+    // Put all our 'other windows' in a container, which we pass in to render_and_poll()
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
     if (ep2 == nullptr) {
