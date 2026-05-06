@@ -54,7 +54,10 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // Grid/graph width/height
     constexpr float gw = 3.0f;
-    constexpr float gh = 3.0f;
+    constexpr float gh = gw * 30351.0f / 41248.0f; // This assumes pixels are perfect squares, and
+                                                   // so the pixel dimensions give the aspect ratio
+                                                   // of the rectangle in the world that the image
+                                                   // represents.
 
     // Create a grid here to match an image
     std::string fn = "./data/mosaic_one_sixteenth.png";
@@ -69,6 +72,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Now visualise with a GridVisual
     auto gv1 = std::make_unique<mplot::GridVisual<float, std::uint32_t, float, glver>>(&g1, offset);
     gv1->set_parent (v.get_id());
+    gv1->twodimensional (true);
     gv1->gridVisMode = mplot::GridVisMode::Triangles;
     gv1->setVectorData (&image_data_tlbr);
     gv1->cm.setType (mplot::ColourMapType::RGB); // inverse greyscale is good for a monochrome image
@@ -80,7 +84,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     std::unique_ptr<mplot::GraphVisual<float, glver>> graph;
     graph = std::make_unique<mplot::GraphVisual<float, glver>> (offset);
     graph->set_parent (v.get_id());
-    graph->twodimensional(false);
+    graph->twodimensional(true);
     graph->setsize (gw, gh);
     graph->setdataaxisdist (0.0f);
     graph->axisstyle = mplot::axisstyle::none;
