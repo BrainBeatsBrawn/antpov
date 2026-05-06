@@ -137,7 +137,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
     // Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh());
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
     eyevm1->show_3d = true;
@@ -187,7 +187,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
                                                                           nullptr);
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
-    craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get());
+    craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get(), 0);
     eyevm2->show_3d = false;
     eyevm2->twodimensional (twodee);
     eyevm2->show_sphere = false;
@@ -221,9 +221,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
     if (ep2 == nullptr) {
-        v.other_eyes = { ep1 };
+        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1 };
     } else {
-        v.other_eyes = { ep1, ep2 };
+        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
     }
 
     // The main program loop
