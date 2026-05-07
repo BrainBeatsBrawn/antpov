@@ -12,6 +12,6 @@
             "event_type" : "timed_translation",
             "translation" : [ 0, 0, 25 ],
             "transform_time" : 2.5
-        },
+        }
     ]
 }
