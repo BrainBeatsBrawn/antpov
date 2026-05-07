@@ -1,0 +1,23 @@
+{
+    "Description" : "Film directions - scripted camera movements/transitions",
+
+    "directions" : [
+        {
+            "event_time" : 1,
+            "event_type" : "sceneview",
+            "sceneview" : [ 0.998969, -0.0453809, 0.000960412, 0, -2.09548e-08, 0.0211581, 0.999776, 0, -0.045391, -0.998745, 0.0211364, 0, 1.76547, 0.130643, -38.407, 1 ]
+        },
+        {
+            "event_time" : 200,
+            "event_type" : "timed_translation",
+            "translation" : [ 0, 0, 25 ],
+            "transform_time_frames" : 100
+        },
+        {
+            "event_time" : 500,
+            "event_type" : "timed_transform",
+            "sceneview" : [  0.701301, 0.243048, -0.670152, 0, 0.0208748, 0.932678, 0.360106, 0, 0.712559, -0.266532, 0.649015, 0, 1.43503, 0.988926, -1.57875, 1  ],
+            "transform_time_frames" : 500
+        }
+    ]
+}
