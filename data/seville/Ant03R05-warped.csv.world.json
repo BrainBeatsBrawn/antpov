@@ -10,14 +10,32 @@
         {
             "event_time" : 200,
             "event_type" : "timed_translation",
-            "translation" : [ 0, 0, 25 ],
+            "translation" : [ 0, 0, 35 ],
             "transform_time_frames" : 100
         },
         {
             "event_time" : 500,
             "event_type" : "timed_transform",
             "sceneview" : [  0.701301, 0.243048, -0.670152, 0, 0.0208748, 0.932678, 0.360106, 0, 0.712559, -0.266532, 0.649015, 0, 1.43503, 0.988926, -1.57875, 1  ],
+            "transform_time_frames" : 300
+        },
+        {
+            "event_time" : 1300,
+            "event_type" : "timed_transform",
+            "sceneview" : [ -0.809471, 0.223785, -0.542842, 0, 0.0208753, 0.934905, 0.354283, 0, 0.586789, 0.27545, -0.76145, 0, 0.967827, 2.26032, -2.93025, 1   ],
             "transform_time_frames" : 500
+        },
+        {
+            "event_time" : 2000,
+            "event_type" : "timed_transform",
+            "sceneview" : [ -0.685958, 0.326498, -0.650278, 0, 0.0208753, 0.902141, 0.430935, 0, 0.727342, 0.282029, -0.625647, 0, 2.54456, 2.86514, -6.51665, 1 ],
+            "transform_time_frames" : 300
+        },
+        {
+            "event_time" : 2500,
+            "event_type" : "timed_transform",
+            "sceneview" : [ -0.335486, 0.913744, -0.229186, 0, 0.0208751, 0.250435, 0.967909, 0, 0.941817, 0.319935, -0.103093, 0, 6.20917, 3.63165, -9.61394, 1 ],
+            "transform_time_frames" : 300
         }
     ]
 }
