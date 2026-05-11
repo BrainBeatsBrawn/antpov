@@ -1,0 +1,5 @@
+Use something like:
+
+ffmpeg -framerate 50 -pattern_type glob -i '*.pnm' -c:v libx264 -pix_fmt yuv420p Ant03R05_ant_topdown.mp4
+
+To convert pnm images to an mpeg
