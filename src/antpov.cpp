@@ -5,6 +5,7 @@
 #include <vector>
 #include <stdexcept>
 #include <format>
+#include <filesystem>
 
 import sm.flags;
 import sm.vvec;
@@ -41,13 +42,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Set light source position suitable for Seville
     v.diffuse_position = { 5, 5, -15 };
 
+    std::uint32_t antid = 0u;
+
     // csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Check if path encodes several paths
         std::vector<std::string> cpaths = mplot::tools::stringToVector (prog_opts.csv_path, ",");
         // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
         // Note that v.csv_positions is populated.
-        std::uint32_t antid = 0u;
         for (auto cpath : cpaths) {
             std::cout << "Reading csv path " << cpath << std::endl;
             if (cpath.find ("Ant12") != std::string::npos) {
@@ -226,6 +228,12 @@ std::int32_t main (std::int32_t argc, char* argv[])
         v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
     }
 
+    if (prog_opts.make_movie) {
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}/scene", antid));
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}/ant", antid));
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}/eyes", antid));
+    }
+
     // The main program loop
     while (!v.readyToFinish()) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
@@ -253,9 +261,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
         }
         // Save frames
         if (prog_opts.make_movie) {
-            v.saveImage (std::format ("./movies/scene/{:06d}.png", v.move_counter));
-            vant.saveImage (std::format ("./movies/ant/{:06d}.png", v.move_counter));
-            veye.saveImage (std::format ("./movies/eyes/{:06d}.png", v.move_counter));
+            v.saveImage (std::format ("./movies/Ant{:02d}/scene/{:06d}.pnm", antid, v.move_counter));
+            vant.saveImage (std::format ("./movies/Ant{:02d}/ant/{:06d}.pnm", antid, v.move_counter));
+            veye.saveImage (std::format ("./movies/Ant{:02d}/eyes/{:06d}.pnm", antid, v.move_counter));
         }
 
         // Here is where you would work on the data for the last view in v.ommatidia_data;
