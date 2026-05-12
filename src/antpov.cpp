@@ -39,10 +39,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     v.frame_tau = 0.017;
 
+    // Match the approximate field of view of the original camera
+    v.set_horizontal_fov (26.0f);
+
     // Set light source position suitable for Seville
     v.diffuse_position = { 5, 5, -15 };
 
     std::uint32_t antid = 0u;
+    std::uint32_t routeidx = 0u;
 
     // csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
@@ -66,6 +70,34 @@ std::int32_t main (std::int32_t argc, char* argv[])
             if (antpov::read_csv (cpath, v.csv_positions, v.csv_flags, antid) == false) {
                 throw std::runtime_error ("Failed to read CSV file");
             } else { std::cout << "Read " << (v.csv_positions.size() - existing) << " ant positions from CSV\n"; }
+
+            // Get Ant index from position p to posn before 'R'
+            std::string::size_type lstart = cpath.find ("Ant") + 3;
+            std::string::size_type lend = cpath.find ("R", lstart);
+            if (lend == std::string::npos) {
+                lend = cpath.find ("Z", lstart);
+            }
+            if (lend == std::string::npos) {
+                std::cout << "Uh oh\n";
+                return -1;
+            }
+            if (cpath.find("ZVOP") != std::string::npos) {
+                // ZVOP Zero Vector Opposite Side - Ant is allowed to go to nest but before arrival is
+                // placed in opposite side of the feeding areay
+                routeidx = 9999;
+            } else if (cpath.find("ZVSF") != std::string::npos) {
+                // ZVOP Zero Vector Semi Familiar - Ant is allowed to go to nest but before arrival is
+                // placed near but not at the feeding area
+                routeidx = 8888;
+            } else if (cpath.find("ZVF") != std::string::npos) {
+                // ZVOP Zero Vector Familiar - Ant is allowed to go to nest but before arrival is
+                // placed back at the feeding area
+                routeidx = 999;
+            } else {
+                std::string::size_type iend = cpath.find_first_of ('_');
+                routeidx = std::stoi (cpath.substr (lend + 1, iend - (lend + 1)));
+            }
+            std::cout << "Route index: " << routeidx << std::endl;
         }
 
         // Now process the positions to generate directions.
@@ -77,7 +109,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
-    v.bc_mult = 2.0f;
+    v.bc_mult = 1.0f;
     v.breadcrumb_every = 10;
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
@@ -229,9 +261,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     if (prog_opts.make_movie) {
-        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}/scene", antid));
-        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}/ant", antid));
-        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}/eyes", antid));
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/scene", antid, routeidx));
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/ant", antid, routeidx));
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/eyes", antid, routeidx));
     }
 
     // The main program loop
@@ -260,10 +292,10 @@ std::int32_t main (std::int32_t argc, char* argv[])
             gv1p->render();
         }
         // Save frames
-        if (prog_opts.make_movie) {
-            v.saveImage (std::format ("./movies/Ant{:02d}/scene/{:06d}.pnm", antid, v.move_counter));
-            vant.saveImage (std::format ("./movies/Ant{:02d}/ant/{:06d}.pnm", antid, v.move_counter));
-            veye.saveImage (std::format ("./movies/Ant{:02d}/eyes/{:06d}.pnm", antid, v.move_counter));
+        if (prog_opts.make_movie && v.move_counter > 2) { // Ignore first couple of locations, as the system takes a couple of moves to get ready
+            v.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/scene/{:06d}.pnm", antid, routeidx, v.move_counter));
+            vant.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/ant/{:06d}.pnm", antid, routeidx, v.move_counter));
+            veye.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/eyes/{:06d}.pnm", antid, routeidx, v.move_counter));
         }
 
         // Here is where you would work on the data for the last view in v.ommatidia_data;
