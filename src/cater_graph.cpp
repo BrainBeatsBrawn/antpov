@@ -25,7 +25,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     sm::vvec<std::uint32_t> antflags;
     sm::vvec<sm::vec<float, 2>> positions;
     if (antpov::read_csv (path, positions, antflags) == false) {
-        std::cout << "Failed to read\n";
+        std::cout << "Failed to read file '" << path << "'\n";
         return -1;
     } else {
         std::cout << "Read " << positions.size() << " ant positions from CSV\n";
@@ -50,12 +50,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     /*
      * Plot the results
      */
-    mplot::Visual<glver> v(1024, 768, "Ant direction analysis");
+    mplot::Visual<glver> v(1024, 768, path);
     // Create the graph
     sm::vec<float> offset = { -1.5f, -1.0f, 0.0f };
     auto gv = std::make_unique<mplot::GraphVisual<float, glver>> (offset);
     gv->set_parent (v.get_id());
     gv->setsize (3, 2);
+    //gv->setlimits (27000, 40000, -40000, 27000);
     mplot::DatasetStyle ds (mplot::stylepolicy::markers);
     ds.markersize = 0.01f;
     gv->setdata (positions, clr, ds);
