@@ -1,5 +1,6 @@
 {
 	"asset":{
+		"generator":"Khronos glTF Blender I/O v4.2.70",
 		"version":"2.0"
 	},
 	"scene":0,
@@ -13,26 +14,19 @@
 	],
 	"nodes":[
 		{
-			"name":"head",
 			"mesh":0,
-			"children": [1],
-                        "rotation":[
-				0,1,0,0
-			],
-			"scale":[
-                                0.001,0.001,0.001
-			],
-			"translation":[
-				0,0,0
-			],
+			"name":"head",
 			"extensions":{
 				"OCES_eyes":{
 					"head":true
 				}
-			}
+			},
+			"scale":[
+                                0.000001,0.000001,0.000001
+			]
 		},
 		{
-			"name":"left-eye",
+			"name":"right-eye",
 			"extensions":{
 				"OCES_eyes":{
 					"eye":0,
@@ -44,7 +38,7 @@
 	"materials":[
 		{
 			"doubleSided":true,
-			"name":"Material",
+			"name":"Material.001",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -52,7 +46,8 @@
 					0,
 					1
 				],
-				"metallicFactor":0
+				"metallicFactor":0,
+				"roughnessFactor":0.5
 			}
 		}
 	],
@@ -121,14 +116,14 @@
 			"componentType":5126,
 			"count":904,
 			"max":[
-				0.7967593669891357,
-				0.5862120389938354,
-				0.7219393849372864
+				808.3294677734375,
+				1203.223876953125,
+				844.3052368164062
 			],
 			"min":[
-				-0.7967593669891357,
-				-0.8584848046302795,
-				-0.6421745419502258
+				-808.3294677734375,
+				-169.99423217773438,
+				-662.1307373046875
 			],
 			"type":"VEC3"
 		},
@@ -150,39 +145,42 @@
 			"count":972,
 			"type":"SCALAR"
 		},
-
 		{
 			"bufferView": 4,
 			"componentType": 5126,
-			"count": 909,
+			"count": 915,
 			"max":[
-				-0.0006188873667270,
-				0.0003067766083404,
-				0.0001649156765779
+				0.2478039264678955,
+				-0.5927164554595947,
+				1.0005931854248047
 			],
 			"min":[
-				-0.0008225132478401,
-				-0.0000965966974036,
-				-0.0001807601365726
+				-0.2172042280435562,
+				-0.8223234415054321,
+				0.5688766241073608
 			],
-			"type":"VEC3"
+			"type": "VEC3",
+			"$comment": "Positions of each facet"
 		},
 		{
+			"$comment": "Axial directions of each facet",
 			"bufferView": 5,
 			"componentType": 5126,
-			"count": 909,
+			"count": 915,
 			"type":"VEC3"
 		},
 		{
+			"$comment": "Offset 'vector' for each facet. In practice, this is a (1,) array of negative numbers",
 			"bufferView": 6,
 			"componentType": 5126,
-			"count": 909,
+			"count": 915,
 			"type":"SCALAR"
 		},
 		{
+			"$comment": "Diameter of each facet",
 			"bufferView": 7,
 			"componentType": 5126,
-			"count": 909,
+			"count": 915,
 			"type":"SCALAR"
 		}
 	],
@@ -212,38 +210,43 @@
 			"target":34963
 		},
 		{
+			"$comment": "Positions of each facet",
 			"buffer":1,
-			"byteLength":10908,
+			"byteLength":10980,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
+			"$comment": "Axial directions of each facet",
 			"buffer":1,
-			"byteLength":10908,
-			"byteOffset":10908,
+			"byteLength":10980,
+			"byteOffset":10980,
 			"target":34962
 		},
 		{
+			"$comment": "Offset vector W values",
 			"buffer":1,
-			"byteLength":3636,
-			"byteOffset":21816,
+			"byteLength":3660,
+			"byteOffset":21960,
 			"target":34962
 		},
 		{
+			"$comment": "Diameter values",
 			"buffer":1,
-			"byteLength":3636,
-			"byteOffset":25452,
+			"byteLength":3660,
+			"byteOffset":25620,
 			"target":34962
 		}
+
 	],
 	"buffers":[
 		{
 			"byteLength":30872,
-			"uri":"velox-mesh-data.bin"
+			"uri":"head-data.bin"
 		},
 		{
-			"byteLength":29088,
-			"uri":"velox-eye-data.bin"
+			"byteLength":29280,
+			"uri":"right-eye-data.bin"
 		}
 	]
 }

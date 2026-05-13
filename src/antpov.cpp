@@ -171,7 +171,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
 
     // Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
+    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0), true);
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
     eyevm1->show_3d = true;
@@ -182,8 +182,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // The ant body for the separate window
     auto av1 = std::make_unique<craysim::AntBodyVisual<glver>>();
     av1->set_parent (vant.get_id());
-    av1->draw_antennae = false;
-    av1->draw_body = false;
+    av1->draw_antennae = true;
+    av1->draw_body = true;
     av1->finalize();
     mplot::VisualModel<glver>* ant_ptr1 = vant.addVisualModel (av1);
     ant_ptr1->name = "ant";
