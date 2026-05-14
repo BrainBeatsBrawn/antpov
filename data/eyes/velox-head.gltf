@@ -16,6 +16,7 @@
 		{
 			"mesh":0,
 			"name":"head",
+			"children":[1],
 			"extensions":{
 				"OCES_eyes":{
 					"head":true
@@ -34,6 +35,7 @@
 				}
 			}
 		}
+
 	],
 	"materials":[
 		{
@@ -72,9 +74,9 @@
 	],
 	"extensions": {
 		"OCES_eyes": {
-			"generator": {"program": "Test-OCES-Eye-Exporter", "version": "0.1.0"},
-			"creationDatetime": "2024-09-12 07:54:27.4",
-			"version": "0.4.0",
+			"generator": {"program": "manual", "version": "0.0.0"},
+			"creationDatetime": "2026-05-13 19:56:00.0",
+			"version": "0.0.0",
 			"mirrorPlanes":[
 				{"normal": "FRONTAL"}
 			],
@@ -117,13 +119,13 @@
 			"count":904,
 			"max":[
 				808.3294677734375,
-				1203.223876953125,
-				844.3052368164062
+				419.5159912109375,
+				825.2427978515625
 			],
 			"min":[
 				-808.3294677734375,
-				-169.99423217773438,
-				-662.1307373046875
+				-953.7021484375,
+				-681.1931762695312
 			],
 			"type":"VEC3"
 		},
@@ -237,12 +239,11 @@
 			"byteOffset":25620,
 			"target":34962
 		}
-
 	],
 	"buffers":[
 		{
 			"byteLength":30872,
-			"uri":"head-data.bin"
+			"uri":"velox-head.bin"
 		},
 		{
 			"byteLength":29280,
