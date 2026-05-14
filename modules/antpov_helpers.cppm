@@ -46,7 +46,7 @@ export namespace antpov
     };
 
     // Read a simple csv with 2D coordinates. Should also read flags. Ah - this is ant specific
-    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags, const std::uint32_t ant_index = 0)
+    bool read_csv (const std::string& path, sm::vvec<sm::vec<float, 2>>& positions, sm::vvec<std::uint32_t>& antflags, const std::uint32_t ant_index = 0, const std::uint32_t route_index = std::numeric_limits<std::uint32_t>::max())
     {
         std::ifstream f (path.c_str(), std::ios::in);
         if (f.is_open() == false) { return false; }
@@ -75,8 +75,13 @@ export namespace antpov
             } // else fl is 0u
 
             // put ant index into bit position 8 and up
-            fl |= (1u << (8u + ant_index));
-
+            if (route_index == std::numeric_limits<std::uint32_t>::max()) {
+                fl |= (1u << (8u + ant_index));
+            } else if (route_index > 99) { // Make ZVF 'ant15'
+                fl |= (1u << (8u + 15u));
+            } else {
+                fl |= (1u << (8u + 15u - route_index));
+            }
             antflags.push_back (fl);
         }
         return true;

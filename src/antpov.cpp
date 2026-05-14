@@ -55,6 +55,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
         // Note that v.csv_positions is populated.
         for (auto cpath : cpaths) {
+
             std::cout << "Reading csv path " << cpath << std::endl;
             if (cpath.find ("Ant12") != std::string::npos) {
                 antid = 12;
@@ -65,11 +66,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
             } else if (cpath.find ("Ant03") != std::string::npos) {
                 antid = 3;
             }
-
-            std::uint64_t existing = v.csv_positions.size();
-            if (antpov::read_csv (cpath, v.csv_positions, v.csv_flags, antid) == false) {
-                throw std::runtime_error ("Failed to read CSV file");
-            } else { std::cout << "Read " << (v.csv_positions.size() - existing) << " ant positions from CSV\n"; }
 
             // Get Ant index from position p to posn before 'R'
             std::string::size_type lstart = cpath.find ("Ant") + 3;
@@ -98,6 +94,15 @@ std::int32_t main (std::int32_t argc, char* argv[])
                 routeidx = std::stoi (cpath.substr (lend + 1, iend - (lend + 1)));
             }
             std::cout << "Route index: " << routeidx << std::endl;
+
+            std::uint64_t existing = v.csv_positions.size();
+
+            std::uint32_t _routeidx = routeidx;
+            // std::uint32_t _routeidx = std::numeric_limits<std::uint32_t>::max(); to switch to colour-by-antid
+
+            if (antpov::read_csv (cpath, v.csv_positions, v.csv_flags, antid, _routeidx) == false) {
+                throw std::runtime_error ("Failed to read CSV file");
+            } else { std::cout << "Read " << (v.csv_positions.size() - existing) << " ant positions from CSV\n"; }
         }
 
         // Now process the positions to generate directions.
@@ -109,7 +114,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
-    v.bc_mult = 1.0f;
+    v.bc_mult = 2.0f;
     v.breadcrumb_every = 10;
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
@@ -121,7 +126,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
         if (j % v.breadcrumb_every == 0u) {
             aflags = v.csv_flags[j];
             // Use a 'base ant index' colour:
-            if (aflags.test (antpov::antflags::ant3)) {
+            if (aflags.test (antpov::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
+                v.bc_clr[i] = mplot::colour::yellow;
+            } else if (aflags.test (antpov::antflags::ant14)) { // Hack to colour by routeID
+                v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::red : mplot::colour::hotpink2;
+            } else if (aflags.test (antpov::antflags::ant13)) { // Hack to colour by routeID
+                v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::blue : mplot::colour::deepskyblue2;
+
+            } else if (aflags.test (antpov::antflags::ant3)) {
                 v.bc_clr[i] = mplot::colour::dodgerblue3;
             } else if (aflags.test (antpov::antflags::ant6)) {
                 v.bc_clr[i] = mplot::colour::springgreen2;
