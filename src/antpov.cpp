@@ -162,8 +162,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // A window for the 2D eye view projection
     mplot::Visual<glver> veye (920, 512, "Eye view");
-    veye.setSceneTrans (sm::vec<float,3>{ float{0}, float{0}, float{-4.1} });
-    veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-0.972577} });
+    veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-1.18557} });
+    veye.setSceneRotation (sm::quaternion<float>{ float{1}, float{0}, float{0}, float{0} });
 
     // A window for the Ant body view (or cylindrical eye)
     mplot::Visual<glver> vant (920, 920, "Ant view");
@@ -236,6 +236,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
     av->set_parent (v.get_id());
+    av->draw_ring = true;
     av->finalize();
     v.agent_body = v.addVisualModel (av);
     v.agent_body->name = "ant";
