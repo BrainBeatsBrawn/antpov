@@ -41,12 +41,15 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // Match the approximate field of view of the original camera
     v.set_horizontal_fov (26.0f);
+    v.ambient_intensity = 0.6f; // override the 0.4/0.6 ambient/diffuse intensity
 
     // Set light source position suitable for Seville
     v.diffuse_position = { 5, 5, -15 };
 
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
+
+    bool colour_by_route = false;
 
     // csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
@@ -97,8 +100,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
             std::uint64_t existing = v.csv_positions.size();
 
-            std::uint32_t _routeidx = routeidx;
-            // std::uint32_t _routeidx = std::numeric_limits<std::uint32_t>::max(); to switch to colour-by-antid
+            std::uint32_t _routeidx = std::numeric_limits<std::uint32_t>::max(); // colour-by-antid is default
+            if (colour_by_route) { _routeidx = routeidx; }
 
             if (antpov::read_csv (cpath, v.csv_positions, v.csv_flags, antid, _routeidx) == false) {
                 throw std::runtime_error ("Failed to read CSV file");
@@ -114,7 +117,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
-    v.bc_mult = 2.0f;
+    if (prog_opts.make_movie) {
+        v.bc_mult = 1.0f;
+    } else {
+        v.bc_mult = 2.0f;
+    }
     v.breadcrumb_every = 10;
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
