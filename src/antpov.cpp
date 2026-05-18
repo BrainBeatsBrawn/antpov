@@ -197,8 +197,12 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // A window for the Ant body view (or cylindrical eye)
     mplot::Visual<glver> vant (920, 920, "Ant view");
-    vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
-    vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
+    vant.setSceneTrans (sm::vec<float,3>{ float{0.141869}, float{0.138982}, float{-3.7961} });
+    vant.setSceneRotation (sm::quaternion<float>{ float{0.907118}, float{0.124024}, float{0.401323}, float{0.0263531} });
+
+    mplot::Visual<glver> vant2 (920, 920, "Ant view 2");
+    vant2.setSceneTrans (sm::vec<float,3>{ float{-0.114634}, float{0.158883}, float{-3.7961} });
+    vant2.setSceneRotation (sm::quaternion<float>{ float{0.861956}, float{0.16712}, float{-0.478478}, float{0.0127006} });
 
     // Ant body, plotted in its own window; first the eyes for the body
     auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
@@ -218,6 +222,25 @@ std::int32_t main (std::int32_t argc, char* argv[])
     mplot::VisualModel<glver>* ant_ptr1 = vant.addVisualModel (av1);
     ant_ptr1->name = "ant";
     ant_ptr1->scaleViewMatrix (1000);
+
+    // Ant body 2, plotted in its own window; first the eyes for the body
+    auto eyevm1_2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
+    eyevm1_2->set_parent (vant2.get_id());
+    eyevm1_2->name = "Ant Eyes";
+    eyevm1_2->show_3d = true;
+    eyevm1_2->finalize();
+    mplot::compoundray::EyeVisual<glver>* ep1_2 = vant2.addVisualModel (eyevm1_2);
+    // Scale this model up, so it's not tiny like the one in the main scene
+    ep1_2->scaleViewMatrix (1000);
+    // The ant body for the separate window
+    auto av1_2 = std::make_unique<craysim::AntBodyVisual<glver>>();
+    av1_2->set_parent (vant2.get_id());
+    av1_2->draw_antennae = true;
+    av1_2->draw_body = true;
+    av1_2->finalize();
+    mplot::VisualModel<glver>* ant_ptr2 = vant2.addVisualModel (av1_2);
+    ant_ptr2->name = "ant";
+    ant_ptr2->scaleViewMatrix (1000);
 
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
     mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
@@ -283,17 +306,18 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // Put all our 'other windows' in a container, which we pass in to render_and_poll()
-    v.other_windows = { &vant, &veye };
+    v.other_windows = { &vant, &veye, &vant2 };
     // Similar for our other eyes
     if (ep2 == nullptr) {
         v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1 };
     } else {
-        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
+        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1, ep2, ep1_2 };
     }
 
     if (prog_opts.make_movie) {
         std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/scene", antid, routeidx));
         std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/ant", antid, routeidx));
+        std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/ant2", antid, routeidx));
         std::filesystem::create_directories (std::format ("./movies/Ant{:02d}R{:02d}/eyes", antid, routeidx));
     }
 
@@ -308,12 +332,16 @@ std::int32_t main (std::int32_t argc, char* argv[])
             }
             // Also the ant head/eyes and body
             ep1->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+            ep1_2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
             ant_ptr1->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
+            ant_ptr2->greyscale ((v.csv_flags[v.move_counter] & 8u) == 8u ? true : false);
         } else {
             if (ep2 != nullptr) { ep2->greyscale (false); }
             // Also the ant head/eyes and body
             ep1->greyscale (false);
+            ep1_2->greyscale (false);
             ant_ptr1->greyscale (false);
+            ant_ptr2->greyscale (false);
         }
         v.render_and_poll(); // Does all the render computations
         if (gv1p != nullptr) {
@@ -326,6 +354,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         if (prog_opts.make_movie && v.move_counter > 2) { // Ignore first couple of locations, as the system takes a couple of moves to get ready
             v.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/scene/{:06d}.pnm", antid, routeidx, v.move_counter));
             vant.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/ant/{:06d}.pnm", antid, routeidx, v.move_counter));
+            vant2.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/ant2/{:06d}.pnm", antid, routeidx, v.move_counter));
             veye.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/eyes/{:06d}.pnm", antid, routeidx, v.move_counter));
         }
 
