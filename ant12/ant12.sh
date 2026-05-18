@@ -9,4 +9,4 @@
 # Once all the paths are complete, move the view around and save screenshots with Ctrl-S
 
 ./build/antpov -f data/seville/ground_and_veg_inner_circular.gltf \
-               -c data/seville/Ant12R01-warped.csv.world.csv,data/seville/Ant12R02-warped.csv.world.csv,data/seville/Ant12ZVF-warped.csv.world.csv -x
+               -c data/seville/Ant12R01-warped.csv.world.csv,data/seville/Ant12R02-warped.csv.world.csv,data/seville/Ant12ZVF-warped.csv.world.csv -x -R

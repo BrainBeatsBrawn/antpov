@@ -49,7 +49,17 @@ std::int32_t main (std::int32_t argc, char* argv[])
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
 
-    bool colour_by_route = false;
+    // Some extra options for antpov only
+    bool colour_by_route = false; // colour by route or ant?
+    bool apply_colour_labels = false;
+    for (std::int32_t i = 0; i < argc; i++) {
+        std::string arg = std::string(argv[i]);
+        if (arg == "-R") {
+            colour_by_route = true; // I have a slightly hacky way to colour by route ID
+        } else if (arg == "-L") {
+            apply_colour_labels = true; // Set true to apply green-for-bush; grey-for-invisible
+        }
+    }
 
     // csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
@@ -117,12 +127,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
-    if (prog_opts.make_movie) {
-        v.bc_mult = 1.0f;
-    } else {
-        v.bc_mult = 2.0f;
-    }
+    v.bc_mult = 1.0f; // default anyway
     v.breadcrumb_every = 10;
+
     // Turn antflags into colour info, all at the start:
     sm::flags<antpov::antflags> aflags;
     v.bc_clr.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
@@ -134,11 +141,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
             aflags = v.csv_flags[j];
             // Use a 'base ant index' colour:
             if (aflags.test (antpov::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
-                v.bc_clr[i] = mplot::colour::yellow;
+                v.bc_clr[i] = mplot::colour::bisque2; // ZVF. A white.
             } else if (aflags.test (antpov::antflags::ant14)) { // Hack to colour by routeID
-                v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::red : mplot::colour::hotpink2;
+                //v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::red : mplot::colour::hotpink2;
+                v.bc_clr[i] = mplot::colour::darkorange2;
             } else if (aflags.test (antpov::antflags::ant13)) { // Hack to colour by routeID
-                v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::blue : mplot::colour::deepskyblue2;
+                //v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::blue : mplot::colour::deepskyblue2;
+                v.bc_clr[i] = mplot::colour::orangered2;
 
             } else if (aflags.test (antpov::antflags::ant3)) {
                 v.bc_clr[i] = mplot::colour::dodgerblue3;
@@ -152,12 +161,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
                 // Default to Out/back colour selection (ant0)
                 v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
             }
-            if (aflags.test (antpov::antflags::direction_uncertain)) {
-                v.bc_clr[i] = mplot::colour::grey40;
-            } else if (aflags.test (antpov::antflags::invisible)) {
-                v.bc_clr[i] = mplot::colour::grey60;
-            } else if (aflags.test (antpov::antflags::bush)) {
-                v.bc_clr[i] = mplot::colour::darkgreen;
+            if (apply_colour_labels) {
+                if (aflags.test (antpov::antflags::direction_uncertain)) {
+                    v.bc_clr[i] = mplot::colour::grey40;
+                } else if (aflags.test (antpov::antflags::invisible)) {
+                    v.bc_clr[i] = mplot::colour::grey60;
+                } else if (aflags.test (antpov::antflags::bush)) {
+                    v.bc_clr[i] = mplot::colour::darkgreen;
+                }
             }
             if (i % 2 == 0) {
                 v.bc_alpha[i] = 1.0f;
