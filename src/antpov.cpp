@@ -205,6 +205,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
     eyevm1->show_3d = true;
+    eyevm1->setGamma (0.45f);
     eyevm1->finalize();
     mplot::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
     // Scale this model up, so it's not tiny like the one in the main scene
@@ -253,6 +254,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->name = "2D Ant Eyes";
     craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get(), 0);
     eyevm2->show_3d = false;
+    eyevm2->setGamma (0.45f);
     eyevm2->twodimensional (twodee);
     eyevm2->show_sphere = false;
     eyevm2->show_rays = false;
