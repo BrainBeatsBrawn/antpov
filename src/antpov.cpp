@@ -239,6 +239,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         gv1->gridVisMode = mplot::GridVisMode::RectInterp;
         gv1->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_datas[1]));
         gv1->cm.setType (mplot::ColourMapType::RGB);
+        gv1->setGamma (0.45f);
         gv1->zScale.set_params (0, 0); // As it's an image, we don't want relief, so set the zScale to have a zero gradient
         gv1->twodimensional (twodee);
         gv1->finalize();
