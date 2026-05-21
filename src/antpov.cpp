@@ -46,6 +46,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Set light source position suitable for Seville
     v.diffuse_position = { 5, 5, -15 };
 
+    // Label options
+    v.sim_opts.set (craysim::options::show_fps, false);
+    v.sim_opts.set (craysim::options::show_movenum, true);
+    v.fps_label_update_period = 1u;
+
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
 
