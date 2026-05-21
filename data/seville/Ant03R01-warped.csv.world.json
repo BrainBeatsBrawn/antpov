@@ -184,15 +184,6 @@
             "sceneview" : [0.821785, 0.341574, -0.456067, 0, -0.059767, 0.847659, 0.527165, 0, 0.566655, -0.405958, 0.717008, 0, 6.80912, 0.825651, -11.3744, 1 ]
         },
         {
-            "error" : "failed",
-            "event_time" : 22500,
-            "event_type" : "timed_orbit",
-            "transform_time_frames" : 300,
-            "orbit_axis" : [ 0, 1, 0 ],
-            "orbit_angle" : 160,
-            "orbit_centre" : [ 6, 0.8, -11 ]
-        },
-        {
             "event_time" : 25300,
             "event_type" : "timed_transform",
             "transform_time_frames" : 60,

@@ -3,35 +3,119 @@
 
     "directions" : [
         {
-            "event_time" : 1,
+            "event_time" : 3,
             "event_type" : "sceneview",
-            "sceneview" : [ 0.998969, -0.0453809, 0.000960412, 0, -2.09548e-08, 0.0211581, 0.999776, 0, -0.045391, -0.998745, 0.0211364, 0, 1.76547, 0.130643, -38.407, 1 ]
+            "sceneview" : [ -0.0377439, -0.998525, -0.0390399, 0, 0.170918, -0.0449429, 0.98426, 0, -0.984562, 0.0304771, 0.172362, 0, -1.74506, -1.99154, -352.766, 1]
         },
+
+
+
+
         {
-            "event_time" : 10,
-            "event_type" : "timed_translation",
-            "translation" : [ 0, 0, 25 ],
-            "transform_time_frames" : 40
-        },
-        {
-            "event_time" : 100,
-            "event_type" : "timed_transform",
-            "sceneview" : [ 0.584027, -0.214563, 0.782864, 0, 0.170918, 0.975317, 0.139802, 0, -0.793536, 0.0521572, 0.606284, 0, -0.107446, -4.18872, -9.59133, 1 ],
+            "event_time" : 200,
+            "event_type" : "timed_rotation",
+            "about_vert_angle_degrees" : 180,
+            "min_jerk"   : false,            
+            "translation" : [ 0, 0, 300 ],
             "transform_time_frames" : 100
         },
         {
-            "event_time" : 550,
-            "event_type" : "timed_transform",
-            "sceneview" : [-0.385507, -0.13799, 0.912329, 0, 0.170918, 0.960964, 0.217568, 0, -0.906737, 0.239807, -0.346873, 0, -1.39653, -4.23245, -2.07806, 1 ],
+            "event_time" : 400,
+            "event_type" : "timed_rotation",
+            "about_vert_angle_degrees" : -180,            
+            "min_jerk"   : false,            
+            "translation" : [ 0, 0, -300 ],
             "transform_time_frames" : 100
+        },
+        
+        {
+            "event_time" : 600,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : true,            
+            "about_vert_angle_degrees" : 180,
+            "translation" : [ 0, 0, 300 ],
+            "transform_time_frames" : 100
+        },
+        {
+            "event_time" : 800,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : true,            
+            "about_vert_angle_degrees" : -180,
+            "translation" : [ 0, 0, -300 ],
+            "transform_time_frames" : 100
+        },
+
+
+        {
+            "event_time" : 1000,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : false,            
+            "about_vert_angle_degrees" : 180,
+            "translation" : [ 0, 0, 300 ],
+            "transform_time_frames" : 50
         },
         {
             "event_time" : 1200,
-            "event_type" : "timed_transform",
-            "sceneview" : [ 0.146739, -0.0429147, 0.988245, 0, 0.170918, 0.985132, 0.0174008, 0, -0.974298, 0.166355, 0.151892, 0, 0.411517, -4.42065, 0.766745, 1 ],
-            "transform_time_frames" : 100
+            "event_type" : "timed_rotation",
+            "min_jerk"   : false,            
+            "about_vert_angle_degrees" : -180,
+            "translation" : [ 0, 0, -300 ],
+            "transform_time_frames" : 50
+        },
+        
+        {
+            "event_time" : 1400,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : true,            
+            "about_vert_angle_degrees" : 180,
+            "translation" : [ 0, 0, 300 ],
+            "transform_time_frames" : 50
+        },
+        {
+            "event_time" : 1600,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : true,            
+            "about_vert_angle_degrees" : -180,
+            "translation" : [ 0, 0, -300 ],
+            "transform_time_frames" : 50
+        },
+
+
+        {
+            "event_time" : 2000,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : false,            
+            "about_vert_angle_degrees" : 180,
+            "translation" : [ 0, 0, 300 ],
+            "transform_time_frames" : 25
+        },
+        {
+            "event_time" : 2200,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : false,            
+            "about_vert_angle_degrees" : -180,
+            "translation" : [ 0, 0, -300 ],
+            "transform_time_frames" : 25
+        },
+        
+        {
+            "event_time" : 2400,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : true,            
+            "about_vert_angle_degrees" : 180,
+            "translation" : [ 0, 0, 300 ],
+            "transform_time_frames" : 25
+        },
+        {
+            "event_time" : 2600,
+            "event_type" : "timed_rotation",
+            "min_jerk"   : true,            
+            "about_vert_angle_degrees" : -180,
+            "translation" : [ 0, 0, -300 ],
+            "transform_time_frames" : 25
         }
+        
 
-
+        
     ]
 }
