@@ -53,9 +53,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.sim_opts.set (craysim::options::show_movenum, true);
     v.fps_label_update_period = 1u;
 
-    // You can unset the view-follows the agent like this
-    v.options.set (mplot::visual_options::viewFollowsVMTranslations, false);
-
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
 
