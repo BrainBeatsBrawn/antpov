@@ -30,8 +30,10 @@ std::int32_t main (std::int32_t argc, char* argv[])
     craysim::parsed_inputs prog_opts = craysim::parse_inputs (argc, argv);
     if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
 
+    std::int32_t _w = prog_opts.w > 0 ? prog_opts.w : 1920;
+    std::int32_t _h = prog_opts.h > 0 ? prog_opts.h : 1080;
     // Create a craysim main window to render the eye/sensor. This loads in the models from gltf file at path
-    craysim::visual<glver> v (1920, 1080, "AntPOV", prog_opts);
+    craysim::visual<glver> v (_w, _h, "AntPOV", prog_opts);
     // Set the agent hoverheight from our inputs if necessary
     v.set_hoverheight (prog_opts.hovh, 0.002f); // 2 mm is good for C. velox model
     // Find the model from the glTF that you want to be the landscape
@@ -50,6 +52,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.sim_opts.set (craysim::options::show_fps, false);
     v.sim_opts.set (craysim::options::show_movenum, true);
     v.fps_label_update_period = 1u;
+
+    // You can unset the view-follows the agent like this
+    v.options.set (mplot::visual_options::viewFollowsVMTranslations, false);
 
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
