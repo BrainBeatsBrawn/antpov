@@ -1,0 +1,11 @@
+{
+    "Description" : "Film directions - scripted camera movements/transitions",
+
+    "directions" : [
+        {
+            "event_time" : 2,
+            "event_type" : "sceneview",
+            "sceneview" : [ -0.989097, -0.147263, -9.2268e-05, 0, 0.0136935, -0.092597, 0.99561, 0, -0.146625, 0.984753, 0.0936039, 0, -3.18224, 1.34247, -12.7661, 1 ]
+        }
+    ]
+}
