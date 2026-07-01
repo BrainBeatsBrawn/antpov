@@ -53,6 +53,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.sim_opts.set (craysim::options::show_movenum, true);
     v.fps_label_update_period = 1u;
 
+    // Save out 3D version of csv_positions?
+    v.sim_opts.set (craysim::options::save_csv_positions, true);
+
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
 
