@@ -1,4 +1,4 @@
-# Ant POV sim (made with mathplot, compound-ray, craysim and oces_viewer)
+# Ant POV simulator
 
 A program to show an ant's point of view in a model environment
 
@@ -11,7 +11,7 @@ renders the ant's view.
 Before compiling antpov, obtain and compile NVidia Optix 8.0 and obtain,
 compile and `make install` compound-ray from:
 
-https://github.com/sebsjames/compound-ray
+https://github.com/BrainBeatsBrawn/compound-ray
 
 You will need to use gcc-12 or gcc-11 to compile compound-ray (or possibly some version of clang).
 
@@ -25,7 +25,13 @@ You also need cmake version 3.28.5 or higher. Either `apt install cmake`
 on Ubuntu 25+ or download and build cmake from the cmake.org download
 page (it's an easy, reliable compile).
 
-Also the mathplot dependencies (wrt branch dev/modules)
+Also the mathplot dependencies:
+
+```bash
+sudo apt install build-essential cmake git ninja-build \
+                 librapidxml-dev freeglut3-dev libglu1-mesa-dev libxmu-dev \
+                 libxi-dev libglfw3-dev libfreetype-dev libhdf5-dev
+```
 
 ## Submodules
 
