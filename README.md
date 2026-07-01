@@ -15,11 +15,10 @@ https://github.com/sebsjames/compound-ray
 
 You will need to use gcc-12 or gcc-11 to compile compound-ray (or possibly some version of clang).
 
-To compile antpov, you need clang-22 and ninja-build:
+To compile antpov, you need clang-20 and ninja-build:
 
 ```bash
-# This won't work for now, I built clang from source
-sudo apt-install clang-22 clang-tools-22 libc++-22-dev ninja-build
+sudo apt-install clang-20 clang-tools-20 libc++-20-dev ninja-build
 ```
 
 You also need cmake version 3.28.5 or higher. Either `apt install cmake`
@@ -30,7 +29,7 @@ Also the mathplot dependencies (wrt branch dev/modules)
 
 ## Submodules
 
-Ant POV sim uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [sebsjames/craysim](https://github.com/sebsjames/craysim), [sebsjames/oces_viewer](https://github.com/sebsjames/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/sebsjames/compound-ray)
+Antpov uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [BrainBeatsBrawn/craysim](https://github.com/BrainBeatsBrawn/craysim), [BrainBeatsBrawn/oces_viewer](https://github.com/BrainBeatsBrawn/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/BrainBeatsBrawn/compound-ray)
 
 ## Build
 
@@ -48,7 +47,7 @@ just as you will have done so for compound-ray:
 ```bash
 mkdir build
 cd build
-CC=clang-22 CXX=clang++-22 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
+CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
 # Optional: -DCMAKE_CXX_FLAGS="-stdlib=libc++"
 make
 ```
