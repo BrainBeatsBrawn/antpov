@@ -32,8 +32,8 @@ sudo apt install build-essential git \
                  gcc-12 g++-12 \
                  nvidia-cuda-toolkit \
                  clang-20 clang-tools-20 libc++-20-dev ninja-build \
-                 freeglut3-dev libglu1-mesa-dev libxmu-dev libxi-dev libglfw3-dev libfreetype-dev libhdf5-dev
-# librapidxml-dev?
+                 freeglut3-dev libglu1-mesa-dev libxmu-dev \
+                 libxi-dev libglfw3-dev libfreetype-dev libhdf5-dev
 ```
 
 * GCC 12 and gmake (from build-essential) is used to compile compound-ray.
@@ -132,7 +132,11 @@ sudo update-alternatives --remove-all gcc
 
 ## Build antpov
 
-To compile antpov, clone it then init/update the submodules
+
+To compile antpov, clone it then init/update the submodules.
+
+Antpov uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [BrainBeatsBrawn/craysim](https://github.com/BrainBeatsBrawn/craysim), [BrainBeatsBrawn/oces_viewer](https://github.com/BrainBeatsBrawn/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/BrainBeatsBrawn/compound-ray)
+
 
 ```bash
 cd ~/src
@@ -152,67 +156,11 @@ CC=clang-20 CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-Opt
 ninja
 ```
 
-
-
-## Old description
-
-## Prerequisites
-
-Before compiling antpov, obtain and compile NVidia Optix 8.0 and obtain,
-compile and `make install` compound-ray from:
-
-https://github.com/BrainBeatsBrawn/compound-ray
-
-You will need to use gcc-12 or gcc-11 to compile compound-ray (or possibly some version of clang).
-
-To compile antpov, you need clang-20 and ninja-build:
-
-```bash
-sudo apt-install clang-20 clang-tools-20 libc++-20-dev ninja-build
-```
-
-You also need cmake version 3.28.5 or higher. Either `apt install cmake`
-on Ubuntu 25+ or download and build cmake from the cmake.org download
-page (it's an easy, reliable compile).
-
-Also the mathplot dependencies:
-
-```bash
-sudo apt install build-essential cmake git ninja-build \
-                 librapidxml-dev freeglut3-dev libglu1-mesa-dev libxmu-dev \
-                 libxi-dev libglfw3-dev libfreetype-dev libhdf5-dev
-```
-
-## Submodules
-
-Antpov uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [BrainBeatsBrawn/craysim](https://github.com/BrainBeatsBrawn/craysim), [BrainBeatsBrawn/oces_viewer](https://github.com/BrainBeatsBrawn/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/BrainBeatsBrawn/compound-ray)
-
-## Build
-
-To compile antpov, recursively clone it, or if you already cloned, init/update the submodules
-
-```bash
-cd antpov
-git submodule init
-git submodule update
-```
-
-then do a cmake build, passing the cmake variable OptiX_INSTALL_DIR
-just as you will have done so for compound-ray:
-
-```bash
-mkdir build
-cd build
-CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
-# Optional: -DCMAKE_CXX_FLAGS="-stdlib=libc++"
-make
-```
-
-Now you can run the program
+That's it. Test by running:
 
 ```bash
 ./build/antpov -f ./data/natural_env.gltf
 ```
 
 Author: Seb James
-Date: Jan 2026
+Date: Jul 2026
