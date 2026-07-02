@@ -10,14 +10,17 @@ renders the ant's view.
 
 You will need an NVidia GPU and an Intel/AMD computer (running a Linux OS).
 
+You will need about 16 GB of free storage to install the compilers/build tools and to complete the build process.
+My freshly installed and updated system started with 9.5 GB of storage used. The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed another 4 GB.
+
 ## Building on Ubuntu 24.04
 
-Here's how to build and install antpov on an Ubuntu 24.04 system.
-It was verified on a cleanly installed system which was fully upgraded to Ubuntu 24.04.4 LTS.
+Here's how to build and run antpov on an Ubuntu 24.04 system.
+It was verified on a cleanly installed system which had been fully upgraded to Ubuntu 24.04.4 LTS.
 
 ## Graphics driver
 
-Use the Ubuntu *Additional Driver* GUI to install an NVidia driver that is compatible with your GPU.
+Use the Ubuntu *Additional Driver* GUI to install an NVidia driver that is compatible with your NVidia GPU.
 I've had successful builds on Ubuntu 24 with both the version 535 driver and the version 580 driver.
 
 ## Install package managed dependencies
@@ -25,18 +28,18 @@ I've had successful builds on Ubuntu 24 with both the version 535 driver and the
 The following packages are required to build antpov:
 
 ```bash
-sudo apt install build-essential \
+sudo apt install build-essential git \
                  gcc-12 g++-12 \
                  nvidia-cuda-toolkit \
                  clang-20 clang-tools-20 libc++-20-dev ninja-build \
-                 freeglut3-dev libglu1-mesa-dev libxmu-dev \ # librapidxml-dev ?
-                 libxi-dev libglfw3-dev libfreetype-dev \ # libhdf5-dev?
+                 freeglut3-dev libglu1-mesa-dev libxmu-dev libxi-dev libglfw3-dev libfreetype-dev libhdf5-dev
+# librapidxml-dev?
 ```
 
 * GCC 12 and gmake (from build-essential) is used to compile compound-ray.
-* nvidia-cuda-toolkit installs the NVidia GPU compiler nvcc.
-* Clang-20 and ninja is used to compile antpov.
-* The libraries freeglut3-dev to libfreetype-dev are required by craysim/mathplot for OpenGL visualizations.
+* Compound-ray also needs nvidia-cuda-toolkit, which installs the NVidia GPU compiler nvcc.
+* Clang-20 and ninja are used to compile antpov.
+* The libraries freeglut3-dev to libhdf5-dev are required by craysim/mathplot for OpenGL visualizations.
 
 ## Compile and install cmake
 
@@ -45,6 +48,7 @@ On Ubuntu 24.04, the packaged CMake is slightly too old for the C++ modules buil
 ```bash
 cd ~/Downloads
 wget https://github.com/Kitware/CMake/releases/download/v4.3.4/cmake-4.3.4.tar.gz
+mkdir -p ~/src
 cd ~/src
 tar xvf ~/Downloads/cmake-4.3.4.tar.gz
 cd cmake-4.3.4
@@ -53,7 +57,7 @@ make -j4
 sudo make install
 ```
 
-You will now have **/usr/local/bin/cmake** which will be used in preference to the package-managed cmake in /usr/bin. Verify with `which cmake` and `cmake --version` *in a new terminal*:
+You will now have **/usr/local/bin/cmake** which will be used in preference to the package-managed cmake in /usr/bin. Verify *in a new terminal*:
 
 ```bash
 seb@ubu24-vm1:~$ which cmake
@@ -67,7 +71,7 @@ seb@ubu24-vm1:~$
 
 ## Build compound-ray
 
-Compound-ray is a library of code that performs the ray casting to simulate the view of the ant's eyes.
+Compound-ray is a library of code that performs ray casting to compute the colour detected by each ommatidium in an insect compound eye within a model environment.
 
 It uses NVidia OptiX to achieve the ray casting on an NVidia GPU.
 
@@ -77,14 +81,14 @@ Compound-ray was written by Blayze Millward ([original code](https://github.com/
 
 You will need to register a developer account with NVidia and download the [NVidia OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) SDK, version 8.0 from the [Legacy Downloads page](https://developer.nvidia.com/designworks/optix/downloads/legacy).
 
-After downloading, you should have obtained the installer shellscript file **NVIDIA-OptiX-SDK-8.0.0-linux64-x86.sh**. We'll assume it's in ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86.sh.
+After downloading, you should have obtained the installer shellscript file **NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64.sh**. We'll assume it's in ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64.sh.
 
 Unpack the file into ~/src:
 
 ```bash
 mkdir -p ~/src
 cd src
-bash ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86.sh
+bash ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64.sh
 ```
 
 Page down to accept the licence agreement, and then you should be prompted to install in the default location in src/. Accept the default. You should now have a directory **~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64** containing the NVidia OptiX SDK.
@@ -118,25 +122,34 @@ make
 sudo make install # Installs in /usr/local
 ```
 
-## Build antpov
+### Switch your compiler back
 
-To compile antpov, recursively clone it, or if you already cloned, init/update the submodules
+Optionally, return to the default gcc-13 by deleting the gcc alternative:
 
 ```bash
+sudo update-alternatives --remove-all gcc
+```
+
+## Build antpov
+
+To compile antpov, clone it then init/update the submodules
+
+```bash
+cd ~/src
+git clone https://github.com/BrainBeatsBrawn/antpov
 cd antpov
 git submodule init
 git submodule update
 ```
 
-then do a cmake build, passing the cmake variable OptiX_INSTALL_DIR
-just as you will have done so for compound-ray:
+Now you do a CMake style build, passing the variable `OptiX_INSTALL_DIR`
+just as you did for compound-ray and specifying that clang++-20 and ninja should be used to compile:
 
 ```bash
 mkdir build
 cd build
-CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
-# Optional: -DCMAKE_CXX_FLAGS="-stdlib=libc++"
-make
+CC=clang-20 CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
+ninja
 ```
 
 
