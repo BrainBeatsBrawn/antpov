@@ -10,6 +10,10 @@
 #include <cmath>
 #include <format>
 #include <map>
+#include <vector>
+#include <string>
+#include <cstdlib>
+
 
 import sm.vec;
 import sm.vvec;
