@@ -6,6 +6,143 @@ A program to show an ant's point of view in a model environment
 glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
 
+## Hardware requirements
+
+You will need an NVidia GPU and an Intel/AMD computer (running a Linux OS).
+
+## Building on Ubuntu 24.04
+
+Here's how to build and install antpov on an Ubuntu 24.04 system.
+It was verified on a cleanly installed system which was fully upgraded to Ubuntu 24.04.4 LTS.
+
+## Graphics driver
+
+Use the Ubuntu *Additional Driver* GUI to install an NVidia driver that is compatible with your GPU.
+I've had successful builds on Ubuntu 24 with both the version 535 driver and the version 580 driver.
+
+## Install package managed dependencies
+
+The following packages are required to build antpov:
+
+```bash
+sudo apt install build-essential \
+                 gcc-12 g++-12 \
+                 nvidia-cuda-toolkit \
+                 clang-20 clang-tools-20 libc++-20-dev ninja-build \
+                 freeglut3-dev libglu1-mesa-dev libxmu-dev \ # librapidxml-dev ?
+                 libxi-dev libglfw3-dev libfreetype-dev \ # libhdf5-dev?
+```
+
+* GCC 12 and gmake (from build-essential) is used to compile compound-ray.
+* nvidia-cuda-toolkit installs the NVidia GPU compiler nvcc.
+* Clang-20 and ninja is used to compile antpov.
+* The libraries freeglut3-dev to libfreetype-dev are required by craysim/mathplot for OpenGL visualizations.
+
+## Compile and install cmake
+
+On Ubuntu 24.04, the packaged CMake is slightly too old for the C++ modules build of antpov, so we compile and install the latest CMake from https://cmake.org/download/ . At the time of writing this is version 4.3.4. CMake versions as old as 3.29 and more recent than 4.3.4 should work too, so if your CMake is already within this range, you can skip this step.
+
+```bash
+cd ~/Downloads
+wget https://github.com/Kitware/CMake/releases/download/v4.3.4/cmake-4.3.4.tar.gz
+cd ~/src
+tar xvf ~/Downloads/cmake-4.3.4.tar.gz
+cd cmake-4.3.4
+./bootstrap --parallel=4 # If you have 4 cores
+make -j4
+sudo make install
+```
+
+You will now have **/usr/local/bin/cmake** which will be used in preference to the package-managed cmake in /usr/bin. Verify with `which cmake` and `cmake --version` *in a new terminal*:
+
+```bash
+seb@ubu24-vm1:~$ which cmake
+/usr/local/bin/cmake
+seb@ubu24-vm1:~$ cmake --version
+cmake version 4.3.4
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+seb@ubu24-vm1:~$
+```
+
+## Build compound-ray
+
+Compound-ray is a library of code that performs the ray casting to simulate the view of the ant's eyes.
+
+It uses NVidia OptiX to achieve the ray casting on an NVidia GPU.
+
+Compound-ray was written by Blayze Millward ([original code](https://github.com/BrainsOnBoard/compound-ray)). A modified version is used here: https://github.com/BrainBeatsBrawn/compound-ray
+
+### NVidia OptiX SDK
+
+You will need to register a developer account with NVidia and download the [NVidia OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) SDK, version 8.0 from the [Legacy Downloads page](https://developer.nvidia.com/designworks/optix/downloads/legacy).
+
+After downloading, you should have obtained the installer shellscript file **NVIDIA-OptiX-SDK-8.0.0-linux64-x86.sh**. We'll assume it's in ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86.sh.
+
+Unpack the file into ~/src:
+
+```bash
+mkdir -p ~/src
+cd src
+bash ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86.sh
+```
+
+Page down to accept the licence agreement, and then you should be prompted to install in the default location in src/. Accept the default. You should now have a directory **~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64** containing the NVidia OptiX SDK.
+
+### Temporarily switch your default compiler to GCC 12
+
+With some build systems, you can specify the compiler version with the environment variables `CC` and `CXX`. For some reason, this does not work here, and instead we have to use the `update-alternatives` system (a Debian/Ubuntu thing) to switch our default compiler from GCC 13 to the OptiX 8.0-compatible GCC 12.
+
+```bash
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
+```
+
+Verify that g++ is version 12:
+
+```bash
+seb@ubu24-vm1:~$ g++ --version
+g++ (Ubuntu 12.4.0-2ubuntu1~24.04.1) 12.4.0
+Copyright (C) 2022 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+```
+
+### Obtain and compile compound-ray
+
+```bash
+cd ~/src
+git clone https://github.com/BrainBeatsBrawn/compound-ray
+cd compound-ray/build
+cmake .. -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
+make
+sudo make install # Installs in /usr/local
+```
+
+## Build antpov
+
+To compile antpov, recursively clone it, or if you already cloned, init/update the submodules
+
+```bash
+cd antpov
+git submodule init
+git submodule update
+```
+
+then do a cmake build, passing the cmake variable OptiX_INSTALL_DIR
+just as you will have done so for compound-ray:
+
+```bash
+mkdir build
+cd build
+CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
+# Optional: -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+make
+```
+
+
+
+## Old description
+
 ## Prerequisites
 
 Before compiling antpov, obtain and compile NVidia Optix 8.0 and obtain,
