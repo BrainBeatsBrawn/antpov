@@ -6,6 +6,8 @@ A program to show an ant's point of view in a model environment
 glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
 
+# Build Ant POV
+
 ## Hardware requirements
 
 You will need an NVIDIA GPU and an Intel/AMD computer (running a Linux OS).
@@ -174,5 +176,11 @@ You can do this by adding another alternative for GCC 13 or you can simply delet
 sudo update-alternatives --remove-all gcc
 ```
 
-Author: Seb James
-Date: Jul 2026
+# Use Ant POV
+
+
+# Credits
+
+Ant POV was authored by Seb James.
+Compound-ray was authored by Blayze Millward, with modifications by Seb James.
+Alex Blenkinsop contributed to sebsjames/maths and to craysim.
