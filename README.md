@@ -9,6 +9,8 @@ renders the ant's view.
 Figures from the associated paper (to be linked here) give you a flavour of what the software was designed to do.
 In the paper, we describe how we reconstructed the views of real ants as they foraged for the first time in their lives outside their nest, which was situated on a piece of land in Seville, Spain.
 
+## Ant foraging paths
+
 Figure 1D shows several realistic routes that were mapped onto the scanned Seville environment model.
 
 ![Figure 1D from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntTracksIn3DWorld.png?raw=true)
@@ -18,6 +20,8 @@ Figure 1D shows several realistic routes that were mapped onto the scanned Sevil
 The entire foraging lives of 4 desert ants are shown with each ant assigned an individual colour (Ant 3: blue; Ant 6: green; Ant 11: pink, Ant 12: orange).
 *N* shows the location of the nest; the numerals indicate the locations of each ant's final feeding location.
 Foraging paths of all ants are plotted within the 3D habitat model, creating a  digital twin.
+
+## A realistic eye model
 
 Figure 3 shows how the biologically realistic eye model allowed us to generate plausible visual input for the ant's brain to process, using naturally generated routes.
 
