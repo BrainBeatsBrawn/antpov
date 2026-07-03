@@ -6,12 +6,27 @@ It opens a
 glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
 
-![Figure from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
+Figures from the associated paper (to be linked here) give you a flavour of what the software was designed to do.
 
-*Digital twins present new opportunities and challenges for neuroethology research.*
-**A.** Top: shows a visualisation of a simulated ant (bottom left of image) within a digital twin.  Top right: render of a standard panoramic view (360deg by +/-45deg around the horizon) as often used to simulate insect vision.
+![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
+
+**Digital twins present new opportunities and challenges for neuroethology research.**
+**A.** Left: shows a visualisation of a simulated ant (bottom left of image) within a digital twin.  Top right: render of a standard panoramic view (360deg by +/-45deg around the horizon) as often used to simulate insect vision.
 Bottom right: render of the biologically constrained eyes outputs.
-**B.** Left: Visualisation of ant as it crested a low lying plant.  The insert shows the views rendered at the corresponding location and pose.
+**B.** Visualisation of ant as it crested a low lying plant.  The insert shows the views rendered at the corresponding locations and pose.
+
+
+![Figure 3 from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntLivesExample.png?raw=true)
+
+**Reconstructing views from the foraging life of a *C. velox* forager.**
+**A.** The background image shows a frame from the video dataset as Ant 3 left the nest for the first time.
+The ant is outlined by a white box; an ant icon indicates her orientation.
+The corresponding position in the digital twin (C) is shown by the white line.
+The insert shows a reconstruction of the visual input Ant 3 will have experienced at this point in her life.
+**B.** A reconstruction of the view experienced by Ant 3 as she collected cookie from the feeder location for the first time.
+**C.** The complete first foraging journey of Ant 3 is plotted in the digital twin.
+*N* shows the nest location, while F shows the location that the ant was rewarded with cookie.
+The foraging path is labelled *Out*, while the homeward path is labelled *In*.}
 
 # Build Ant POV
 
@@ -19,7 +34,7 @@ Bottom right: render of the biologically constrained eyes outputs.
 
 You will need an NVIDIA GPU and an Intel/AMD computer (running a Linux OS).
 
-You will need about 16 GB of free storage to install the compilers/build tools and to complete the build process.
+You will need about 16 GB of free storage to install the compilers and build tools and to complete the build process.
 My freshly installed and updated system started with 9.5 GB of storage used.
 The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed another 4 GB.
 
