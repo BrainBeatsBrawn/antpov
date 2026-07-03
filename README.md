@@ -1,10 +1,12 @@
 # Ant POV simulator
 
-A program to show an ant's point of view in a model environment
+**antpov** is a program to show an ant's point of view in a model environment.
 
-**antpov** opens a
+It opens a
 glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
+
+![Figure from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
 
 # Build Ant POV
 
