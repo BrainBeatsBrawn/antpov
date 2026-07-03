@@ -8,18 +8,17 @@ renders the ant's view.
 
 Figures from the associated paper (to be linked here) give you a flavour of what the software was designed to do.
 
-## Digital twins present new opportunities and challenges for neuroethology research
-
 ![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
 
+**Digital twins present new opportunities and challenges for neuroethology research.**
 **A.** Left: shows a visualisation of a simulated ant (bottom left of image) within a digital twin.  Top right: render of a standard panoramic view (360deg by +/-45deg around the horizon) as often used to simulate insect vision.
 Bottom right: render of the biologically constrained eyes outputs.
 **B.** Visualisation of ant as it crested a low lying plant.  The insert shows the views rendered at the corresponding locations and pose.
 
-## Reconstructing views from the foraging life of a *C. velox* forager
 
 ![Figure 3 from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntLivesExample.png?raw=true)
 
+**Reconstructing views from the foraging life of a *C. velox* forager.**
 **A.** The background image shows a frame from the video dataset as Ant 3 left the nest for the first time.
 The ant is outlined by a white box; an ant icon indicates her orientation.
 The corresponding position in the digital twin (C) is shown by the white line.
@@ -27,7 +26,7 @@ The insert shows a reconstruction of the visual input Ant 3 will have experience
 **B.** A reconstruction of the view experienced by Ant 3 as she collected cookie from the feeder location for the first time.
 **C.** The complete first foraging journey of Ant 3 is plotted in the digital twin.
 *N* shows the nest location, while F shows the location that the ant was rewarded with cookie.
-The foraging path is labelled *Out*, while the homeward path is labelled *In*.}
+The foraging path is labelled *Out*, while the homeward path is labelled *In*.
 
 # Build Ant POV
 
