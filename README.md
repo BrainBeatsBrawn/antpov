@@ -7,14 +7,13 @@ glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
 
 Figures from the associated paper (to be linked here) give you a flavour of what the software was designed to do.
+In the paper, we describe how we reconstructed the views of real ants as they foraged for the first time in their lives outside their nest, which was situated on a piece of land in Seville, Spain.
 
-![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
+Figure 1D shows several realistic routes that were mapped onto the scanned Seville environment model.
 
-**Digital twins present new opportunities and challenges for neuroethology research.**
-**A.** Left: shows a visualisation of a simulated ant (bottom left of image) within a digital twin.  Top right: render of a standard panoramic view (360deg by +/-45deg around the horizon) as often used to simulate insect vision.
-Bottom right: render of the biologically constrained eyes outputs.
-**B.** Visualisation of ant as it crested a low lying plant.  The insert shows the views rendered at the corresponding locations and pose.
+![Figure 1D from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntTracksIn3DWorld.png?raw=true)
 
+Figure 3 shows how the biologically realistic eye model allowed us to generate plausible visual input for the ant's brain to process, using naturally generated routes.
 
 ![Figure 3 from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntLivesExample.png?raw=true)
 
@@ -27,6 +26,15 @@ The insert shows a reconstruction of the visual input Ant 3 will have experience
 **C.** The complete first foraging journey of Ant 3 is plotted in the digital twin.
 *N* shows the nest location, while F shows the location that the ant was rewarded with cookie.
 The foraging path is labelled *Out*, while the homeward path is labelled *In*.
+
+Figure 4 shows our simulated ant, along with a representation of her view of the scanned Seville environment model.
+
+![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
+
+**Digital twins present new opportunities and challenges for neuroethology research.**
+**A.** Left: shows a visualisation of a simulated ant (bottom left of image) within a digital twin.  Top right: render of a standard panoramic view (360deg by +/-45deg around the horizon) as often used to simulate insect vision.
+Bottom right: render of the biologically constrained eyes outputs.
+**B.** Visualisation of ant as it crested a low lying plant.  The insert shows the views rendered at the corresponding locations and pose.
 
 # Build Ant POV
 
