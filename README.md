@@ -13,6 +13,12 @@ Figure 1D shows several realistic routes that were mapped onto the scanned Sevil
 
 ![Figure 1D from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntTracksIn3DWorld.png?raw=true)
 
+**Foraging paths embedded in the digital twin of the natural habitat.**
+
+The entire foraging lives of 4 desert ants are shown with each ant assigned an individual colour (Ant 3: blue; Ant 6: green; Ant 11: pink, Ant 12: orange).
+*N* shows the location of the nest; the numerals indicate the locations of each ant's final feeding location.
+Foraging paths of all ants are plotted within the 3D habitat model, creating a  digital twin.
+
 Figure 3 shows how the biologically realistic eye model allowed us to generate plausible visual input for the ant's brain to process, using naturally generated routes.
 
 ![Figure 3 from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntLivesExample.png?raw=true)
