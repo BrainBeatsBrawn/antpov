@@ -8,10 +8,11 @@ renders the ant's view.
 
 ## Hardware requirements
 
-You will need an NVidia GPU and an Intel/AMD computer (running a Linux OS).
+You will need an NVIDIA GPU and an Intel/AMD computer (running a Linux OS).
 
 You will need about 16 GB of free storage to install the compilers/build tools and to complete the build process.
-My freshly installed and updated system started with 9.5 GB of storage used. The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed another 4 GB.
+My freshly installed and updated system started with 9.5 GB of storage used.
+The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed another 4 GB.
 
 ## Building on Ubuntu 24.04
 
@@ -20,7 +21,11 @@ It was verified on a cleanly installed system which had been fully upgraded to U
 
 ## Graphics driver
 
-Use the Ubuntu *Additional Driver* GUI to install an NVidia driver that is compatible with your NVidia GPU.
+Use the Ubuntu *Additional Driver* GUI to install an NVIDIA graphics driver that is compatible with your NVIDIA GPU.
+If you chose to enable "Third party drivers" when you installed Ubuntu, that should have done the job.
+You can verify by opening the NVIDIA Settings program and looking at 'System Information'.
+You should see an 'NVIDIA Driver Version' field.
+If it's not there, then you probably don't have the NVIDIA driver installed.
 I've had successful builds on Ubuntu 24 with both the version 535 driver and the version 580 driver.
 
 ## Install package managed dependencies
@@ -37,13 +42,15 @@ sudo apt install build-essential git \
 ```
 
 * GCC 12 and gmake (from build-essential) is used to compile compound-ray.
-* Compound-ray also needs nvidia-cuda-toolkit, which installs the NVidia GPU compiler nvcc.
+* Compound-ray also needs nvidia-cuda-toolkit, which installs the NVIDIA GPU compiler nvcc.
 * Clang-20 and ninja are used to compile antpov.
 * The libraries freeglut3-dev to libhdf5-dev are required by craysim/mathplot for OpenGL visualizations.
 
 ## Compile and install cmake
 
-On Ubuntu 24.04, the packaged CMake is slightly too old for the C++ modules build of antpov, so we compile and install the latest CMake from https://cmake.org/download/ . At the time of writing this is version 4.3.4. CMake versions as old as 3.29 and more recent than 4.3.4 should work too, so if your CMake is already within this range, you can skip this step.
+On Ubuntu 24.04, the packaged CMake is slightly too old for the C++ modules build of antpov, so we compile and install the latest CMake from https://cmake.org/download/
+At the time of writing this is version 4.3.4.
+CMake versions as old as 3.29 and more recent than 4.3.4 should work too, so if your CMake is already within this range, you can skip this step.
 
 ```bash
 cd ~/Downloads
@@ -73,13 +80,13 @@ seb@ubu24-vm1:~$
 
 Compound-ray is a library of code that performs ray casting to compute the colour detected by each ommatidium in an insect compound eye within a model environment.
 
-It uses NVidia OptiX to achieve the ray casting on an NVidia GPU.
+It uses NVIDIA OptiX to achieve the ray casting on an NVIDIA GPU.
 
 Compound-ray was written by Blayze Millward ([original code](https://github.com/BrainsOnBoard/compound-ray)). A modified version is used here: https://github.com/BrainBeatsBrawn/compound-ray
 
-### NVidia OptiX SDK
+### NVIDIA OptiX SDK
 
-You will need to register a developer account with NVidia and download the [NVidia OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) SDK, version 8.0 from the [Legacy Downloads page](https://developer.nvidia.com/designworks/optix/downloads/legacy).
+You will need to register a developer account with NVIDIA and download the [NVIDIA OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) SDK, version 8.0 from the [Legacy Downloads page](https://developer.nvidia.com/designworks/optix/downloads/legacy).
 
 After downloading, you should have obtained the installer shellscript file **NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64.sh**. We'll assume it's in ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64.sh.
 
@@ -91,7 +98,9 @@ cd src
 bash ~/Downloads/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64.sh
 ```
 
-Page down to accept the licence agreement, and then you should be prompted to install in the default location in src/. Accept the default. You should now have a directory **~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64** containing the NVidia OptiX SDK.
+Page down to accept the licence agreement, and then you should be prompted to install in the default location in src/.
+Accept the default.
+You should now have a directory **~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64** containing the NVIDIA OptiX SDK.
 
 ### Temporarily switch your default compiler to GCC 12
 
@@ -127,7 +136,8 @@ sudo make install # Installs in /usr/local
 
 To compile antpov, clone it then init/update the submodules.
 
-Antpov uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [BrainBeatsBrawn/craysim](https://github.com/BrainBeatsBrawn/craysim), [BrainBeatsBrawn/oces_viewer](https://github.com/BrainBeatsBrawn/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf). The program links to Seb's fork of [compound-ray](https://github.com/BrainBeatsBrawn/compound-ray)
+Antpov uses the submodules [sebsjames/mathplot](https://github.com/sebsjames/mathplot), [sebsjames/maths](https://github.com/sebsjames/maths), [BrainBeatsBrawn/craysim](https://github.com/BrainBeatsBrawn/craysim), [BrainBeatsBrawn/oces_viewer](https://github.com/BrainBeatsBrawn/oces_viewer) and [tinygltf](https://github.com/sebsjames/tinygltf).
+The program links to Seb's fork of [compound-ray](https://github.com/BrainBeatsBrawn/compound-ray)
 
 
 ```bash
@@ -157,7 +167,8 @@ cd ~/src/antpov
 
 ### Switch your compiler back
 
-Optionally, change your system back, so that the gcc and g++ commands involke the OS-default GCC 13. You can do this by adding another alternative for GCC 13 or you can simply delete the gcc alternative like this:
+Optionally, change your system back, so that the gcc and g++ commands involke the OS-default GCC 13.
+You can do this by adding another alternative for GCC 13 or you can simply delete the gcc alternative like this:
 
 ```bash
 sudo update-alternatives --remove-all gcc
