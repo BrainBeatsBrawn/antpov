@@ -113,7 +113,6 @@ setup_module_variables_for_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot)
 # craysim module defs
 include(${PROJECT_SOURCE_DIR}/extern/craysim/cmake/module_definitions.cmake)
 setup_module_variables_for_craysim_maths (${PROJECT_SOURCE_DIR}/extern/maths ${PROJECT_SOURCE_DIR}/extern/json)
-message ("CRAYSIM_MATHS_MODULES ${CRAYSIM_MATHS_MODULES}")
 setup_module_variables_for_craysim_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot)
 setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim)
 # OCES
