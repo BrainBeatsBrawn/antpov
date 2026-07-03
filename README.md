@@ -122,14 +122,6 @@ make
 sudo make install # Installs in /usr/local
 ```
 
-### Switch your compiler back
-
-Optionally, return to the default gcc-13 by deleting the gcc alternative:
-
-```bash
-sudo update-alternatives --remove-all gcc
-```
-
 ## Build antpov
 
 
@@ -159,7 +151,16 @@ ninja
 That's it. Test by running:
 
 ```bash
+cd ~/src/antpov
 ./build/antpov -f ./data/natural_env.gltf
+```
+
+### Switch your compiler back
+
+Optionally, change your system back, so that the gcc and g++ commands involke the OS-default GCC 13. You can do this by adding another alternative for GCC 13 or you can simply delete the gcc alternative like this:
+
+```bash
+sudo update-alternatives --remove-all gcc
 ```
 
 Author: Seb James
