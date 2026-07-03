@@ -13,7 +13,7 @@ In the paper, we describe how we reconstructed the views of real ants as they fo
 
 Figure 1D shows several realistic routes that were mapped onto the scanned Seville environment model.
 
-![Figure 1D from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntTracksIn3DWorld.png?raw=true)
+<!-- ![Figure 1D from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntTracksIn3DWorld.png?raw=true) -->
 
 **Foraging paths embedded in the digital twin of the natural habitat.**
 
@@ -25,7 +25,7 @@ Foraging paths plotted within the digitally scanned 3D habitat model.
 
 Figure 3 shows how the biologically realistic eye model allowed us to generate plausible visual input for the ant's brain to process, using naturally generated routes.
 
-![Figure 3 from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntLivesExample.png?raw=true)
+<!-- ![Figure 3 from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntLivesExample.png?raw=true) -->
 
 **Reconstructing views from the foraging life of a *C. velox* forager.**
 **A.** The background image shows a frame from the video dataset as Ant 3 left the nest for the first time.
@@ -39,7 +39,7 @@ The foraging path is labelled *Out*, while the homeward path is labelled *In*.
 
 Figure 4 shows our simulated ant, along with a representation of her view of the scanned Seville environment model.
 
-![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true)
+<!-- ![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true) -->
 
 **Digital twins present new opportunities and challenges for neuroethology research.**
 **A.** Left: shows a visualisation of a simulated ant (bottom left of image) within a digital twin.  Top right: render of a standard panoramic view (360deg by +/-45deg around the horizon) as often used to simulate insect vision.
@@ -217,7 +217,7 @@ sudo update-alternatives --remove-all gcc
 
 # Use Ant POV
 
-We hope that others may want to experiment with our software, verify that our results are robust and make use of *craysim* (the library that makes Ant POV possible) in their own projects.
+We hope that you'll want to experiment with our software, verify that our results are robust and even try to use *craysim* (the library that makes Ant POV possible) in your own projects.
 
 ## Experimenting with the example environment
 
