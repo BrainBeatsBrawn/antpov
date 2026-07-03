@@ -52,9 +52,9 @@ Bottom right: render of the biologically constrained eyes outputs.
 
 You will need an NVIDIA GPU and an Intel/AMD computer (running a Linux OS).
 
-You will need about 16 GB of free storage to install the compilers and build tools and to complete the build process.
+You will need about 13 GB of free storage to install the compilers and build tools and to complete the build process.
 My freshly installed and updated system started with 9.5 GB of storage used.
-The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed another 4 GB.
+The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed 1 GB.
 
 ## Building on Ubuntu 24.04
 
