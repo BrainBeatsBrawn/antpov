@@ -1,28 +1,9 @@
-# Each C++ module file has to be listed here (as they don't have a .cppm or .ixx file suffix)
-set_source_files_properties (
-  ${MPLOT_MATHS_CORE_MODULES}
-  ${MPLOT_MATHS_VISUALMODEL_MODULES}
-  ${MPLOT_CORE_MODULES}
-  ${OCES_MODULES}
-  ${ANTPOV_VM_MODULES}
-  ${FIDUCIALS_VM_MODULES}
-  ${MY_MODULES}
-  PROPERTIES LANGUAGE CXX
-)
-
 # Build glad library here
 include_directories(BEFORE ${MPLOT_INCLUDE_PATH}/mplot/glad)
 add_library(glad STATIC ${MPLOT_INCLUDE_PATH}/mplot/glad/gl.c)
 
 # Build mathplot fonts data
 add_library(mplot_fontdata STATIC ${MPLOT_INCLUDE_PATH}/mplot/VisualFaceAsm.cpp)
-
-# A special exe to make fiducials for the Seville environment
-add_executable(fiducials fiducials.cpp)
-set(FIDUCIALS_MODULES ${MPLOT_MATHS_CORE_MODULES} ${MPLOT_MATHS_VISUALMODEL_MODULES} ${MPLOT_CORE_MODULES} ${FIDUCIALS_VM_MODULES})
-list(REMOVE_DUPLICATES FIDUCIALS_MODULES)
-target_sources(fiducials PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR} FILES ${FIDUCIALS_MODULES})
-target_link_libraries(fiducials ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glfw glad mplot_fontdata)
 
 # The main ant simulator
 set(ANTPOV_MODULES
@@ -39,12 +20,20 @@ set(ANTPOV_MODULES
   ${MY_MODULES}
 )
 list(REMOVE_DUPLICATES ANTPOV_MODULES)
-add_executable(antpov antpov.cpp)
-target_sources(antpov
+
+add_library(antpov_modules STATIC)
+target_sources(antpov_modules
   PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
   FILES ${ANTPOV_MODULES}
 )
-target_link_libraries(antpov ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glad mplot_fontdata)
+target_link_libraries(antpov_modules ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glad mplot_fontdata)
+
+add_executable(antpov antpov.cpp)
+target_link_libraries(antpov antpov_modules)
+
+# A special exe to make fiducials for the Seville environment
+add_executable(fiducials fiducials.cpp)
+target_link_libraries(fiducials antpov_modules)
 
 # Ant direction processing test
 set(DIRNS_MODULES
@@ -52,34 +41,25 @@ set(DIRNS_MODULES
   ${MPLOT_CORE_MODULES}
   ${MPLOT_MATHS_VISUALMODEL_MODULES}
   ${MPLOT_INCLUDE_PATH}/mplot/GraphVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/GridVisual.cppm
   ${MY_MODULES}
 )
 list(REMOVE_DUPLICATES DIRNS_MODULES)
-add_executable(dirns dirns.cpp)
-target_sources(dirns
+add_library(dirns_modules STATIC)
+target_sources(dirns_modules
   PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
   FILES ${DIRNS_MODULES}
 )
-target_link_libraries(dirns ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+target_link_libraries(dirns_modules ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+
+add_executable(dirns dirns.cpp)
+target_link_libraries(dirns dirns_modules)
 
 add_executable(cater_paths cater_paths.cpp)
-target_sources(cater_paths
-  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
-  FILES ${DIRNS_MODULES}
-)
-target_link_libraries(cater_paths ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+target_link_libraries(cater_paths dirns_modules)
 
 add_executable(cater_sel_paths cater_sel_paths.cpp)
-target_sources(cater_sel_paths
-  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
-  FILES ${DIRNS_MODULES} ${MPLOT_INCLUDE_PATH}/mplot/GridVisual.cppm
-
-)
-target_link_libraries(cater_sel_paths ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+target_link_libraries(cater_sel_paths dirns_modules)
 
 add_executable(cater_graph cater_graph.cpp)
-target_sources(cater_graph
-  PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
-  FILES ${DIRNS_MODULES}
-)
-target_link_libraries(cater_graph ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} glad mplot_fontdata)
+target_link_libraries(cater_graph dirns_modules)

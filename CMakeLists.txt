@@ -127,17 +127,15 @@ set(MY_MODULES ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm)
 # The OCES reader code
 set(OCES_MODULES ${OCES_READER_MATHS_MODULES} ${OCES_READER_MODULES})
 
-# Define a list of the additional VisualModel modules that we make use of in antpov
+# Define a list of the additional VisualModel modules that we make use of in antpov (or fiducials)
 set(ANTPOV_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/GraphVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/GridVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/RodVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/VectorVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/SphereVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm
 )
-
-# Define a list of the VisualModel modules that we require in fiducials
-set(FIDUCIALS_VM_MODULES ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm)
 
 # Compile stuff in subdirectories
 add_subdirectory(src)
