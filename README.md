@@ -17,9 +17,9 @@ Figure 1D shows several realistic routes that were mapped onto the scanned Sevil
 
 **Foraging paths embedded in the digital twin of the natural habitat.**
 
-The entire foraging lives of 4 desert ants are shown with each ant assigned an individual colour (Ant 3: blue; Ant 6: green; Ant 11: pink, Ant 12: orange).
-*N* shows the location of the nest; the numerals indicate the locations of each ant's final feeding location.
-Foraging paths of all ants are plotted within the 3D habitat model, creating a  digital twin.
+One foraging path for each of 4 desert ants are shown with each ant assigned an individual colour (Ant 3: blue; Ant 6: green; Ant 11: pink, Ant 12: orange).
+*N* shows the location of the nest; the numerals indicate the locations of each ant's feeding location.
+Foraging paths plotted within the digitally scanned 3D habitat model.
 
 ## A realistic eye model
 
@@ -200,8 +200,7 @@ CC=clang-20 CXX=clang++-20 cmake .. -GNinja -DOptiX_INSTALL_DIR=~/src/NVIDIA-Opt
 ninja
 ```
 
-That's it. Test by running:
-
+That's it. Test by launching antpov with a bundled test environment:
 ```bash
 cd ~/src/antpov
 ./build/antpov -f ./data/natural_env.gltf
@@ -218,6 +217,60 @@ sudo update-alternatives --remove-all gcc
 
 # Use Ant POV
 
+We hope that others may want to experiment with our software, verify that our results are robust and make use of *craysim* (the library that makes Ant POV possible) in their own projects.
+
+## Experimenting with the example environment
+
+Start by familiarising yourself with the capabilities of the software.
+
+```bash
+cd ~/src/antpov
+./build/antpov -f ./data/natural_env.gltf
+```
+
+Three windows should open. One shows the scene, with the ant to be found somewhere within the scene.
+Another shows a visualization of the ant's head and eyes, separate from the scene.
+The third windows shows a two dimensional representation of the ant's view.
+
+Arrange the windows so that you can see them all, and highlight the one titled 'AntPOV'.
+This window processes keyboard-input.
+
+Let's find our ant. You can turn on a set of coordinate arrows that are centred on the ant by pressing 'c'.
+Zoom out with your scroll wheel to help find the ant coordinate arrows.
+You can move your view of the scene with mouse movements and either your left or right button held down.
+The left button rotates the scene; the right button translates it.
+If you place the agent coordinate arrows at the centre of the window, your rotations should occur around the ant's location.
+Zoom in on the coordinate arrows, then switch them off.
+You should see our ant, with her compound eyes rendering her view.
+
+You can move her around with some key bindings.
+The usual gaming 'wasd' keys move her forwards/backwards, left and right. Change her yaw and roll with the arrow keys. ',' and '.' control her roll.
+
+A summary of all the key bindings is available if you press Ctrl-h (you will see the output in the terminal from which you started the program).
+
+## Reproducing the results in the paper
+
+To reproduce our results, you will need to download our Seville environment glTF file.
+This is not distributed along with the source code because it is too large (3.2 GB) to reside in a git repository on github.com.
+Go to [link coming]() and download both the glTF (ground_and_veg_inner_circular.gltf) and the associated NavMesh file (navmesh_4420489099394405100). Place these files in antpov/data/seville/
+
+You can now run the scripts that will take the two-dimensional coordinates for the ant routes and project them into the three-dimensional Seville model.
+
+### Fig 1D
+
+### Fig 3
+
+### Fig 4C
+
+## Make your own Insect POV
+
+The antpov program, with its ant- and application-specific functionality is only a few hundred lines of code.
+All the functionality that allows you to place compound-ray eyes in a glTF-encoded scene, and to move the eyes over the surface of a landscape in that scene is held in (mostly C++ modular) libraries.
+[Compound-ray](https://github.com/BrainBeatsBrawn/compound-ray) provides the ray casting; [mathplot](https://github.com/sebsjames/mathplot) does OpenGL visualization; [craysim](https://github.com/BrainBeatsBrawn/craysim) binds it all together into a simulation.
+The idea is to make it easy to create new simulations.
+A new simulation might feature different eye models, different behaviour and it might contain a brain model to control the agent's movement.
+
+You can see the simplest possible craysim program here: [craysim_minimal](https://github.com/BrainBeatsBrawn/craysim_minimal).
 
 # Credits
 
