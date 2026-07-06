@@ -217,7 +217,7 @@ sudo update-alternatives --remove-all gcc
 
 ## Building on Ubuntu 26.04
 
-You can follow the same instructions as for Ubuntu 24.04, but instead of compiling cmake, you can use the package-managed one instead with
+You can follow the same instructions as for Ubuntu 24.04, but instead of compiling CMake, you can install with apt:
 
 ```bash
 sudo apt install cmake
