@@ -4,7 +4,7 @@ This directory holds the source for the programs in this repository.
 
 ## antpov.cpp
 
-The main **antpov** program. This is very much a research code script! It uses a a `craysim_visual<>` to load and render the ant within the scene, and some `mplot::visual`s to render the ant's eyes separately from the scene.
+The main **antpov** program. This is very much a research code script! It uses a a `craysim_visual<>` to load and render the ant within the scene, and some `mplot::Visual` windows to render the ant's eyes separately from the scene.
 
 Some additional code is in the C++ module file **antpov_helpers.cppm**.
 
