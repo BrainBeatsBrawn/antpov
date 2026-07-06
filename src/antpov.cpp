@@ -329,6 +329,35 @@ std::int32_t main (std::int32_t argc, char* argv[])
             ant_ptr1->greyscale (false);
         }
         v.render_and_poll(); // Does all the render computations
+
+        // How to access the eye data.
+        //
+        // In this program, we pass the eye data to a mathplot VisualModel to be rendered on
+        // screen. However, we might want to save these data to a file, or pass them into a brain
+        // model. This is a description to get you started if you need to do this.
+        //
+        // It is placed here, after v.render_and_poll(), because in that function the new eye values
+        // will have been computed.
+        //
+        // Eye data lives in craysim_visual's v.ommatidia_datas which has type:
+        //
+        // std::map<std::uint32_t, std::vector<std::array<float, 3>>> ommatidia_datas;
+        //
+        // This structure is keyed by the compound-ray camera ID. In compound-ray cameras are
+        // specified in the glTF file, and so any camera may have any ID.
+        //
+        // In the Seville scene, ground_and_veg_inner_circular.gltf, the biologically realistic eye
+        // camera is always camera 0, i.e. v.ommatidia_datas[0].
+        //
+        // If the file has been modified so that there is also a cylindrical eye camera present,
+        // then that is expected (by this program) to be v.ommatidia_datas[1].
+        //
+        // v.ommatidia_datas[0] is std::vector<std::array<float, 3>> - a vector of RGB values, with
+        // one RGB for each ommatidium.
+        //
+        // Match the RGB values up with the ommatidia position information in craysim_visual's
+        // v.ommatidias which is a camera ID-keyed map of vectors of Ommatidium objects.
+
         if (gv1p != nullptr) {
             //gv1p->reinitColours();
             gv1p->setVectorData (reinterpret_cast<std::vector<sm::vec<float>>*>(&v.ommatidia_datas[1]));
