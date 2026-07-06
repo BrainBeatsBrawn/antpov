@@ -26,12 +26,12 @@ This sub-directory contains scripts that run antpov to reproduce Ant 03's run 01
 Run any of the scripts from the base antpov:
 
 ```
-[09:03:23 antpov] ./scripts/ant03/r01_various_cam_angles.sh 
+./scripts/ant03/r01_various_cam_angles.sh 
 ```
 
 ## ant12
 
-Ant 12's run 01, 02 and Zero Vector run. These are the runs shown in Figure 4.
+Ant 12's run 01, 02 and Zero Vector run. These are the runs shown in Figure 4. 
 
 ## four_paths
 
