@@ -252,7 +252,7 @@ A summary of all the key bindings is available if you press Ctrl-h (you will see
 
 To reproduce our results, you will need to download our Seville environment glTF file.
 This is not distributed along with the source code because it is too large (3.2 GB) for a github.com repository.
-Go to [link coming]() and download both the glTF (**ground_and_veg_inner_circular.gltf**) and the associated NavMesh file (**navmesh_4420489099394405100**). Place these files in antpov/data/seville/
+Go to [link coming]() and download **Seville_scanned_model.zip**. Unpack the zip file to obtain both the glTF (**ground_and_veg_inner_circular.gltf**) and the associated NavMesh file (**navmesh_4420489099394405100**). Place these files in antpov/data/seville/
 
 You can now run the scripts that will take the two-dimensional coordinates for the ant routes and project them into the three-dimensional Seville model.
 

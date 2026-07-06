@@ -6,17 +6,13 @@ This folder contains scripts that make it possible to reproduce the results from
 
 Before running the scripts, you will need to download the Seville environment glTF file, which is too large to distribute in this repository.
 
-Download the following files and place them in antpov/data/seville/
+Download the following file
 
 (Correct URLs to be added)
 
-https://path.to/ground_and_veg_inner_circular.gltf
+https://somepath.to/Seville_scanned_model.zip
 
-https://path.to/navmesh_4420489099394405100
-
-or
-
-https://path.to/antpov_seville_data.zip
+Unpack the zip and move the files **ground_and_veg_inner_circular.gltf** and **navmesh_4420489099394405100** to antpov/data/seville/
 
 You will also need to have compiled the software in a directory antpov/build, after following the build instructions in the [top-level readme](https://github.com/BrainBeatsBrawn/antpov/blob/main/README.md).
 
