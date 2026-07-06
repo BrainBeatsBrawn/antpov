@@ -56,6 +56,14 @@ You will need about 13 GB of free storage to install the compilers and build too
 My freshly installed and updated system started with 9.5 GB of storage used.
 The package managed dependencies added 9 GB; CMake and compound-ray was 2 GB, the antpov repository (and its submodules) another 1 GB and finally the build of antpov consumed 1 GB.
 
+## Building on Ubuntu 26.04
+
+You can follow the same instructions as for Ubuntu 24.04, but instead of compiling CMake, you can install with apt:
+
+```bash
+sudo apt install cmake
+```
+
 ## Building on Ubuntu 24.04
 
 Here's how to build and run antpov on an Ubuntu 24.04 system.
@@ -213,14 +221,6 @@ You can do this by adding another alternative for GCC 13 or you can simply delet
 
 ```bash
 sudo update-alternatives --remove-all gcc
-```
-
-## Building on Ubuntu 26.04
-
-You can follow the same instructions as for Ubuntu 24.04, but instead of compiling CMake, you can install with apt:
-
-```bash
-sudo apt install cmake
 ```
 
 # Use Ant POV
