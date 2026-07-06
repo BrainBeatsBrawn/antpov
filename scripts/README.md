@@ -37,6 +37,12 @@ Ant 12's run 01, 02 and Zero Vector run. These are the runs shown in Figure 4.
 
 This script runs four different Ant runs in sequence to reproduce the model from which Figure 1D is a screenshot.
 
+It plots the last forage for each of Ants 3, 6, 11 and 12.
+
+```
+./scripts/four_paths/four_paths.sh 
+```
+
 ## Making movies
 
 If you want to make a movie of any of these runs, edit the script and add `-x -m` to the antpov command invocation.
