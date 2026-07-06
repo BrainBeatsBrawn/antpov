@@ -33,6 +33,10 @@ Run any of the scripts from the base antpov:
 
 Ant 12's run 01, 02 and Zero Vector run. These are the runs shown in Figure 4. 
 
+```
+./scripts/ant12/r01_r02_zvf.sh
+```
+
 ## four_paths
 
 This script runs four different Ant runs in sequence to reproduce the model from which Figure 1D is a screenshot.

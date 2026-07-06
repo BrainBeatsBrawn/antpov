@@ -251,16 +251,30 @@ A summary of all the key bindings is available if you press Ctrl-h (you will see
 ## Reproducing the results in the paper
 
 To reproduce our results, you will need to download our Seville environment glTF file.
-This is not distributed along with the source code because it is too large (3.2 GB) to reside in a git repository on github.com.
-Go to [link coming]() and download both the glTF (ground_and_veg_inner_circular.gltf) and the associated NavMesh file (navmesh_4420489099394405100). Place these files in antpov/data/seville/
+This is not distributed along with the source code because it is too large (3.2 GB) for a github.com repository.
+Go to [link coming]() and download both the glTF (**ground_and_veg_inner_circular.gltf**) and the associated NavMesh file (**navmesh_4420489099394405100**). Place these files in antpov/data/seville/
 
 You can now run the scripts that will take the two-dimensional coordinates for the ant routes and project them into the three-dimensional Seville model.
 
 ### Fig 1D
 
+```
+./scripts/four_paths/four_paths.sh 
+```
+
 ### Fig 3
 
+```
+./scripts/ant03/r01_top_down.sh
+```
+
 ### Fig 4C
+
+```
+./scripts/ant12/r01_r02_zvf.sh
+```
+
+See also the [scripts README](https://github.com/BrainBeatsBrawn/antpov/tree/main/scripts).
 
 ## Make your own Insect POV
 
