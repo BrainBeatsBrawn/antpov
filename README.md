@@ -215,6 +215,14 @@ You can do this by adding another alternative for GCC 13 or you can simply delet
 sudo update-alternatives --remove-all gcc
 ```
 
+## Building on Ubuntu 26.04
+
+You can follow the same instructions as for Ubuntu 24.04, but instead of compiling cmake, you can use the package-managed one instead with
+
+```bash
+sudo apt install cmake
+```
+
 # Use Ant POV
 
 We hope that you'll want to experiment with our software, verify that our results are robust and even try to use *craysim* (the library that makes Ant POV possible) in your own projects.
