@@ -121,7 +121,7 @@ setup_module_variables_for_oces_reader_maths (${PROJECT_SOURCE_DIR}/extern/maths
 setup_module_variables_for_oces_reader (${PROJECT_SOURCE_DIR}/extern/oces_viewer)
 
 # Modules in this repo
-set(MY_MODULES ${PROJECT_SOURCE_DIR}/modules/antpov_helpers.cppm)
+set(MY_MODULES ${PROJECT_SOURCE_DIR}/src/antpov_helpers.cppm)
 
 # The OCES reader code
 set(OCES_MODULES ${OCES_READER_MATHS_MODULES} ${OCES_READER_MODULES})
