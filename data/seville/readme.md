@@ -7,3 +7,5 @@ I used a script to do a batch of them:
 for i in *-warped.csv; do
     ./to-world-coords.py $i "-14,-14" "14,14" > $i.world.csv
 done
+
+The *.world.csv files were used to create *.world.csv.3d.csv files, which are 3D locations obtained by fitting an ant agent to the 2D locations in *.world.csv.
