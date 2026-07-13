@@ -7,115 +7,13 @@
             "event_type" : "sceneview",
             "sceneview" : [ -0.0377439, -0.998525, -0.0390399, 0, 0.170918, -0.0449429, 0.98426, 0, -0.984562, 0.0304771, 0.172362, 0, -1.74506, -1.99154, -352.766, 1]
         },
-
-
-
-
         {
             "event_time" : 200,
             "event_type" : "timed_rotation",
             "about_vert_angle_degrees" : 180,
-            "min_jerk"   : false,            
+            "min_jerk"   : false,
             "translation" : [ 0, 0, 300 ],
             "transform_time_frames" : 100
-        },
-        {
-            "event_time" : 400,
-            "event_type" : "timed_rotation",
-            "about_vert_angle_degrees" : -180,            
-            "min_jerk"   : false,            
-            "translation" : [ 0, 0, -300 ],
-            "transform_time_frames" : 100
-        },
-        
-        {
-            "event_time" : 600,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : true,            
-            "about_vert_angle_degrees" : 180,
-            "translation" : [ 0, 0, 300 ],
-            "transform_time_frames" : 100
-        },
-        {
-            "event_time" : 800,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : true,            
-            "about_vert_angle_degrees" : -180,
-            "translation" : [ 0, 0, -300 ],
-            "transform_time_frames" : 100
-        },
-
-
-        {
-            "event_time" : 1000,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : false,            
-            "about_vert_angle_degrees" : 180,
-            "translation" : [ 0, 0, 300 ],
-            "transform_time_frames" : 50
-        },
-        {
-            "event_time" : 1200,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : false,            
-            "about_vert_angle_degrees" : -180,
-            "translation" : [ 0, 0, -300 ],
-            "transform_time_frames" : 50
-        },
-        
-        {
-            "event_time" : 1400,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : true,            
-            "about_vert_angle_degrees" : 180,
-            "translation" : [ 0, 0, 300 ],
-            "transform_time_frames" : 50
-        },
-        {
-            "event_time" : 1600,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : true,            
-            "about_vert_angle_degrees" : -180,
-            "translation" : [ 0, 0, -300 ],
-            "transform_time_frames" : 50
-        },
-
-
-        {
-            "event_time" : 2000,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : false,            
-            "about_vert_angle_degrees" : 180,
-            "translation" : [ 0, 0, 300 ],
-            "transform_time_frames" : 25
-        },
-        {
-            "event_time" : 2200,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : false,            
-            "about_vert_angle_degrees" : -180,
-            "translation" : [ 0, 0, -300 ],
-            "transform_time_frames" : 25
-        },
-        
-        {
-            "event_time" : 2400,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : true,            
-            "about_vert_angle_degrees" : 180,
-            "translation" : [ 0, 0, 300 ],
-            "transform_time_frames" : 25
-        },
-        {
-            "event_time" : 2600,
-            "event_type" : "timed_rotation",
-            "min_jerk"   : true,            
-            "about_vert_angle_degrees" : -180,
-            "translation" : [ 0, 0, -300 ],
-            "transform_time_frames" : 25
         }
-        
-
-        
     ]
 }
