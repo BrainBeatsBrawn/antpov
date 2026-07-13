@@ -255,6 +255,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
         gv1->finalize();
         gv1p = veye.addVisualModel (gv1);
         gv1p->scaleViewMatrix (1);
+
+        veye.setSceneTrans (sm::vec<float,3>{ float{-0.0245425}, float{-0.876597}, float{-1.56183} });
+        veye.setSceneRotation (sm::quaternion<float>{ float{1}, float{0}, float{0}, float{0} });
     }
 
     // 2D eye representation (goes in the other window)
