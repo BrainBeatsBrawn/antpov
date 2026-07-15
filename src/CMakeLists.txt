@@ -2,6 +2,9 @@
 add_executable(antpov antpov.cpp)
 target_link_libraries(antpov antpov_modules)
 
+add_executable(antpov_plotcoords antpov_plotcoords.cpp)
+target_link_libraries(antpov_plotcoords antpov_modules)
+
 # A special exe to make fiducials for the Seville environment
 add_executable(fiducials fiducials.cpp)
 target_link_libraries(fiducials antpov_modules)
