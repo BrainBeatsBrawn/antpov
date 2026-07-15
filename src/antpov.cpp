@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <format>
 #include <filesystem>
+#include <fstream>
 
 import sm.flags;
 import sm.vvec;
@@ -137,7 +138,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
-    v.bc_mult = 1.0f; // default anyway
+    v.bc_mult = 2.0f; // 1 is default
     v.breadcrumb_every = 10;
 
     // Turn antflags into colour info, all at the start:
@@ -380,4 +381,50 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     v.complete_recording();
+
+    // Manually create 6D positions with flags
+    if (!v.csv_found_positions.empty() && !v.first_csv.empty()) {
+        std::string fp_filename = v.first_csv + ".6d.csv";
+        std::cout << "Write out found 3D positions and directions to " << fp_filename << "\n";
+        std::ofstream fout (fp_filename, std::ios::out | std::ios::trunc);
+        if (fout.is_open()) {
+            fout << "# x,y,z,dir_x,dir_y,dir_z,bush,cookie,shadow,invisible,dirn_uncertain\n";
+            std::uint32_t i = 0;
+            sm::vec<float> last_p = v.csv_found_positions[0];
+            sm::vec<float> last_d = {};
+            for (auto p : v.csv_found_positions) {
+                // Flags columns order originally was: Bush, Cookie, Shadow, Visibility; We add "Dirn Uncertain"
+                sm::flags<antpov::antflags> aflags;
+                aflags = v.csv_flags[i];
+
+                // need to compute the 3D direction (giving ant pose) again.
+                sm::vec<float> pose_direction = {};
+                pose_direction = p - last_p;
+                last_p = p;
+                bool dirn_uncertain = pose_direction.length() < std::numeric_limits<float>::epsilon();
+                if (dirn_uncertain) {
+                    // Use last dirn
+                    pose_direction = last_d;
+                } else {
+                    pose_direction.renormalize();
+                    last_d = pose_direction;
+                }
+                fout << p.str_comma_separated() << ","
+                     << pose_direction.str_comma_separated() << ","
+                     << (aflags.test (antpov::antflags::bush) ? "1" : "0") << ","
+                     << (aflags.test (antpov::antflags::cookie) ? "1" : "0") << ","
+                     << (aflags.test (antpov::antflags::shadow) ? "1" : "0") << ","
+                     << (aflags.test (antpov::antflags::invisible) ? "1" : "0") << ","
+                     << (dirn_uncertain ? "1" : "0")
+                     << std::endl;
+
+                ++i;
+            }
+            fout.close();
+        } else {
+            std::cout << "Failed to open " << fp_filename << " to write out 3D csv positions\n";
+        }
+    } else {
+        std::cout << "No found positions to write out\n";
+    }
 }
