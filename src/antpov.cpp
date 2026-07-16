@@ -194,6 +194,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Once CSV has been read (if you are using that feature) do some setup on the landscape
     v.setup_landscape();
 
+    constexpr bool hide_land = false;
+    if constexpr (hide_land == true) {
+        // In special case, may want to hide landscape (and vegetation)
+        v.hide_landscape ("vegetation_inner_alternative");
+        // And set a white background
+        v.bgcolour = {1, 1, 1, 0};
+    }
+
     // From cmd line output (after ctrl-z) set the initial view
     v.setSceneTrans (sm::vec<float,3>{ float{0.682335}, float{0.47893}, float{-8.38334} });
     v.setSceneRotation (sm::quaternion<float>{ float{0.73946}, float{0.6732}, float{0.00036425}, float{0.000331613} });
@@ -206,10 +214,20 @@ std::int32_t main (std::int32_t argc, char* argv[])
     veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-1.18557} });
     veye.setSceneRotation (sm::quaternion<float>{ float{1}, float{0}, float{0}, float{0} });
 
+    // Enable a special mode to make a short video of ant head in same orientation as a photographed ant
+    constexpr bool seeing_what_they_see_format = false;
+    std::int32_t vant_x = seeing_what_they_see_format ? 1920 : 920;
     // A window for the Ant body view (or cylindrical eye)
-    mplot::Visual<glver> vant (920, 920, "Ant view");
-    vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
-    vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
+    mplot::Visual<glver> vant (vant_x, vant_x, "Ant view");
+    if constexpr (!seeing_what_they_see_format) {
+        // Original orientation of ant head in videos
+        vant.setSceneTrans (sm::vec<float,3>{ float{0.113123}, float{0.0217872}, float{-3.7961} });
+        vant.setSceneRotation (sm::quaternion<float>{ float{0.937372}, float{0.106131}, float{0.330499}, float{0.0289824} });
+    } else {
+        // Orientation to match a slide where our ant is set next to a photo of a real ant head
+        vant.setSceneTrans (sm::vec<float,3>{ float{-0.213751}, float{0.446347}, float{-4.42643} });
+        vant.setSceneRotation (sm::quaternion<float>{ float{0.774197}, float{0.444591}, float{-0.447665}, float{0.0505289} });
+    }
 
     // Ant body, plotted in its own window; first the eyes for the body
     auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
@@ -370,9 +388,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
         }
         // Save frames
         if (prog_opts.make_movie && v.move_counter > 2) { // Ignore first couple of locations, as the system takes a couple of moves to get ready
-            v.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/scene/{:06d}.pnm", antid, routeidx, v.move_counter));
+            if constexpr (seeing_what_they_see_format == false) {
+                v.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/scene/{:06d}.pnm", antid, routeidx, v.move_counter));
+                veye.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/eyes/{:06d}.pnm", antid, routeidx, v.move_counter));
+            }
             vant.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/ant/{:06d}.pnm", antid, routeidx, v.move_counter));
-            veye.saveImage (std::format ("./movies/Ant{:02d}R{:02d}/eyes/{:06d}.pnm", antid, routeidx, v.move_counter));
         }
 
         // Here is where you would work on the data for the last view in v.ommatidia_data;
