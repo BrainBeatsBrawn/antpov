@@ -2,3 +2,5 @@
 *.h5
 ground_and_veg_inner_circular.gltf
 ground_and_veg_inner_cyl.gltf
+*.gltf
+*.blend
