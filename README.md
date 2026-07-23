@@ -6,7 +6,7 @@ It opens a
 glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
 
-Figures from the associated paper (to be linked here) give you a flavour of what the software was designed to do.
+Figures from the associated paper (**to be linked here**) give you a flavour of what the software was designed to do.
 In the paper, we describe how we reconstructed the views of real ants as they foraged for the first time in their lives outside their nest, which was situated on a piece of land in Seville, Spain.
 
 ## Ant foraging paths
@@ -37,7 +37,7 @@ The insert shows a reconstruction of the visual input Ant 3 will have experience
 *N* shows the nest location, while F shows the location that the ant was rewarded with cookie.
 The foraging path is labelled *Out*, while the homeward path is labelled *In*.
 
-Figure 4 shows our simulated ant, along with a representation of her view of the scanned Seville environment model.
+Figure 4 shows our simulated ant, along with a representation of her view of the [scanned Seville environment model](https://doi.org/10.15131/shef.data.32860832).
 
 <!-- ![Figure 4A and 4B from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/ValueOfDigitalTwin.png?raw=true) -->
 
@@ -260,7 +260,7 @@ A summary of all the key bindings is available if you press Ctrl-h (you will see
 
 To reproduce our results, you will need to download our Seville environment glTF file.
 This is not distributed along with the source code because it is too large (3.2 GB) for a github.com repository.
-Go to [link coming]() and download **Seville_scanned_model.zip**. Unpack the zip file to obtain both the glTF (**ground_and_veg_inner_circular.gltf**) and the associated NavMesh file (**navmesh_4420489099394405100**). Place these files in antpov/data/seville/
+Go to [Dataset: Reconstructing the visual histories of desert ants](https://doi.org/10.15131/shef.data.32860832), enter the folder **3. Reconstructing Ant Views**  and download **Seville_scanned_model.zip**. Unpack the zip file to obtain both the glTF (**ground_and_veg_inner_circular.gltf**) and the associated NavMesh file (**navmesh_4420489099394405100**). Place these files in antpov/data/seville/
 
 You can now run the scripts that will take the two-dimensional coordinates for the ant routes and project them into the three-dimensional Seville model.
 

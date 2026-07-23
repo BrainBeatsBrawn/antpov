@@ -6,13 +6,15 @@ This folder contains scripts that make it possible to reproduce the results from
 
 Before running the scripts, you will need to download the Seville environment glTF file, which is too large to distribute in this repository.
 
-Download the following file
+Download from our Dataset:
 
-(Correct URLs to be added)
+[Dataset: Reconstructing the visual histories of desert ants](https://doi.org/10.15131/shef.data.32860832),
 
-https://somepath.to/Seville_scanned_model.zip
+Enter the folder **3. Reconstructing Ant Views**  and download **Seville_scanned_model.zip**.
 
-Unpack the zip and move the files **ground_and_veg_inner_circular.gltf** and **navmesh_4420489099394405100** to antpov/data/seville/
+Unpack the zip file to obtain both the glTF (**ground_and_veg_inner_circular.gltf**) and the associated NavMesh file (**navmesh_4420489099394405100**).
+
+Place these files in antpov/data/seville/
 
 You will also need to have compiled the software in a directory antpov/build, after following the build instructions in the [top-level readme](https://github.com/BrainBeatsBrawn/antpov/blob/main/README.md).
 
