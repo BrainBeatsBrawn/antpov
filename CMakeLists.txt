@@ -22,20 +22,22 @@ if(NOT CMAKE_BUILD_TYPE)
     CACHE STRING "Choose build type from: Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
 
-# The file FindOptiX.cmake is provided by craysim
+# To find the file FindOptiX.cmake with include(FindOptiX), we need to
+# add to the CMAKE_MODULE_PATH. Here, FindOptix.cmake is provided by
+# craysim
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/craysim/cmake" ${CMAKE_MODULE_PATH})
 
 # Path to the NVidia OptiX SDK directory e.g. ~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
 set(OptiX_INSTALL_DIR "${PROJECT_SOURCE_DIR}/../" CACHE PATH "Path to OptiX installed location.")
 
 # Find the libraries which will be needed in addition to compound-ray (libEyeRenderer3.so)
-find_package(glfw3 3.2...3.4 REQUIRED)
-find_package(OpenGL)
+find_package(glfw3 REQUIRED)
+find_package(OpenGL REQUIRED)
 find_package(OpenMP) # (OpenMP may be used to build navmesh)
 find_package(Freetype REQUIRED)
 find_package(HDF5 REQUIRED)
 find_package(OptiX REQUIRED)
-find_package(compound-ray)
+find_package(compound-ray REQUIRED)
 
 # Where is mathplot? (allows headers and modules to be found)
 set(MPLOT_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot" CACHE PATH "The path to mathplot")
@@ -96,12 +98,6 @@ include_directories ("${PROJECT_SOURCE_DIR}/extern/json/include")
 #
 # Define lists of module files to build
 #
-
-# We obtain module variable definitions from some of our dependencies
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot/cmake" ${CMAKE_MODULE_PATH})
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/maths/cmake" ${CMAKE_MODULE_PATH})
-# we have already added extern/craysim/cmake to the module path.
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/oces_viewer/cmake" ${CMAKE_MODULE_PATH})
 
 # Include maths module defs
 include(${PROJECT_SOURCE_DIR}/extern/maths/cmake/module_definitions.cmake)
