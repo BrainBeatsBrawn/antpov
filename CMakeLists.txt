@@ -104,8 +104,7 @@ include(${PROJECT_SOURCE_DIR}/extern/maths/cmake/module_definitions.cmake)
 setup_module_variables_for_maths (${PROJECT_SOURCE_DIR}/extern/maths ${PROJECT_SOURCE_DIR}/extern/json)
 # Include mathplot module defs
 include(${PROJECT_SOURCE_DIR}/extern/mathplot/cmake/module_definitions.cmake)
-setup_module_variables_for_mathplot_maths (${PROJECT_SOURCE_DIR}/extern/maths)
-setup_module_variables_for_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot ${PROJECT_SOURCE_DIR}/extern/json)
+setup_module_variables_for_mathplot (${PROJECT_SOURCE_DIR}/extern/mathplot ${PROJECT_SOURCE_DIR}/extern/maths ${PROJECT_SOURCE_DIR}/extern/json)
 # craysim module defs
 include(${PROJECT_SOURCE_DIR}/extern/craysim/cmake/module_definitions.cmake)
 setup_module_variables_for_craysim_maths (${PROJECT_SOURCE_DIR}/extern/maths ${PROJECT_SOURCE_DIR}/extern/json)
@@ -146,8 +145,6 @@ add_library(mplot_fontdata STATIC ${MPLOT_INCLUDE_PATH}/mplot/VisualFaceAsm.cpp)
 
 # The main ant simulator library
 set(ANTPOV_MODULES
-  ${MPLOT_MATHS_CORE_MODULES}
-  ${MPLOT_MATHS_VISUALMODEL_MODULES}
   ${MPLOT_CORE_MODULES}
   ${CRAYSIM_MATHS_MODULES}
   ${CRAYSIM_MATHPLOT_MODULES}
