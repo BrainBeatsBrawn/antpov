@@ -137,7 +137,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         antpov::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
         // for each antflag, set dirn uncertain flag
     }
-    v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
+    v.setup_breadcrumbs (16000); // not quite enough to show a whole path/all paths from csv, but allows collisvis
     v.bc_mult = 2.0f; // 1 is default
     v.breadcrumb_every = 10;
 
