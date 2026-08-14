@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.28.5 FATAL_ERROR)
 
 project(antpov LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Put binaries directly in the build dir
