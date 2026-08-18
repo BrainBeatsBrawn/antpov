@@ -96,6 +96,12 @@ include_directories ("${PROJECT_SOURCE_DIR}/extern")
 # allows #include <nlohmann/json.hpp> (craysim requires sm::config, which requires json)
 include_directories ("${PROJECT_SOURCE_DIR}/extern/json/include")
 
+# If CUDA is installed in /usr/local we need this for OptiX to #include "cuda.h"
+include_directories ("/usr/local/cuda/include")
+# Also CUDA Libs need to be accessible (/usr/local/cuda/lib64)
+# These should be passed over from compoundray really
+link_libraries("-L/usr/local/cuda/lib64")
+
 #
 # Define lists of module files to build
 #
