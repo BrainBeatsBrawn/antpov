@@ -71,6 +71,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             apply_colour_labels = true; // Set true to apply green-for-bush; grey-for-invisible
         }
     }
+    std::cout << "We are colouring ant trail by " << (colour_by_route ? "forage/run" : "ant") << std::endl;
 
     // csv reading (comes between find_landscape and setup_landscape)
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
@@ -153,19 +154,32 @@ std::int32_t main (std::int32_t argc, char* argv[])
             // Use a 'base ant index' colour:
             if (aflags.test (antpov::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
                 v.bc_clr[i] = mplot::colour::bisque2; // ZVF. A white.
-            } else if (aflags.test (antpov::antflags::ant14)) { // Hack to colour by routeID
-                //v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::red : mplot::colour::hotpink2;
-                v.bc_clr[i] = mplot::colour::darkorange2;
-            } else if (aflags.test (antpov::antflags::ant13)) { // Hack to colour by routeID
-                //v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::blue : mplot::colour::deepskyblue2;
+            } else if (aflags.test (antpov::antflags::ant14)) { // Hack to colour by routeID 1
+                v.bc_clr[i] = mplot::colour::peachpuff;
+            } else if (aflags.test (antpov::antflags::ant13)) { // routeID 2
                 v.bc_clr[i] = mplot::colour::orangered2;
+                // routeID 3 is darkorange2 (ant12), so that works for both colour schemes
+                // routeID 4 is coral2 (maroon2 if ant11)
+
+            } else if (aflags.test (antpov::antflags::ant10)) { // routeID 5
+                v.bc_clr[i] = mplot::colour::tan1;
+            } else if (aflags.test (antpov::antflags::ant9)) { // routeID 6
+                v.bc_clr[i] = mplot::colour::chocolate3;
+            } else if (aflags.test (antpov::antflags::ant8)) { // routeID 7
+                v.bc_clr[i] = mplot::colour::cadmiumorange;
+            } else if (aflags.test (antpov::antflags::ant7)) { // routeID 8
+                v.bc_clr[i] = mplot::colour::sienna2;
 
             } else if (aflags.test (antpov::antflags::ant3)) {
                 v.bc_clr[i] = mplot::colour::dodgerblue3;
             } else if (aflags.test (antpov::antflags::ant6)) {
                 v.bc_clr[i] = mplot::colour::springgreen2;
             } else if (aflags.test (antpov::antflags::ant11)) {
-                v.bc_clr[i] = mplot::colour::maroon2;
+                if (colour_by_route) {
+                    v.bc_clr[i] = mplot::colour::coral2;
+                } else {
+                    v.bc_clr[i] = mplot::colour::maroon2;
+                }
             } else if (aflags.test (antpov::antflags::ant12)) {
                 v.bc_clr[i] = mplot::colour::darkorange2;
             } else {

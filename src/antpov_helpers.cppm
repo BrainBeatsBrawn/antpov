@@ -80,7 +80,11 @@ export namespace antpov
             } else if (route_index > 99) { // Make ZVF 'ant15'
                 fl |= (1u << (8u + 15u));
             } else {
-                fl |= (1u << (8u + 15u - route_index));
+                if (route_index < 15u) {
+                    fl |= (1u << (8u + 15u - route_index));
+                } else {
+                    std::cout << "Can't add route_index " << route_index << " into flags\n";
+                }
             }
             antflags.push_back (fl);
         }
