@@ -333,9 +333,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
     if (ep2 == nullptr) {
-        v.other_eyes[0] = std::vector<craysim::compoundray::EyeVisual<glver>*>{ ep1 };
+        v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1 };
     } else {
-        v.other_eyes[0] = std::vector<craysim::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
+        v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1, ep2 };
     }
 
     if (prog_opts.make_movie) {

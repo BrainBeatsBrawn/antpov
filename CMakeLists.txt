@@ -152,6 +152,9 @@ set(ANTPOV_MODULES
   ${OCES_READER_MODULES}
   ${ANTPOV_VM_MODULES}
   ${CATERHELP_MODULES}
+  ${PROJECT_SOURCE_DIR}/extern/mathplot/mplot/HexGridVisual.cppm
+  ${PROJECT_SOURCE_DIR}/extern/mathplot/mplot/QuiverVisual.cppm
+  ${PROJECT_SOURCE_DIR}/extern/mathplot/mplot/LengthscaleVisual.cppm
 )
 list(REMOVE_DUPLICATES ANTPOV_MODULES)
 add_library(antpov_modules STATIC)
