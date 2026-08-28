@@ -18,4 +18,4 @@ fi
 data/seville/mosaic-warped/mosaic-world/Ant07R08-warped.csv.world.csv,\
 data/seville/mosaic-warped/mosaic-world/Ant07R09-warped.csv.world.csv,\
 data/seville/mosaic-warped/mosaic-world/Ant07ZVF-warped.csv.world.csv\
- -x -R -6
+ -x -R
