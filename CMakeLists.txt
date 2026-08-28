@@ -119,8 +119,8 @@ setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim ${PROJE
 include(${PROJECT_SOURCE_DIR}/extern/oces_viewer/cmake/module_definitions.cmake)
 setup_module_variables_for_oces_viewer (${PROJECT_SOURCE_DIR}/extern/oces_viewer ${PROJECT_SOURCE_DIR}/extern/maths)
 
-# Modules in this repo
-set(MY_MODULES ${PROJECT_SOURCE_DIR}/src/antpov_helpers.cppm)
+include(${PROJECT_SOURCE_DIR}/extern/cater_helpers/cmake/module_definitions.cmake)
+setup_module_variables_for_cater_helpers (${PROJECT_SOURCE_DIR}/extern/cater_helpers ${PROJECT_SOURCE_DIR}/extern/maths)
 
 # Define a list of the additional VisualModel modules that we make use of in antpov (or fiducials)
 set(ANTPOV_VM_MODULES
@@ -151,7 +151,7 @@ set(ANTPOV_MODULES
   ${CRAYSIM_DOUBLEHEX_MODULES}
   ${OCES_READER_MODULES}
   ${ANTPOV_VM_MODULES}
-  ${MY_MODULES}
+  ${CATERHELP_MODULES}
 )
 list(REMOVE_DUPLICATES ANTPOV_MODULES)
 add_library(antpov_modules STATIC)

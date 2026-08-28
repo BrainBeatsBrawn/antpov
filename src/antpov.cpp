@@ -21,7 +21,7 @@ import mplot.gridvisual;
 import craysim.visual;
 import craysim.antbody;
 
-import antpov.helpers;
+import cater.helpers;
 
 // OpenGL 4.3 for Instanced VisualModels
 constexpr std::int32_t glver = mplot::gl::version_4_3;
@@ -77,7 +77,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Check if path encodes several paths
         std::vector<std::string> cpaths = mplot::tools::stringToVector (prog_opts.csv_path, ",");
-        // Use antpov::read_csv instead of craysim::read_csv as we are also reading flags
+        // Use cater::helpers::read_csv instead of craysim::read_csv as we are also reading flags
         // Note that v.csv_positions is populated.
         for (auto cpath : cpaths) {
 
@@ -125,7 +125,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             std::uint32_t _routeidx = std::numeric_limits<std::uint32_t>::max(); // colour-by-antid is default
             if (colour_by_route) { _routeidx = routeidx; }
 
-            if (antpov::read_csv (cpath, v.csv_positions, v.csv_flags, antid, _routeidx) == false) {
+            if (cater::helpers::read_csv (cpath, v.csv_positions, v.csv_flags, antid, _routeidx) == false) {
                 throw std::runtime_error ("Failed to read CSV file");
             } else { std::cout << "Read " << (v.csv_positions.size() - existing) << " ant positions from CSV\n"; }
         }
@@ -133,9 +133,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // Now process the positions to generate directions.
         std::uint32_t block = 3;
         float max_delta_phi = 2.8f;
-        // maybe process_positions belongs in craysim.visual?
         sm::vvec<sm::vec<float, 2>> dirns (v.csv_positions.size(), sm::vec<float, 2>{}); // dummy, unused
-        antpov::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
+        cater::helpers::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv
@@ -143,7 +142,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.breadcrumb_every = 10;
 
     // Turn antflags into colour info, all at the start:
-    sm::flags<antpov::antflags> aflags;
+    sm::flags<cater::helpers::antflags> aflags;
     v.bc_clr.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
     v.bc_alpha.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
     v.bc_scale.resize (1 + v.csv_flags.size() / v.breadcrumb_every);
@@ -152,46 +151,46 @@ std::int32_t main (std::int32_t argc, char* argv[])
         if (j % v.breadcrumb_every == 0u) {
             aflags = v.csv_flags[j];
             // Use a 'base ant index' colour:
-            if (aflags.test (antpov::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
+            if (aflags.test (cater::helpers::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
                 v.bc_clr[i] = mplot::colour::bisque2; // ZVF. A white.
-            } else if (aflags.test (antpov::antflags::ant14)) { // Hack to colour by routeID 1
+            } else if (aflags.test (cater::helpers::antflags::ant14)) { // Hack to colour by routeID 1
                 v.bc_clr[i] = mplot::colour::peachpuff;
-            } else if (aflags.test (antpov::antflags::ant13)) { // routeID 2
+            } else if (aflags.test (cater::helpers::antflags::ant13)) { // routeID 2
                 v.bc_clr[i] = mplot::colour::orangered2;
                 // routeID 3 is darkorange2 (ant12), so that works for both colour schemes
                 // routeID 4 is coral2 (maroon2 if ant11)
 
-            } else if (aflags.test (antpov::antflags::ant10)) { // routeID 5
+            } else if (aflags.test (cater::helpers::antflags::ant10)) { // routeID 5
                 v.bc_clr[i] = mplot::colour::tan1;
-            } else if (aflags.test (antpov::antflags::ant9)) { // routeID 6
+            } else if (aflags.test (cater::helpers::antflags::ant9)) { // routeID 6
                 v.bc_clr[i] = mplot::colour::chocolate3;
-            } else if (aflags.test (antpov::antflags::ant8)) { // routeID 7
+            } else if (aflags.test (cater::helpers::antflags::ant8)) { // routeID 7
                 v.bc_clr[i] = mplot::colour::cadmiumorange;
-            } else if (aflags.test (antpov::antflags::ant7)) { // routeID 8
+            } else if (aflags.test (cater::helpers::antflags::ant7)) { // routeID 8
                 v.bc_clr[i] = mplot::colour::sienna2;
 
-            } else if (aflags.test (antpov::antflags::ant3)) {
+            } else if (aflags.test (cater::helpers::antflags::ant3)) {
                 v.bc_clr[i] = mplot::colour::dodgerblue3;
-            } else if (aflags.test (antpov::antflags::ant6)) {
+            } else if (aflags.test (cater::helpers::antflags::ant6)) {
                 v.bc_clr[i] = mplot::colour::springgreen2;
-            } else if (aflags.test (antpov::antflags::ant11)) {
+            } else if (aflags.test (cater::helpers::antflags::ant11)) {
                 if (colour_by_route) {
                     v.bc_clr[i] = mplot::colour::coral2;
                 } else {
                     v.bc_clr[i] = mplot::colour::maroon2;
                 }
-            } else if (aflags.test (antpov::antflags::ant12)) {
+            } else if (aflags.test (cater::helpers::antflags::ant12)) {
                 v.bc_clr[i] = mplot::colour::darkorange2;
             } else {
                 // Default to Out/back colour selection (ant0)
-                v.bc_clr[i] = aflags.test (antpov::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
+                v.bc_clr[i] = aflags.test (cater::helpers::antflags::cookie) ? mplot::colour::deepskyblue2 : mplot::colour::flesh;
             }
             if (apply_colour_labels) {
-                if (aflags.test (antpov::antflags::direction_uncertain)) {
+                if (aflags.test (cater::helpers::antflags::direction_uncertain)) {
                     v.bc_clr[i] = mplot::colour::grey40;
-                } else if (aflags.test (antpov::antflags::invisible)) {
+                } else if (aflags.test (cater::helpers::antflags::invisible)) {
                     v.bc_clr[i] = mplot::colour::grey60;
-                } else if (aflags.test (antpov::antflags::bush)) {
+                } else if (aflags.test (cater::helpers::antflags::bush)) {
                     v.bc_clr[i] = mplot::colour::darkgreen;
                 }
             }
@@ -428,7 +427,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             sm::vec<float> last_d = {};
             for (auto p : v.csv_found_positions) {
                 // Flags columns order originally was: Bush, Cookie, Shadow, Visibility; We add "Dirn Uncertain"
-                sm::flags<antpov::antflags> aflags;
+                sm::flags<cater::helpers::antflags> aflags;
                 aflags = v.csv_flags[i];
 
                 // need to compute the 3D direction (giving ant pose) again.
@@ -445,10 +444,10 @@ std::int32_t main (std::int32_t argc, char* argv[])
                 }
                 fout << p.str_comma_separated() << ","
                      << pose_direction.str_comma_separated() << ","
-                     << (aflags.test (antpov::antflags::bush) ? "1" : "0") << ","
-                     << (aflags.test (antpov::antflags::cookie) ? "1" : "0") << ","
-                     << (aflags.test (antpov::antflags::shadow) ? "1" : "0") << ","
-                     << (aflags.test (antpov::antflags::invisible) ? "1" : "0") << ","
+                     << (aflags.test (cater::helpers::antflags::bush) ? "1" : "0") << ","
+                     << (aflags.test (cater::helpers::antflags::cookie) ? "1" : "0") << ","
+                     << (aflags.test (cater::helpers::antflags::shadow) ? "1" : "0") << ","
+                     << (aflags.test (cater::helpers::antflags::invisible) ? "1" : "0") << ","
                      << (dirn_uncertain ? "1" : "0")
                      << std::endl;
 
