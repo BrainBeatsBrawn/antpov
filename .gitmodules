@@ -16,3 +16,6 @@
 [submodule "extern/json"]
 	path = extern/json
 	url = https://github.com/nlohmann/json
+[submodule "extern/cater_helpers"]
+	path = extern/cater_helpers
+	url = https://github.com/BrainBeatsBrawn/cater_helpers

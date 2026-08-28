@@ -22,8 +22,6 @@ import mplot.scattervisual;
 import craysim.visual;
 import craysim.antbody;
 
-import antpov.helpers;
-
 // OpenGL 4.3 for Instanced VisualModels
 constexpr std::int32_t glver = mplot::gl::version_4_3;
 

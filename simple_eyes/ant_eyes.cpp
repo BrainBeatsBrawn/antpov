@@ -49,7 +49,7 @@ constexpr bool show_rgb = false;
 constexpr bool show_scatter = false;
 constexpr bool show_antoinette = true;
 
-void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
+void buildModel (mplot::Visual<>& v, const sm::hexgrid<float>& hg,
                  sm::vvec<sm::vec<float, 3>>& sphere_coords,
                  sm::vvec<sm::vec<float, 3>>& sphere_coords2,
                  sm::vvec<sm::vec<float, 3>>& eye_coords,
@@ -90,7 +90,7 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid& hg,
     // Add a DoubleHexGridVisual view of the eye pair (only works for two_eyes == true)
     if constexpr (two_eyes == true) {
         sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
-        auto hgv = std::make_unique<craysim::DoubleHexGridVisual<float,mplot::gl::version_4_1>>(&hg, eyepos+offset);
+        auto hgv = std::make_unique<craysim::DoubleHexGridVisual<float, mplot::gl::version_4_1>>(&hg, eyepos+offset);
         hgv->set_parent (v.get_id());
         hgv->setDataCoords (&eye_coords); // pass combined coords
         hgv->setScalarData (&datatwice);          // pass combined data
@@ -222,7 +222,7 @@ int main (int argc, char** argv)
     // Make a HexGrid of width similar to sphere
     constexpr float hex_d = 0.0126; // 12.6 um mean
     constexpr float hex_span = mc::two_pi * r_sph;
-    sm::hexgrid hg(hex_d, hex_span, 0.0f);
+    sm::hexgrid<float> hg(hex_d, hex_span, 0.0f);
     // the argument is the circlular boundary radius (0.5 * pi * r_sph) should wrap up to half way round sphere
     if constexpr (proj == spherical_projection::splodge) {
         hg.set_circular_boundary (0.85f * r_sph);
