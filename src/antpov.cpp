@@ -13,8 +13,8 @@ import sm.vvec;
 import sm.grid;
 
 import mplot.gl.version;
-import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
-import mplot.compoundray.eyevisual;
+import craysim.compoundray.interop; // mathplot <--> compoundray interoperability
+import craysim.compoundray.eyevisual;
 import mplot.tools;
 import mplot.gridvisual;
 
@@ -243,13 +243,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
+    auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
     eyevm1->set_parent (vant.get_id());
     eyevm1->name = "Ant Eyes";
     eyevm1->show_3d = true;
     eyevm1->setGamma (0.45f);
     eyevm1->finalize();
-    mplot::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
+    craysim::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
     // Scale this model up, so it's not tiny like the one in the main scene
     ep1->scaleViewMatrix (1000);
     // The ant body for the separate window
@@ -263,7 +263,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->scaleViewMatrix (1000);
 
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
-    mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
+    craysim::compoundray::EyeVisual<glver>* ep2 = nullptr;
 
     sm::vec<float, 2> dx = { 0.0035f, 0.003f };
     sm::vec<float, 2> nul = { 0.0f, 0.0f };
@@ -293,9 +293,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // 2D eye representation (goes in the other window)
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{},
-                                                                          &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
-                                                                          nullptr);
+    auto eyevm2 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{},
+                                                                            &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
+                                                                            nullptr);
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
     craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get(), 0);
@@ -309,7 +309,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
-
 
     // An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
@@ -334,9 +333,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
     if (ep2 == nullptr) {
-        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1 };
+        v.other_eyes[0] = std::vector<craysim::compoundray::EyeVisual<glver>*>{ ep1 };
     } else {
-        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
+        v.other_eyes[0] = std::vector<craysim::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
     }
 
     if (prog_opts.make_movie) {
@@ -346,7 +345,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // The main program loop
-    while (!v.readyToFinish()) {
+    while (!(v.readyToFinish() || vant.readyToFinish() || veye.readyToFinish())) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
 
         if (v.move_counter < v.csv_flags.size()) {
