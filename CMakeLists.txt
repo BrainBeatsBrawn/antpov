@@ -117,7 +117,7 @@ include(${PROJECT_SOURCE_DIR}/extern/craysim/cmake/module_definitions.cmake)
 setup_module_variables_for_craysim (${PROJECT_SOURCE_DIR}/extern/craysim ${PROJECT_SOURCE_DIR}/extern/mathplot ${PROJECT_SOURCE_DIR}/extern/maths ${PROJECT_SOURCE_DIR}/extern/json)
 # OCES
 include(${PROJECT_SOURCE_DIR}/extern/oces_viewer/cmake/module_definitions.cmake)
-setup_module_variables_for_oces_reader (${PROJECT_SOURCE_DIR}/extern/oces_viewer ${PROJECT_SOURCE_DIR}/extern/maths)
+setup_module_variables_for_oces_viewer (${PROJECT_SOURCE_DIR}/extern/oces_viewer ${PROJECT_SOURCE_DIR}/extern/maths)
 
 # Modules in this repo
 set(MY_MODULES ${PROJECT_SOURCE_DIR}/src/antpov_helpers.cppm)
