@@ -11,6 +11,8 @@
 import sm.flags;
 import sm.vvec;
 import sm.grid;
+import sm.hexgrid;
+import sm.hexgrid.hdf;
 
 import mplot.gl.version;
 import craysim.compoundray.interop; // mathplot <--> compoundray interoperability
@@ -20,6 +22,7 @@ import mplot.gridvisual;
 
 import craysim.visual;
 import craysim.antbody;
+import craysim.doublehexgrid;
 
 import cater.helpers;
 
@@ -271,7 +274,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     std::uint32_t cyl_h = 90;
     sm::grid g1(cyl_w, cyl_h, dx, nul, sm::griddomainwrap::horizontal, sm::gridorder::bottomleft_to_topright);
 
-    constexpr bool twodee = true;
+    constexpr bool twodee = false;
 
     // Showing a cylindrical representation, if it is present
     if (v.efpaths.size() > 1 && v.efpaths[1].find ("cyl.eye") != std::string::npos) {
@@ -310,6 +313,36 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
 
+    craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra
+    sm::hexgrid<float> eye_hexgrid;
+    if (v.sim_opts.test (craysim::options::eye_is_hex)) {
+
+        // read eye_hexgrid from eyefilenamebase.h5... then:
+        std::string eye_hexgrid_path = {};
+        if (v.efpaths.empty()) {
+            std::cout << "No efpaths yet...\n";
+        } else {
+            std::cout << "v.efpaths[0] = " << v.efpaths[0] << "\n";
+            eye_hexgrid_path = v.efpaths[0];
+            mplot::tools::stripFileSuffix (eye_hexgrid_path);
+            eye_hexgrid_path += ".h5";
+            std::cout << "eye_hexgrid_path = " << eye_hexgrid_path << "\n";
+        }
+        sm::hexgrid_load (eye_hexgrid, eye_hexgrid_path);
+        std::cout << "eye_hexgrid has " << eye_hexgrid.num() << " hexes\n";
+
+        auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{0,0,0});
+        dhg->set_parent (veye.get_id());
+        dhg->ommData = &v.ommatidia_datas[0];
+        dhg->ommatidia = v.get_ommatidia_ptr(0); // gets repeatedly reset in craysim_visual
+        //dhg->show_flat = true; // couple of issues to solve here
+        dhg->setGamma (0.45f);
+        dhg->twodimensional (twodee);
+        dhg->finalize();
+        dhp = veye.addVisualModel (dhg);
+        dhp->scaleViewMatrix (1000);
+    }
+
     // An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
     av->set_parent (v.get_id());
@@ -335,7 +368,12 @@ std::int32_t main (std::int32_t argc, char* argv[])
     if (ep2 == nullptr) {
         v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1 };
     } else {
-        v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1, ep2 };
+        if (dhp == nullptr) {
+            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1, ep2 };
+        } else {
+            std::cout << "Adding ep1, ep2 and dhp!\n";
+            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1, ep2, dhp };
+        }
     }
 
     if (prog_opts.make_movie) {
