@@ -245,16 +245,54 @@ std::int32_t main (std::int32_t argc, char* argv[])
         vant.setSceneRotation (sm::quaternion<float>{ float{0.774197}, float{0.444591}, float{-0.447665}, float{0.0505289} });
     }
 
-    // Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
-    eyevm1->set_parent (vant.get_id());
-    eyevm1->name = "Ant Eyes";
-    eyevm1->show_3d = true;
-    eyevm1->setGamma (0.45f);
-    eyevm1->finalize();
-    craysim::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
-    // Scale this model up, so it's not tiny like the one in the main scene
-    ep1->scaleViewMatrix (1000);
+    // Load the eye hexgrid, if it is needed
+    sm::hexgrid<float> eye_hexgrid;
+    if (v.sim_opts.test (craysim::options::eye_is_hex)) {
+        // read eye_hexgrid from eyefilenamebase.h5... then:
+        std::string eye_hexgrid_path = {};
+        if (v.efpaths.empty()) {
+            std::cout << "No efpaths yet...\n";
+        } else {
+            std::cout << "v.efpaths[0] = " << v.efpaths[0] << "\n";
+            eye_hexgrid_path = v.efpaths[0];
+            mplot::tools::stripFileSuffix (eye_hexgrid_path);
+            eye_hexgrid_path += ".h5";
+            std::cout << "eye_hexgrid_path = " << eye_hexgrid_path << "\n";
+        }
+        sm::hexgrid_load (eye_hexgrid, eye_hexgrid_path);
+        std::cout << "eye_hexgrid has " << eye_hexgrid.num() << " hexes\n";
+    }
+
+    constexpr bool twodee = false;
+
+    craysim::compoundray::ommatidia_data<glver>* ep1 = nullptr;
+    if (v.sim_opts.test (craysim::options::eye_is_hex)) {
+        auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{0,0,0});
+        dhg->set_parent (vant.get_id());
+        dhg->ommData = &v.ommatidia_datas[0];
+        dhg->ommatidia = v.get_ommatidia_ptr(0); // gets repeatedly reset in craysim_visual
+        dhg->show_flat = false;
+        dhg->setGamma (0.45f);
+        dhg->twodimensional (false);
+        dhg->finalize();
+        ep1 = vant.addVisualModel (dhg);
+        ep1->scaleViewMatrix (1000);
+
+        // Plus add a separate model for the head mesh? Or add mesh to the doublehexgrid? Be nice to
+        // be able to squirt some extra vertices in to any VisualModel?
+
+    } else {
+        // Ant body, plotted in its own window; first the eyes for the body
+        auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
+        eyevm1->set_parent (vant.get_id());
+        eyevm1->name = "Ant Eyes";
+        eyevm1->show_3d = true;
+        eyevm1->setGamma (0.45f);
+        eyevm1->finalize();
+        ep1 = vant.addVisualModel (eyevm1);
+        // Scale this model up, so it's not tiny like the one in the main scene
+        ep1->scaleViewMatrix (1000);
+    }
     // The ant body for the separate window
     auto av1 = std::make_unique<craysim::AntBodyVisual<glver>>();
     av1->set_parent (vant.get_id());
@@ -266,15 +304,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->scaleViewMatrix (1000);
 
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
-    craysim::compoundray::EyeVisual<glver>* ep2 = nullptr;
+    craysim::compoundray::ommatidia_data<glver>* ep2 = nullptr;
 
     sm::vec<float, 2> dx = { 0.0035f, 0.003f };
     sm::vec<float, 2> nul = { 0.0f, 0.0f };
     std::uint32_t cyl_w = 360; // must match cyl.eye
     std::uint32_t cyl_h = 90;
     sm::grid g1(cyl_w, cyl_h, dx, nul, sm::griddomainwrap::horizontal, sm::gridorder::bottomleft_to_topright);
-
-    constexpr bool twodee = false;
 
     // Showing a cylindrical representation, if it is present
     if (v.efpaths.size() > 1 && v.efpaths[1].find ("cyl.eye") != std::string::npos) {
@@ -313,29 +349,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
 
-    craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra
-    sm::hexgrid<float> eye_hexgrid;
+    craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra double hex of flat eyes
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
-
-        // read eye_hexgrid from eyefilenamebase.h5... then:
-        std::string eye_hexgrid_path = {};
-        if (v.efpaths.empty()) {
-            std::cout << "No efpaths yet...\n";
-        } else {
-            std::cout << "v.efpaths[0] = " << v.efpaths[0] << "\n";
-            eye_hexgrid_path = v.efpaths[0];
-            mplot::tools::stripFileSuffix (eye_hexgrid_path);
-            eye_hexgrid_path += ".h5";
-            std::cout << "eye_hexgrid_path = " << eye_hexgrid_path << "\n";
-        }
-        sm::hexgrid_load (eye_hexgrid, eye_hexgrid_path);
-        std::cout << "eye_hexgrid has " << eye_hexgrid.num() << " hexes\n";
-
         auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{0,0,0});
         dhg->set_parent (veye.get_id());
         dhg->ommData = &v.ommatidia_datas[0];
         dhg->ommatidia = v.get_ommatidia_ptr(0); // gets repeatedly reset in craysim_visual
-        //dhg->show_flat = true; // couple of issues to solve here
+        dhg->show_flat = true; // couple of issues to solve here
+        dhg->second_grid_offset = {0.001f, 0};
         dhg->setGamma (0.45f);
         dhg->twodimensional (twodee);
         dhg->finalize();
