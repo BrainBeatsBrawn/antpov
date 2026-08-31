@@ -346,19 +346,17 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
 
-    constexpr float dh_offset = 0.00075f;
     craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra double hex of flat eyes
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
-        auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{}); // offset here gets overridden later
+        auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{});
         dhg->set_parent (veye.get_id());
         dhg->ommData = &v.ommatidia_datas[0];
         dhg->ommatidia = v.get_ommatidia_ptr(0); // gets repeatedly reset in craysim_visual
         dhg->show_flat = true; // couple of issues to solve here
-        dhg->second_grid_offset = {-dh_offset, 0};
-        dhg->second_grid_flip_lr = true; // after flip-lr, the offset will be +0.001f
+        dhg->second_grid_flip_lr = true;   // flip the second grid left-right
+        dhg->grid_offset = {0.00075f, 0}; // grid offset is applied in opposide senses to each grid
         dhg->setGamma (0.45f);
         dhg->twodimensional (twodee);
-        mflip.pretranslate (sm::vec<float, 3>{1000 * (dh_offset / 2.0f), 0, 0});
         dhg->setViewMatrix (mflip);
         dhg->finalize();
         dhp = veye.addVisualModel (dhg);
