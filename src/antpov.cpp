@@ -274,13 +274,10 @@ std::int32_t main (std::int32_t argc, char* argv[])
         dhg->show_flat = false;
         dhg->setGamma (0.45f);
         dhg->twodimensional (false);
+        dhg->addMeshgroup (v.get_head_mesh(0)); // Adds the meshgroup
         dhg->finalize();
         ep1 = vant.addVisualModel (dhg);
         ep1->scaleViewMatrix (1000);
-
-        // Plus add a separate model for the head mesh? Or add mesh to the doublehexgrid? Be nice to
-        // be able to squirt some extra vertices in to any VisualModel?
-
     } else {
         // Ant body, plotted in its own window; first the eyes for the body
         auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
