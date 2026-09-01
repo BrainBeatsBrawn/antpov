@@ -6,8 +6,6 @@ This directory holds the source for the programs in this repository.
 
 The main **antpov** program. This is very much a research code script! It uses a a `craysim_visual<>` to load and render the ant within the scene, and some `mplot::Visual` windows to render the ant's eyes separately from the scene.
 
-Some additional code is in the C++ module file **antpov_helpers.cppm**.
-
 Example invocations:
 
 ```bash
@@ -17,6 +15,18 @@ Example invocations:
 ```bash
 ./build/antpov -f data/seville/ground_and_veg_inner_circular.gltf \
                -c data/seville/Ant03R01-warped.csv.world.csv
+```
+
+## antpov_plotcoords.cpp
+
+A short program to re-plot, as a 'scatter plot within a gltf model environment', the locations found by a previous simulation run in antpov.
+Antpov simulation runs generate *.3d.csv (and *.6d.csv) files.
+The .3d.csv files contain the 'found' height of the ant at each of the 2D locations that the CATER project data provides as input.
+
+Example call:
+```bash
+./build/antpov_plotcoords -f data/seville/ground_and_veg_inner_circular.gltf \
+                           -c data/seville/Ant03R01-warped.csv.world.csv.3d.csv
 ```
 
 ## cater_graph.cpp
