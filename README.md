@@ -11,7 +11,7 @@ In the paper, we describe how we reconstructed the views of real ants as they fo
 
 ## Ant foraging paths
 
-Figure 1D shows several realistic routes that were mapped onto the scanned Seville environment model.
+Figure 1D shows several real ant routes that were mapped onto the scanned Seville environment model.
 
 ![Figure 1D from the paper](https://github.com/BrainBeatsBrawn/antpov/blob/main/images/AntTracksIn3DWorld.png?raw=true)
 
