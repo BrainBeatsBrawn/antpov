@@ -1,3 +1,17 @@
+/*
+ * A program to re-plot, as a 'scatter plot within a gltf model environment', the locations found by
+ * a previous simulation run in antpov. Antpov simulation runs generate *.3d.csv (and *.6d.csv)
+ * files. The .3d.csv files contain the 'found' height of the ant at each of the 2D locations that
+ * the CATER project data provides as input.
+ *
+ * Example call:
+ *
+ * ./build/antpov_plotcoords -f data/seville/ground_and_veg_inner_circular.gltf \
+ *                           -c data/seville/Ant03R01-warped.csv.world.csv.3d.csv
+ *
+ * Author: Seb James
+ * Date: 2026
+ */
 #include <iostream>
 #include <cstdint>
 #include <memory>
@@ -27,6 +41,7 @@ void read_csv (const std::string& csv, sm::vvec<sm::vec<float, 3>>& points)
     std::ifstream fin (csv, std::ios::in);
     if (!fin.is_open()) {
         std::cout << "Failed to open " << csv << " for reading in read_csv\n";
+        std::cout << "Specify path to a .3d.csv file with -c\n";
     } else {
         std::string line = {};
         while (getline (fin, line)) {
