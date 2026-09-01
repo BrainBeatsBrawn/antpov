@@ -265,7 +265,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     constexpr bool twodee = true;
 
-    craysim::compoundray::ommatidia_data<glver>* ep1 = nullptr;
+    craysim::compoundray::ommatidia_datamodel<glver>* ep1 = nullptr;
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
         auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{0,0,0});
         dhg->set_parent (vant.get_id());
@@ -274,7 +274,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         dhg->show_flat = false;
         dhg->setGamma (0.45f);
         dhg->twodimensional (false);
-        dhg->addMeshgroup (v.get_head_mesh(0)); // Adds the meshgroup
+        dhg->addMeshgroup (*v.get_head_mesh(0)); // Adds the meshgroup
         dhg->finalize();
         ep1 = vant.addVisualModel (dhg);
         ep1->scaleViewMatrix (1000);
@@ -301,7 +301,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->scaleViewMatrix (1000);
 
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
-    craysim::compoundray::ommatidia_data<glver>* ep2 = nullptr;
+    craysim::compoundray::ommatidia_datamodel<glver>* ep2 = nullptr;
 
     sm::vec<float, 2> dx = { 0.0035f, 0.003f };
     sm::vec<float, 2> nul = { 0.0f, 0.0f };
@@ -386,13 +386,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
     if (ep2 == nullptr) {
-        v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1 };
+        v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_datamodel<glver>*>{ ep1 };
     } else {
         if (dhp == nullptr) {
-            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1, ep2 };
+            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_datamodel<glver>*>{ ep1, ep2 };
         } else {
             std::cout << "Adding ep1, ep2 and dhp!\n";
-            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_data<glver>*>{ ep1, ep2, dhp };
+            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_datamodel<glver>*>{ ep1, ep2, dhp };
         }
     }
 
