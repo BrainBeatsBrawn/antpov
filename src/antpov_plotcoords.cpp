@@ -13,10 +13,7 @@ import sm.vvec;
 import sm.grid;
 
 import mplot.gl.version;
-import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
-import mplot.compoundray.eyevisual;
 import mplot.tools;
-import mplot.gridvisual;
 import mplot.scattervisual;
 
 import craysim.visual;

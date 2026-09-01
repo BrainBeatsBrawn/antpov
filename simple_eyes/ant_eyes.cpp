@@ -33,7 +33,8 @@ import mplot.hexgridvisual;
 import mplot.lengthscalevisual;
 
 import craysim.antbody;
-import craysim.doublehexgridvisual;
+import craysim.compoundray.ommatidium;
+import craysim.doublehexgrid;
 
 enum class spherical_projection
 {
@@ -52,7 +53,7 @@ constexpr bool show_antoinette = true;
 void buildModel (mplot::Visual<>& v, const sm::hexgrid<float>& hg,
                  sm::vvec<sm::vec<float, 3>>& sphere_coords,
                  sm::vvec<sm::vec<float, 3>>& sphere_coords2,
-                 sm::vvec<sm::vec<float, 3>>& eye_coords,
+                 sm::vvec<craysim::compoundray::Ommatidium>& eye_coords,
                  sm::vvec<sm::vec<float, 3>>& neighb_r,
                  sm::vvec<sm::vec<float, 3>>& neighb_g,
                  sm::vvec<sm::vec<float, 3>>& neighb_b,
@@ -87,14 +88,14 @@ void buildModel (mplot::Visual<>& v, const sm::hexgrid<float>& hg,
         v.addVisualModel (sv);
     }
 
-    // Add a DoubleHexGridVisual view of the eye pair (only works for two_eyes == true)
+    // Add a DoubleHexGrid view of the eye pair (only works for two_eyes == true)
     if constexpr (two_eyes == true) {
         sm::vec<float, 3> offset = { 0.0f, 0.0f, 0.0f };
-        auto hgv = std::make_unique<craysim::DoubleHexGridVisual<float, mplot::gl::version_4_1>>(&hg, eyepos+offset);
+        auto hgv = std::make_unique<craysim::doublehexgrid<mplot::gl::version_4_1>>(&hg, eyepos + offset);
         hgv->set_parent (v.get_id());
-        hgv->setDataCoords (&eye_coords); // pass combined coords
-        hgv->setScalarData (&datatwice);          // pass combined data
-        hgv->hexVisMode = mplot::HexVisMode::HexInterp; // HexInterp or mplot::HexVisMode::Triangles for a smoother surface plot
+        hgv->ommatidia = &eye_coords; // pass combined coords
+        hgv->scalarData = &datatwice;          // pass combined data
+        hgv->hexVisMode = craysim::HexVisMode::HexInterp;
         hgv->cm.setType (mplot::ColourMapType::Jet);
         hgv->finalize();
         v.addVisualModel (hgv);
@@ -292,8 +293,15 @@ int main (int argc, char** argv)
         sphere_coords2[i] = sphere_coords[i] * sm::vec<float>{-1, 1, 1};
     }
     // All coordinates in a single memory structure
-    sm::vvec<sm::vec<float, 3>> eye_coords (sphere_coords);
-    eye_coords.insert (eye_coords.end(), sphere_coords2.begin(), sphere_coords2.end());
+    sm::vvec<craysim::compoundray::Ommatidium> eye_coords;
+    for (auto s : sphere_coords) {
+        craysim::compoundray::Ommatidium o = { s, s, 0, 0 };
+        eye_coords.push_back (o);
+    }
+    for (auto s : sphere_coords2) {
+        craysim::compoundray::Ommatidium o = { s, s, 0, 0 };
+        eye_coords.push_back (o);
+    }
 
     // 'R' neighbours (neighbour east) on the sphere
     sm::vvec<sm::vec<float, 3>> neighb_r(hg.num(), sm::vec<float, 3>{0,0,0});
@@ -338,7 +346,7 @@ int main (int argc, char** argv)
         d.add_contained_vals ("/neighb_r2", neighb_r2);
         d.add_contained_vals ("/neighb_g2", neighb_g2);
         d.add_contained_vals ("/neighb_b2", neighb_b2);
-        d.add_contained_vals ("/eye_coords", eye_coords);
+        //d.add_contained_vals ("/eye_coords", eye_coords);
         d.add_contained_vals ("/sphere_coords", sphere_coords);
         d.add_contained_vals ("/sphere_coords2", sphere_coords2);
     }

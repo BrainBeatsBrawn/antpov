@@ -11,15 +11,18 @@
 import sm.flags;
 import sm.vvec;
 import sm.grid;
+import sm.hexgrid;
+import sm.hexgrid.hdf;
 
 import mplot.gl.version;
-import mplot.compoundray.interop; // mathplot <--> compoundray interoperability
-import mplot.compoundray.eyevisual;
+import craysim.compoundray.interop; // mathplot <--> compoundray interoperability
+import craysim.compoundray.eyevisual;
 import mplot.tools;
 import mplot.gridvisual;
 
 import craysim.visual;
 import craysim.antbody;
+import craysim.doublehexgrid;
 
 import cater.helpers;
 
@@ -154,7 +157,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             if (aflags.test (cater::helpers::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
                 v.bc_clr[i] = mplot::colour::bisque2; // ZVF. A white.
             } else if (aflags.test (cater::helpers::antflags::ant14)) { // Hack to colour by routeID 1
-                v.bc_clr[i] = mplot::colour::peachpuff;
+                v.bc_clr[i] = mplot::colour::sandybrown;
             } else if (aflags.test (cater::helpers::antflags::ant13)) { // routeID 2
                 v.bc_clr[i] = mplot::colour::orangered2;
                 // routeID 3 is darkorange2 (ant12), so that works for both colour schemes
@@ -242,16 +245,51 @@ std::int32_t main (std::int32_t argc, char* argv[])
         vant.setSceneRotation (sm::quaternion<float>{ float{0.774197}, float{0.444591}, float{-0.447665}, float{0.0505289} });
     }
 
-    // Ant body, plotted in its own window; first the eyes for the body
-    auto eyevm1 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
-    eyevm1->set_parent (vant.get_id());
-    eyevm1->name = "Ant Eyes";
-    eyevm1->show_3d = true;
-    eyevm1->setGamma (0.45f);
-    eyevm1->finalize();
-    mplot::compoundray::EyeVisual<glver>* ep1 = vant.addVisualModel (eyevm1);
-    // Scale this model up, so it's not tiny like the one in the main scene
-    ep1->scaleViewMatrix (1000);
+    // Load the eye hexgrid, if it is needed
+    sm::hexgrid<float> eye_hexgrid;
+    if (v.sim_opts.test (craysim::options::eye_is_hex)) {
+        // read eye_hexgrid from eyefilenamebase.h5... then:
+        std::string eye_hexgrid_path = {};
+        if (v.efpaths.empty()) {
+            std::cout << "No efpaths yet...\n";
+        } else {
+            std::cout << "v.efpaths[0] = " << v.efpaths[0] << "\n";
+            eye_hexgrid_path = v.efpaths[0];
+            mplot::tools::stripFileSuffix (eye_hexgrid_path);
+            eye_hexgrid_path += ".h5";
+            std::cout << "eye_hexgrid_path = " << eye_hexgrid_path << "\n";
+        }
+        sm::hexgrid_load (eye_hexgrid, eye_hexgrid_path);
+        std::cout << "eye_hexgrid has " << eye_hexgrid.num() << " hexes\n";
+    }
+
+    constexpr bool twodee = true;
+
+    craysim::compoundray::ommatidia_datamodel<glver>* ep1 = nullptr;
+    if (v.sim_opts.test (craysim::options::eye_is_hex)) {
+        auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{0,0,0});
+        dhg->set_parent (vant.get_id());
+        dhg->ommData = &v.ommatidia_datas[0];
+        dhg->ommatidia = v.get_ommatidia_ptr(0); // gets repeatedly reset in craysim_visual
+        dhg->show_flat = false;
+        dhg->setGamma (0.45f);
+        dhg->twodimensional (false);
+        dhg->addMeshgroup (*v.get_head_mesh(0)); // Adds the meshgroup
+        dhg->finalize();
+        ep1 = vant.addVisualModel (dhg);
+        ep1->scaleViewMatrix (1000);
+    } else {
+        // Ant body, plotted in its own window; first the eyes for the body
+        auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
+        eyevm1->set_parent (vant.get_id());
+        eyevm1->name = "Ant Eyes";
+        eyevm1->show_3d = true;
+        eyevm1->setGamma (0.45f);
+        eyevm1->finalize();
+        ep1 = vant.addVisualModel (eyevm1);
+        // Scale this model up, so it's not tiny like the one in the main scene
+        ep1->scaleViewMatrix (1000);
+    }
     // The ant body for the separate window
     auto av1 = std::make_unique<craysim::AntBodyVisual<glver>>();
     av1->set_parent (vant.get_id());
@@ -263,15 +301,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ant_ptr1->scaleViewMatrix (1000);
 
     mplot::GridVisual<float, std::uint32_t, float, glver>* gv1p = nullptr;
-    mplot::compoundray::EyeVisual<glver>* ep2 = nullptr;
+    craysim::compoundray::ommatidia_datamodel<glver>* ep2 = nullptr;
 
     sm::vec<float, 2> dx = { 0.0035f, 0.003f };
     sm::vec<float, 2> nul = { 0.0f, 0.0f };
     std::uint32_t cyl_w = 360; // must match cyl.eye
     std::uint32_t cyl_h = 90;
     sm::grid g1(cyl_w, cyl_h, dx, nul, sm::griddomainwrap::horizontal, sm::gridorder::bottomleft_to_topright);
-
-    constexpr bool twodee = true;
 
     // Showing a cylindrical representation, if it is present
     if (v.efpaths.size() > 1 && v.efpaths[1].find ("cyl.eye") != std::string::npos) {
@@ -293,9 +329,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // 2D eye representation (goes in the other window)
-    auto eyevm2 = std::make_unique<mplot::compoundray::EyeVisual<glver>> (sm::vec<>{},
-                                                                          &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
-                                                                          nullptr);
+    auto eyevm2 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{},
+                                                                            &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
+                                                                            nullptr);
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
     craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get(), 0);
@@ -310,6 +346,22 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
 
+    craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra double hex of flat eyes
+    if (v.sim_opts.test (craysim::options::eye_is_hex)) {
+        auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{});
+        dhg->set_parent (veye.get_id());
+        dhg->ommData = &v.ommatidia_datas[0];
+        dhg->ommatidia = v.get_ommatidia_ptr(0); // gets repeatedly reset in craysim_visual
+        dhg->show_flat = true; // couple of issues to solve here
+        dhg->second_grid_flip_lr = true;   // flip the second grid left-right
+        dhg->grid_offset = {0.00075f, 0}; // grid offset is applied in opposide senses to each grid
+        dhg->setGamma (0.45f);
+        dhg->twodimensional (twodee);
+        dhg->setViewMatrix (mflip);
+        dhg->finalize();
+        dhp = veye.addVisualModel (dhg);
+        dhp->scaleViewMatrix (1000);
+    }
 
     // An ant body to go in the scene
     auto av = std::make_unique<craysim::AntBodyVisual<glver>>();
@@ -334,9 +386,14 @@ std::int32_t main (std::int32_t argc, char* argv[])
     v.other_windows = { &vant, &veye };
     // Similar for our other eyes
     if (ep2 == nullptr) {
-        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1 };
+        v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_datamodel<glver>*>{ ep1 };
     } else {
-        v.other_eyes[0] = std::vector<mplot::compoundray::EyeVisual<glver>*>{ ep1, ep2 };
+        if (dhp == nullptr) {
+            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_datamodel<glver>*>{ ep1, ep2 };
+        } else {
+            std::cout << "Adding ep1, ep2 and dhp!\n";
+            v.other_eyes[0] = std::vector<craysim::compoundray::ommatidia_datamodel<glver>*>{ ep1, ep2, dhp };
+        }
     }
 
     if (prog_opts.make_movie) {
@@ -346,7 +403,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // The main program loop
-    while (!v.readyToFinish()) {
+    while (!(v.readyToFinish() || vant.readyToFinish() || veye.readyToFinish())) {
         v.start_loop_timer(); // It's important to call this line at the start of the loop
 
         if (v.move_counter < v.csv_flags.size()) {
