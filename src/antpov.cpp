@@ -341,7 +341,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->show_rays = false;
     sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
     eyevm2->setViewMatrix (mflip);
-    eyevm2->addMeshgroup (*v.get_head_mesh(0));
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
