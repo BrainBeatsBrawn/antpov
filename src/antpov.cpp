@@ -157,7 +157,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             if (aflags.test (cater::helpers::antflags::ant15)) { // There was no ant 15, this is used to flag for ZVF colour
                 v.bc_clr[i] = mplot::colour::bisque2; // ZVF. A white.
             } else if (aflags.test (cater::helpers::antflags::ant14)) { // Hack to colour by routeID 1
-                v.bc_clr[i] = mplot::colour::peachpuff;
+                v.bc_clr[i] = mplot::colour::sandybrown;
             } else if (aflags.test (cater::helpers::antflags::ant13)) { // routeID 2
                 v.bc_clr[i] = mplot::colour::orangered2;
                 // routeID 3 is darkorange2 (ant12), so that works for both colour schemes
