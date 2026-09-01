@@ -274,17 +274,18 @@ std::int32_t main (std::int32_t argc, char* argv[])
         dhg->show_flat = false;
         dhg->setGamma (0.45f);
         dhg->twodimensional (false);
-        dhg->addMeshgroup (*v.get_head_mesh(0)); // Adds the meshgroup
+        dhg->addMeshgroup (*v.get_head_mesh(0)); // Adds the ant head model
         dhg->finalize();
         ep1 = vant.addVisualModel (dhg);
         ep1->scaleViewMatrix (1000);
     } else {
         // Ant body, plotted in its own window; first the eyes for the body
-        auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0), v.get_head_mesh(0));
+        auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0));
         eyevm1->set_parent (vant.get_id());
         eyevm1->name = "Ant Eyes";
         eyevm1->show_3d = true;
         eyevm1->setGamma (0.45f);
+        eyevm1->addMeshgroup (*v.get_head_mesh(0));
         eyevm1->finalize();
         ep1 = vant.addVisualModel (eyevm1);
         // Scale this model up, so it's not tiny like the one in the main scene
@@ -329,9 +330,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     }
 
     // 2D eye representation (goes in the other window)
-    auto eyevm2 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{},
-                                                                            &v.ommatidia_datas[0], v.get_ommatidia_ptr(0),
-                                                                            nullptr);
+    auto eyevm2 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0));
     eyevm2->set_parent (veye.get_id());
     eyevm2->name = "2D Ant Eyes";
     craysim::add_ant_eye_spherical_projection<glver> (v, eyevm2.get(), 0);
@@ -342,6 +341,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     eyevm2->show_rays = false;
     sm::mat<float, 4> mflip (sm::quaternion<float>{0, 0, 1, 0});
     eyevm2->setViewMatrix (mflip);
+    eyevm2->addMeshgroup (*v.get_head_mesh(0));
     eyevm2->finalize();
     ep2 = veye.addVisualModel (eyevm2);
     ep2->scaleViewMatrix (1000);
