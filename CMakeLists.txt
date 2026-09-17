@@ -131,6 +131,7 @@ set(ANTPOV_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/SphereVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/HexGridVisual.cppm
 )
 
 #
@@ -146,6 +147,7 @@ add_library(mplot_fontdata STATIC ${MPLOT_INCLUDE_PATH}/mplot/VisualFaceAsm.cpp)
 
 # The main ant simulator library
 set(ANTPOV_MODULES
+  ${SM_HEXFFT_MODULES}
   ${CRAYSIM_MODULES}
   ${CRAYSIM_ANTBODY_MODULES}
   ${CRAYSIM_DOUBLEHEX_MODULES}

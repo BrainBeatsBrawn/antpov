@@ -13,12 +13,14 @@ import sm.vvec;
 import sm.grid;
 import sm.hexgrid;
 import sm.hexgrid.hdf;
+import sm.hexfft;
 
 import mplot.gl.version;
 import craysim.compoundray.interop; // mathplot <--> compoundray interoperability
 import craysim.compoundray.eyevisual;
 import mplot.tools;
 import mplot.gridvisual;
+import mplot.hexgridvisual;
 
 import craysim.visual;
 import craysim.antbody;
@@ -247,6 +249,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // Load the eye hexgrid, if it is needed
     sm::hexgrid<float> eye_hexgrid;
+    // We may FFT the eye view
+    sm::hexfft::fft<float> hfft;
+    sm::vvec<float> fft_r;
+    sm::vvec<float> fft_i;
+
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
         // read eye_hexgrid from eyefilenamebase.h5... then:
         std::string eye_hexgrid_path = {};
@@ -261,6 +268,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
         }
         sm::hexgrid_load (eye_hexgrid, eye_hexgrid_path);
         std::cout << "eye_hexgrid has " << eye_hexgrid.num() << " hexes\n";
+
+        // Init the FFT object
+        hfft.init (&eye_hexgrid);
+        fft_r.resize (hfft.hgf->num(), 0.0f);
+        fft_i.resize (hfft.hgf->num(), 0.0f);
     }
 
     constexpr bool twodee = true;
@@ -278,6 +290,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         dhg->finalize();
         ep1 = vant.addVisualModel (dhg);
         ep1->scaleViewMatrix (1000);
+
     } else {
         // Ant body, plotted in its own window; first the eyes for the body
         auto eyevm1 = std::make_unique<craysim::compoundray::EyeVisual<glver>> (sm::vec<>{}, &v.ommatidia_datas[0], v.get_ommatidia_ptr(0));
@@ -360,6 +373,20 @@ std::int32_t main (std::int32_t argc, char* argv[])
         dhg->finalize();
         dhp = veye.addVisualModel (dhg);
         dhp->scaleViewMatrix (1000);
+
+        // If eye is hex, we can FFT and show the result
+        const float myUscale = hfft.Uscale / 1.8f;
+        const float fhhgw = (hfft.hgf->width() * myUscale) / 2.0f;
+        auto fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{0.2f});
+        fhgv->set_parent (veye.get_id());
+        fhgv->zoom = myUscale;
+        fhgv->setScalarData (&fft_r);
+        fhgv->cm.setType (mplot::ColourMapType::CET_D09);
+        fhgv->hexVisMode = mplot::HexVisMode::HexInterp;
+        fhgv->zScale.null_scaling();
+        fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
+        fhgv->finalize();
+        veye.addVisualModel (fhgv);
     }
 
     // An ant body to go in the scene
