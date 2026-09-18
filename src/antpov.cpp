@@ -360,7 +360,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2->scaleViewMatrix (1000);
 
     craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra double hex of flat eyes
-    mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgvp = nullptr;
+    mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_r_p = nullptr;
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
         auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{});
         dhg->set_parent (veye.get_id());
@@ -380,18 +380,18 @@ std::int32_t main (std::int32_t argc, char* argv[])
         const float myUscale = hfft.Uscale;
         const float fhhgw = (hfft.hgf->width() * myUscale) / 2.0f;
         std::cout << "fhhgw = " << fhhgw << " and hfft.hgf->num() = " << hfft.hgf->num() << std::endl;
-        auto fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{-0.5f, -0.5f});
+        auto fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{+0.5f, -0.5f});
         fhgv->set_parent (veye.get_id());
         fhgv->zoom = myUscale;
         fhgv->setScalarData (&fft_r);
         fhgv->cm.setType (mplot::ColourMapType::CET_D09);
-        fhgv->hexVisMode = mplot::HexVisMode::HexInterp;
+        fhgv->hexVisMode = mplot::HexVisMode::Triangles;
         fhgv->zScale.null_scaling();
         fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
         fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
         fhgv->finalize();
-        fhgvp = veye.addVisualModel (fhgv);
-        fhgvp->scaleViewMatrix (1000);
+        fhgv_r_p = veye.addVisualModel (fhgv);
+        fhgv_r_p->scaleViewMatrix (1000);
     }
 
     // An ant body to go in the scene
@@ -489,8 +489,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
         }
 
         // Update FFT
-        if (fhgvp != nullptr) {
-            // Just one eye for now
+        if (fhgv_r_p != nullptr) { // FFT of right-hand eye
+            // Just one eye for now (the right hand one)
             sm::vvec<float> fftin (v.ommatidia_datas[0].size() / 2, 0.0f);
             for (std::uint32_t i = 0; i < v.ommatidia_datas[0].size() / 2; ++i) {
                 std::array<float, 3> rgb = v.ommatidia_datas[0][i];
@@ -500,10 +500,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             for (std::uint32_t i = 0; i < hfft.X_hexgrid.size(); ++i) {
                 fft_r[i] = std::real (hfft.X_hexgrid[i]);
             }
-            //auto rng = fft_r.range();
-            //fhgvp->colourScale.compute_scaling (rng);
-            //std::cout << "FFT range " << rng << std::endl;
-            fhgvp->updateData (&fft_r);
+            fhgv_r_p->reinitColours();
         }
 
         // Save frames
