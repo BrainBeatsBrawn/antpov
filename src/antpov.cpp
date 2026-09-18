@@ -230,8 +230,8 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // A window for the 2D eye view projection
     mplot::Visual<glver> veye (920, 512, "Eye view");
-    veye.setSceneTrans (sm::vec<float,3>{ float{-0.00859182}, float{-0.616208}, float{-1.18557} });
-    veye.setSceneRotation (sm::quaternion<float>{ float{1}, float{0}, float{0}, float{0} });
+    veye.setSceneTrans (sm::vec<float,3>{ float{0.00700033}, float{0.889128}, float{-4.82789} });
+    veye.setSceneRotation (sm::quaternion<float>{ float{0.997879}, float{-0.0566149}, float{0.0303102}, float{-0.0106723} });
 
     // Enable a special mode to make a short video of ant head in same orientation as a photographed ant
     constexpr bool seeing_what_they_see_format = false;
@@ -360,7 +360,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     ep2->scaleViewMatrix (1000);
 
     craysim::doublehexgrid<glver>* dhp = nullptr; // optional extra double hex of flat eyes
+
+    // FFT visualmodels
     mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_r_p = nullptr;
+    mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_ri_p = nullptr;
+    mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_l_p = nullptr;
+    mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_li_p = nullptr;
+
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
         auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{});
         dhg->set_parent (veye.get_id());
@@ -378,20 +384,92 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
         // If eye is hex, we can FFT and show the result
         const float myUscale = hfft.Uscale;
-        const float fhhgw = (hfft.hgf->width() * myUscale) / 2.0f;
-        std::cout << "fhhgw = " << fhhgw << " and hfft.hgf->num() = " << hfft.hgf->num() << std::endl;
+        //const float fhhgw = (hfft.hgf->width() * myUscale) / 2.0f;
+        auto fftvismode = mplot::HexVisMode::HexInterp;
+        bool realimaginary = true;// if false, then magnitude/phase
+
+        // Right real
         auto fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{+0.5f, -0.5f});
         fhgv->set_parent (veye.get_id());
         fhgv->zoom = myUscale;
-        fhgv->setScalarData (&fft_r);
+        fhgv->twodimensional (twodee);
+        fhgv->setComplexData (&hfft.X_hexgrid);
+        if (realimaginary) {
+            fhgv->complexHandling = mplot::complex_number_handling::as_real_scalar;
+            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
+        } else {
+            fhgv->complexHandling = mplot::complex_number_handling::as_magnitude_scalar;
+            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
+        }
         fhgv->cm.setType (mplot::ColourMapType::CET_D09);
-        fhgv->hexVisMode = mplot::HexVisMode::Triangles;
+        fhgv->hexVisMode = fftvismode;
         fhgv->zScale.null_scaling();
-        fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
-        fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
+        //fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.02f));
         fhgv->finalize();
         fhgv_r_p = veye.addVisualModel (fhgv);
         fhgv_r_p->scaleViewMatrix (1000);
+
+        fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{+0.5f, -1.0f});
+        fhgv->set_parent (veye.get_id());
+        fhgv->zoom = myUscale;
+        fhgv->twodimensional (twodee);
+        fhgv->setComplexData (&hfft.X_hexgrid);
+        if (realimaginary) {
+            fhgv->complexHandling = mplot::complex_number_handling::as_imaginary_scalar;
+            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
+        } else {
+            fhgv->complexHandling = mplot::complex_number_handling::as_phase_scalar;
+            fhgv->colourScale.compute_scaling (-sm::mathconst<float>::pi, sm::mathconst<float>::pi);
+        }
+        fhgv->cm.setType (mplot::ColourMapType::CET_D13);
+        fhgv->hexVisMode = fftvismode;
+        fhgv->zScale.null_scaling();
+        //fhgv->addLabel ("FFT (imag)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.02f));
+        fhgv->finalize();
+        fhgv_ri_p = veye.addVisualModel (fhgv);
+        fhgv_ri_p->scaleViewMatrix (1000);
+
+        // Left real
+        fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{-0.5f, -0.5f});
+        fhgv->set_parent (veye.get_id());
+        fhgv->zoom = myUscale;
+        fhgv->twodimensional (twodee);
+        fhgv->setComplexData (&hfft.X_hexgrid);
+        if (realimaginary) {
+            fhgv->complexHandling = mplot::complex_number_handling::as_real_scalar;
+            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
+        } else {
+            fhgv->complexHandling = mplot::complex_number_handling::as_magnitude_scalar;
+            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
+        }
+        fhgv->cm.setType (mplot::ColourMapType::CET_D09);
+        fhgv->hexVisMode = fftvismode;
+        fhgv->zScale.null_scaling();
+        //fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
+        fhgv->finalize();
+        fhgv_l_p = veye.addVisualModel (fhgv);
+        fhgv_l_p->scaleViewMatrix (1000);
+
+        // Left imag
+        fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{-0.5f, -1.0f});
+        fhgv->set_parent (veye.get_id());
+        fhgv->zoom = myUscale;
+        fhgv->twodimensional (twodee);
+        fhgv->setComplexData (&hfft.X_hexgrid);
+        if (realimaginary) {
+            fhgv->complexHandling = mplot::complex_number_handling::as_imaginary_scalar;
+            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
+        } else {
+            fhgv->complexHandling = mplot::complex_number_handling::as_phase_scalar;
+            fhgv->colourScale.compute_scaling (-sm::mathconst<float>::pi, sm::mathconst<float>::pi);
+        }
+        fhgv->cm.setType (mplot::ColourMapType::CET_D13);
+        fhgv->hexVisMode = fftvismode;
+        fhgv->zScale.null_scaling();
+        //fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
+        fhgv->finalize();
+        fhgv_li_p = veye.addVisualModel (fhgv);
+        fhgv_li_p->scaleViewMatrix (1000);
     }
 
     // An ant body to go in the scene
@@ -490,17 +568,24 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
         // Update FFT
         if (fhgv_r_p != nullptr) { // FFT of right-hand eye
-            // Just one eye for now (the right hand one)
-            sm::vvec<float> fftin (v.ommatidia_datas[0].size() / 2, 0.0f);
-            for (std::uint32_t i = 0; i < v.ommatidia_datas[0].size() / 2; ++i) {
+            const std::uint32_t sz2 = v.ommatidia_datas[0].size() / 2;
+            // Right eye FFT
+            sm::vvec<float> fftin (sz2, 0.0f);
+            for (std::uint32_t i = 0; i < sz2; ++i) {
                 std::array<float, 3> rgb = v.ommatidia_datas[0][i];
                 fftin[i] = (rgb[0] + rgb[1] + rgb[2]) * 0.333333333f;
             }
-            hfft.forward (fftin);
-            for (std::uint32_t i = 0; i < hfft.X_hexgrid.size(); ++i) {
-                fft_r[i] = std::real (hfft.X_hexgrid[i]);
-            }
+            hfft.forward (fftin); // be nice to pass in span.
             fhgv_r_p->reinitColours();
+            fhgv_ri_p->reinitColours();
+            // Left eye
+            for (std::uint32_t i = 0; i < sz2; ++i) {
+                std::array<float, 3> rgb = v.ommatidia_datas[0][sz2 + i];
+                fftin[i] = (rgb[0] + rgb[1] + rgb[2]) * 0.333333333f;
+            }
+            hfft.forward (fftin);
+            fhgv_l_p->reinitColours();
+            fhgv_li_p->reinitColours();
         }
 
         // Save frames
