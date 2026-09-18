@@ -69,10 +69,13 @@ std::int32_t main (std::int32_t argc, char* argv[])
     // Some extra options for antpov only
     bool colour_by_route = false; // colour by route or ant?
     bool apply_colour_labels = false;
+    bool realimaginary = true; // if false, then magnitude/phase
     for (std::int32_t i = 0; i < argc; i++) {
         std::string arg = std::string(argv[i]);
         if (arg == "-R") {
             colour_by_route = true; // I have a slightly hacky way to colour by route ID
+        } else if (arg == "-T") {
+            realimaginary = false; // magnitude/phase instead
         } else if (arg == "-L") {
             apply_colour_labels = true; // Set true to apply green-for-bush; grey-for-invisible
         }
@@ -386,7 +389,6 @@ std::int32_t main (std::int32_t argc, char* argv[])
         const float myUscale = hfft.Uscale;
         //const float fhhgw = (hfft.hgf->width() * myUscale) / 2.0f;
         auto fftvismode = mplot::HexVisMode::HexInterp;
-        bool realimaginary = true;// if false, then magnitude/phase
 
         // Right real
         auto fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{+0.5f, -0.5f});
