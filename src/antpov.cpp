@@ -34,6 +34,8 @@ constexpr std::int32_t glver = mplot::gl::version_4_3;
 
 std::int32_t main (std::int32_t argc, char* argv[])
 {
+    using mc = sm::mathconst<float>;
+
     craysim::parsed_inputs prog_opts = craysim::parse_inputs (argc, argv);
     if (prog_opts.opts.test (craysim::options::can_exit)) { return 1; }
 
@@ -62,6 +64,9 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // Uncomment to save out 3D version of csv_positions as a CSV file
     v.sim_opts.set (craysim::options::save_csv_positions, true);
+
+    // slow down angular speed
+    v.kcmd_angular_speed = 0.2f * mc::two_pi / 360.0f;
 
     std::uint32_t antid = 0u;
     std::uint32_t routeidx = 0u;
@@ -258,7 +263,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
     // hfft.X_hexgrid diffs
     sm::vvec<std::complex<float>> X_hexgrid_saved_left;
-    sm::vvec<std::complex<float>> X_hexgrid_diff_left;
+    sm::vvec<float> X_hexgrid_diff_left;
+
+    sm::vvec<float> fftin;
+    sm::vvec<float> fftin_saved_left;
+    sm::vvec<float> fftin_diff_left;
 
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
         // read eye_hexgrid from eyefilenamebase.h5... then:
@@ -278,7 +287,11 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // Init the FFT object
         hfft.init (&eye_hexgrid);
         X_hexgrid_saved_left.resize (hfft.X_hexgrid.size(), std::complex<float>{0, 0});
-        X_hexgrid_diff_left.resize (hfft.X_hexgrid.size(), std::complex<float>{0, 0});
+        X_hexgrid_diff_left.resize (hfft.X_hexgrid.size(), 0.0f);
+
+        fftin.resize (eye_hexgrid.num(), 0.0f);
+        fftin_saved_left.resize (eye_hexgrid.num(), 0.0f);
+        fftin_diff_left.resize (eye_hexgrid.num(), 0.0f);
     }
 
     constexpr bool twodee = true;
@@ -372,9 +385,12 @@ std::int32_t main (std::int32_t argc, char* argv[])
     mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_l_p = nullptr;
     mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_li_p = nullptr;
     mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_l_diff_p = nullptr;
-    mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_li_diff_p = nullptr;
+    //mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_li_diff_p = nullptr;
     mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_l_saved_p = nullptr;
     mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>* fhgv_li_saved_p = nullptr;
+
+    mplot::HexGridVisual<float, sm::hexalign::point_up, glver>* in_left_saved_p = nullptr;
+    mplot::HexGridVisual<float, sm::hexalign::point_up, glver>* in_left_diff_p = nullptr;
 
     if (v.sim_opts.test (craysim::options::eye_is_hex)) {
         auto dhg = std::make_unique<craysim::doublehexgrid<glver>> (&eye_hexgrid, sm::vec<>{});
@@ -427,7 +443,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
         } else {
             fhgv->complexHandling = mplot::complex_number_handling::as_phase_scalar;
-            fhgv->colourScale.compute_scaling (-sm::mathconst<float>::pi, sm::mathconst<float>::pi);
+            fhgv->colourScale.compute_scaling (-mc::pi, mc::pi);
         }
         fhgv->cm.setType (mplot::ColourMapType::CET_D13);
         fhgv->hexVisMode = fftvismode;
@@ -469,7 +485,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
         } else {
             fhgv->complexHandling = mplot::complex_number_handling::as_phase_scalar;
-            fhgv->colourScale.compute_scaling (-sm::mathconst<float>::pi, sm::mathconst<float>::pi);
+            fhgv->colourScale.compute_scaling (-mc::pi, mc::pi);
         }
         fhgv->cm.setType (mplot::ColourMapType::CET_D13);
         fhgv->hexVisMode = fftvismode;
@@ -511,7 +527,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
             fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
         } else {
             fhgv->complexHandling = mplot::complex_number_handling::as_phase_scalar;
-            fhgv->colourScale.compute_scaling (-sm::mathconst<float>::pi, sm::mathconst<float>::pi);
+            fhgv->colourScale.compute_scaling (-mc::pi, mc::pi);
         }
         fhgv->cm.setType (mplot::ColourMapType::CET_D13);
         fhgv->hexVisMode = fftvismode;
@@ -521,47 +537,45 @@ std::int32_t main (std::int32_t argc, char* argv[])
         fhgv_li_saved_p = veye.addVisualModel (fhgv);
         fhgv_li_saved_p->scaleViewMatrix (1000);
 
-        // Left DIFF real
+        // Left Saved input
+        auto in_left_saved = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::point_up, glver>>(hfft.hg, sm::vec<>{-1.2f, 0.0f});
+        in_left_saved->set_parent (veye.get_id());
+        in_left_saved->twodimensional (twodee);
+        in_left_saved->setScalarData (&fftin_saved_left);
+        in_left_saved->colourScale.identity_scaling();
+        in_left_saved->cm.setType (mplot::ColourMapType::GreyscaleInv);
+        in_left_saved->hexVisMode = fftvismode;
+        in_left_saved->zScale.null_scaling();
+        in_left_saved->finalize();
+        in_left_saved_p = veye.addVisualModel (in_left_saved);
+        in_left_saved_p->scaleViewMatrix (1000);
+
+        // Left Diff of inputs
+        auto in_left_diff = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::point_up, glver>>(hfft.hg, sm::vec<>{-1.9f, 0.0f});
+        in_left_diff->set_parent (veye.get_id());
+        in_left_diff->twodimensional (twodee);
+        in_left_diff->setScalarData (&fftin_diff_left);
+        in_left_diff->colourScale.compute_scaling(-1,1);
+        in_left_diff->cm.setType (mplot::ColourMapType::CET_D09);
+        in_left_diff->hexVisMode = fftvismode;
+        in_left_diff->zScale.null_scaling();
+        in_left_diff->finalize();
+        in_left_diff_p = veye.addVisualModel (in_left_diff);
+        in_left_diff_p->scaleViewMatrix (1000);
+
+        // Left DIFF of magnitudes
         fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{-1.9f, -0.5f});
         fhgv->set_parent (veye.get_id());
         fhgv->zoom = myUscale;
         fhgv->twodimensional (twodee);
-        fhgv->setComplexData (&X_hexgrid_diff_left);
-        if (realimaginary) {
-            fhgv->complexHandling = mplot::complex_number_handling::as_real_scalar;
-            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
-        } else {
-            fhgv->complexHandling = mplot::complex_number_handling::as_magnitude_scalar;
-            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
-        }
+        fhgv->setScalarData (&X_hexgrid_diff_left);
+        fhgv->colourScale.compute_scaling (-20.0f, 20.0f);
         fhgv->cm.setType (mplot::ColourMapType::CET_D09);
         fhgv->hexVisMode = fftvismode;
         fhgv->zScale.null_scaling();
-        //fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
         fhgv->finalize();
         fhgv_l_diff_p = veye.addVisualModel (fhgv);
         fhgv_l_diff_p->scaleViewMatrix (1000);
-
-        // Left DIFF imag
-        fhgv = std::make_unique<mplot::HexGridVisual<float, sm::hexalign::flat_up, glver>>(hfft.hgf.get(), sm::vec<>{-1.9f, -1.0f});
-        fhgv->set_parent (veye.get_id());
-        fhgv->zoom = myUscale;
-        fhgv->twodimensional (twodee);
-        fhgv->setComplexData (&X_hexgrid_diff_left);
-        if (realimaginary) {
-            fhgv->complexHandling = mplot::complex_number_handling::as_imaginary_scalar;
-            fhgv->colourScale.compute_scaling (-60.0f, 60.0f);
-        } else {
-            fhgv->complexHandling = mplot::complex_number_handling::as_phase_scalar;
-            fhgv->colourScale.compute_scaling (-sm::mathconst<float>::pi, sm::mathconst<float>::pi);
-        }
-        fhgv->cm.setType (mplot::ColourMapType::CET_D13);
-        fhgv->hexVisMode = fftvismode;
-        fhgv->zScale.null_scaling();
-        //fhgv->addLabel ("FFT (real)", sm::vec<float>{-fhhgw, fhhgw * 1.1f}, mplot::TextFeatures(0.05f));
-        fhgv->finalize();
-        fhgv_li_diff_p = veye.addVisualModel (fhgv);
-        fhgv_li_diff_p->scaleViewMatrix (1000);
     }
 
     // An ant body to go in the scene
@@ -662,7 +676,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         if (fhgv_r_p != nullptr) { // FFT of right-hand eye
             const std::uint32_t sz2 = v.ommatidia_datas[0].size() / 2;
             // Right eye FFT
-            sm::vvec<float> fftin (sz2, 0.0f);
+            // fftin.resize (sz2, 0.0f);
             for (std::uint32_t i = 0; i < sz2; ++i) {
                 std::array<float, 3> rgb = v.ommatidia_datas[0][i];
                 fftin[i] = (rgb[0] + rgb[1] + rgb[2]) * 0.333333333f;
@@ -681,13 +695,22 @@ std::int32_t main (std::int32_t argc, char* argv[])
 
             if (v.vstate.test (craysim::visual<glver>::state::free_movement_set)) {
                 X_hexgrid_saved_left = hfft.X_hexgrid;
+                fftin_saved_left = fftin;
                 v.vstate.reset (craysim::visual<glver>::state::free_movement_set);
             }
-            X_hexgrid_diff_left = hfft.X_hexgrid - X_hexgrid_saved_left;
+
+            for (std::uint32_t i = 0; i < hfft.X_hexgrid.size(); ++i) {
+                X_hexgrid_diff_left[i] = std::abs(hfft.X_hexgrid[i]) - std::abs(X_hexgrid_saved_left[i]);
+            }
+
+            fftin_diff_left = fftin - fftin_saved_left;
             fhgv_l_saved_p->reinitColours();
             fhgv_li_saved_p->reinitColours();
             fhgv_l_diff_p->reinitColours();
-            fhgv_li_diff_p->reinitColours();
+            //fhgv_li_diff_p->reinitColours();
+
+            in_left_saved_p->reinitColours();
+            in_left_diff_p->reinitColours();
         }
 
         // Save frames
