@@ -18,8 +18,9 @@ constexpr std::int32_t glver = mplot::gl::version_4_3;
 struct myvisual final : public mplot::Visual<glver>
 {
     myvisual (int width, int height, const std::string& title) : mplot::Visual<glver> (width, height, title) {}
-    float speedmag = 1.0f;
+    float speedmag = 45.0f;
     bool needsupdate = true;
+    bool smooth = false;
 protected:
     void key_callback_extra (int key, [[maybe_unused]] int scancode, int action, [[maybe_unused]] int mods) override
     {
@@ -39,6 +40,15 @@ protected:
             speedmag *= 1.2f;
             needsupdate = true;
         }
+        if (key == mplot::key::s && action == mplot::keyaction::press) {
+            smooth = !smooth;
+            needsupdate = true;
+        }
+        if (key == mplot::key::h && action == mplot::keyaction::press) {
+            std::cout << "Use '1'/'2' to change multiplier by multiples of 2\n";
+            std::cout << "Use '3'/'4' to change multiplier by multiples of 1.2\n";
+            std::cout << "Use 's' to toggle smoothing\n";
+        }
     }
 };
 
@@ -50,10 +60,24 @@ draw (myvisual& v,
       sm::vvec<sm::vec<float, 2>>& positions,
       sm::vvec<sm::vec<float, 2>>& dirns,
       sm::vvec<std::uint32_t>& antflags,
-      sm::vvec<float>& ant_speed)
+      sm::vvec<float>& _ant_speed)
 {
     if (gptr != nullptr) { v.removeVisualModel (gptr); }
     if (cbptr != nullptr) { v.removeVisualModel (cbptr); }
+
+    sm::vvec<float> ant_speed = _ant_speed;
+
+    if (v.smooth) {
+        // Fix speed gaps
+        for (std::uint32_t i = 0u; i < antflags.size() && i < positions.size(); ++i) {
+            if ((antflags[i] & 16u) == 16u) {
+                if (i > 0u) { ant_speed[i] = ant_speed[i-1]; }
+            }
+        }
+        // then smooth
+        using wrapdata = sm::vvec<float>::wrapdata;
+        ant_speed.smooth_gauss_inplace<wrapdata::none> (2.0f, 2);
+    }
 
     // Get colour from speed
     sm::vvec<float> clr = ant_speed;
@@ -99,7 +123,9 @@ draw (myvisual& v,
     cbv->framelinewidth = 0.003f;
     cbv->tf.fontsize = 0.03f;
     cbv->cm.setType (cmap);
-    cbv->scale.compute_scaling (0, 1.0f / v.speedmag);
+    constexpr float samples_per_second = 50.0f;
+    cbv->scale.compute_scaling (0, samples_per_second / v.speedmag);
+    cbv->label = "m/s";
     cbv->finalize();
     mplot::ColourBarVisual<float, glver>* cptr = v.addVisualModel (cbv);
 
