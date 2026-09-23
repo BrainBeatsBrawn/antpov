@@ -60,7 +60,8 @@ draw (myvisual& v,
       sm::vvec<sm::vec<float, 2>>& positions,
       sm::vvec<sm::vec<float, 2>>& dirns,
       sm::vvec<std::uint32_t>& antflags,
-      sm::vvec<float>& _ant_speed)
+      sm::vvec<float>& _ant_speed,
+      const std::string& title)
 {
     if (gptr != nullptr) { v.removeVisualModel (gptr); }
     if (cbptr != nullptr) { v.removeVisualModel (cbptr); }
@@ -110,6 +111,7 @@ draw (myvisual& v,
     gv->set_parent (v.get_id());
     gv->setsize (3, 2);
     gv->setdata (positions, dirns, clr, dsq);
+    gv->addLabel (title, sm::vec<>{0.05f, 0.05f}, gv->tf);
     gv->finalize();
     mplot::GraphVisual<float, glver>* ptr = v.addVisualModel (gv);
 
@@ -164,7 +166,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         v.waitevents(0.017);
         if (v.needsupdate) {
             std::cout << "Re-draw with multiplier " << v.speedmag << "\n";
-            std::tie(gptr, cptr) = draw (v, gptr, cptr, positions, dirns, antflags, ant_speed);
+            std::tie(gptr, cptr) = draw (v, gptr, cptr, positions, dirns, antflags, ant_speed, path);
             v.needsupdate = false;
         }
         v.render();
