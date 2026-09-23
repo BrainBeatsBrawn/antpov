@@ -4,14 +4,107 @@
 #include <tuple>
 #include <cmath>
 #include <string>
+#include <tuple>
 
 import sm.vec;
 import sm.vvec;
 import cater.helpers;
 import mplot.visual;
 import mplot.graphvisual;
+import mplot.colourbarvisual;
 
 constexpr std::int32_t glver = mplot::gl::version_4_3;
+
+struct myvisual final : public mplot::Visual<glver>
+{
+    myvisual (int width, int height, const std::string& title) : mplot::Visual<glver> (width, height, title) {}
+    float speedmag = 1.0f;
+    bool needsupdate = true;
+protected:
+    void key_callback_extra (int key, [[maybe_unused]] int scancode, int action, [[maybe_unused]] int mods) override
+    {
+        if (key == mplot::key::n1 && action == mplot::keyaction::press) {
+            speedmag /= 2.0f;
+            needsupdate = true;
+        }
+        if (key == mplot::key::n2 && action == mplot::keyaction::press) {
+            speedmag *= 2.0f;
+            needsupdate = true;
+        }
+        if (key == mplot::key::n3 && action == mplot::keyaction::press) {
+            speedmag /= 1.2f;
+            needsupdate = true;
+        }
+        if (key == mplot::key::n4 && action == mplot::keyaction::press) {
+            speedmag *= 1.2f;
+            needsupdate = true;
+        }
+    }
+};
+
+// Draw/re-draw the GraphVisual
+std::tuple<mplot::GraphVisual<float, glver>*, mplot::ColourBarVisual<float, glver>*>
+draw (myvisual& v,
+      mplot::GraphVisual<float, glver>* gptr,
+      mplot::ColourBarVisual<float, glver>* cbptr,
+      sm::vvec<sm::vec<float, 2>>& positions,
+      sm::vvec<sm::vec<float, 2>>& dirns,
+      sm::vvec<std::uint32_t>& antflags,
+      sm::vvec<float>& ant_speed)
+{
+    if (gptr != nullptr) { v.removeVisualModel (gptr); }
+    if (cbptr != nullptr) { v.removeVisualModel (cbptr); }
+
+    // Get colour from speed
+    sm::vvec<float> clr = ant_speed;
+    clr *= v.speedmag;
+    // Threshold down
+    clr.threshold_inplace (0.0f, 1.0f);
+    // Replace flagged ones, too
+    for (std::uint32_t i = 0; i < antflags.size() && i < positions.size(); ++i) {
+        if ((antflags[i] & 16u) == 16u) {
+            clr[i] = 1.0f;
+        }
+    }
+
+    auto cmap = mplot::ColourMapType::CET_R1;
+
+    const float sz = 0.5f;
+    // Set up quiver dataset style
+    mplot::DatasetStyle dsq (mplot::stylepolicy::markers);
+    dsq.markerstyle = mplot::markerstyle::quiver_fromcoord;
+    dsq.markersize /= sz * 8.0f;
+    dsq.colourmap.setType (cmap); // Plasma is the default
+    dsq.quiver_flagset.reset (mplot::quiver_flags::colour_fixed);
+    dsq.quiver_flagset.set (mplot::quiver_flags::thickness_fixed);
+    dsq.quiver_flagset.reset (mplot::quiver_flags::show_zeros);
+    dsq.quiver_flagset.reset (mplot::quiver_flags::marker_sphere);
+    dsq.linewidth /= sz * 5.0f;
+    // Create the graph
+    sm::vec<float> offset = { -1.5f, -1.0f, 0.0f };
+    auto gv = std::make_unique<mplot::GraphVisual<float, glver>> (offset);
+    gv->set_parent (v.get_id());
+    gv->setsize (3, 2);
+    gv->setdata (positions, dirns, clr, dsq);
+    gv->finalize();
+    mplot::GraphVisual<float, glver>* ptr = v.addVisualModel (gv);
+
+    offset[0] += 3.1;
+    auto cbv = std::make_unique<mplot::ColourBarVisual<float, glver>>(offset);
+    cbv->set_parent (v.get_id());
+    cbv->orientation = mplot::colourbar_orientation::vertical;
+    cbv->tickside = mplot::colourbar_tickside::right_or_below;
+    cbv->width = 0.06f;
+    cbv->length = 0.4f;
+    cbv->framelinewidth = 0.003f;
+    cbv->tf.fontsize = 0.03f;
+    cbv->cm.setType (cmap);
+    cbv->scale.compute_scaling (0, 1.0f / v.speedmag);
+    cbv->finalize();
+    mplot::ColourBarVisual<float, glver>* cptr = v.addVisualModel (cbv);
+
+    return { ptr, cptr };
+}
 
 std::int32_t main (std::int32_t argc, char* argv[])
 {
@@ -32,49 +125,22 @@ std::int32_t main (std::int32_t argc, char* argv[])
         // Invert y
         for (auto& p : positions) { p[1] *= -1; }
     }
-    /*
-     * Process the positions
-     */
+    // Process the positions
     sm::vvec<sm::vec<float, 2>> dirns (positions.size(), sm::vec<float, 2>{});
-    const auto[pos_orig, dirn_orig] = cater::helpers::process_positions<false> (positions, antflags, dirns, block, max_delta_phi);
+    sm::vvec<float> ant_speed;
+    const auto[pos_orig, dirn_orig] = cater::helpers::process_positions<false> (positions, antflags, dirns, ant_speed, block, max_delta_phi);
 
-    // Get colour from antflags
-    sm::vvec<float> clr (positions.size(), 0.0f);
-    for (std::uint32_t i = 0; i < antflags.size() && i < positions.size(); ++i) {
-        if ((antflags[i] & 16u) == 16u) { clr[i] = 1.0f; }
+    // Visualize
+    myvisual v(1024, 768, "Ant direction analysis");
+    mplot::GraphVisual<float, glver>* gptr = nullptr;
+    mplot::ColourBarVisual<float, glver>* cptr = nullptr;
+    while (!v.readyToFinish()) {
+        v.waitevents(0.017);
+        if (v.needsupdate) {
+            std::cout << "Re-draw with multiplier " << v.speedmag << "\n";
+            std::tie(gptr, cptr) = draw (v, gptr, cptr, positions, dirns, antflags, ant_speed);
+            v.needsupdate = false;
+        }
+        v.render();
     }
-
-    /*
-     * Plot the results
-     */
-    float sz = 0.5f;
-
-    mplot::Visual<glver> v(1024, 768, "Ant direction analysis");
-    // Set up quiver dataset style
-    mplot::DatasetStyle dsq (mplot::stylepolicy::markers);
-    dsq.markerstyle = mplot::markerstyle::quiver_fromcoord;
-    dsq.markersize /= sz * 8.0f;
-    dsq.colourmap.setType (mplot::ColourMapType::Jet); // Plasma is the default
-    dsq.quiver_flagset.reset (mplot::quiver_flags::colour_fixed);
-    dsq.quiver_flagset.set (mplot::quiver_flags::thickness_fixed);
-    dsq.quiver_flagset.reset (mplot::quiver_flags::show_zeros);
-    dsq.quiver_flagset.reset (mplot::quiver_flags::marker_sphere);
-    dsq.linewidth /= sz * 5.0f;
-    // Create the graph
-    sm::vec<float> offset = { -1.5f, -1.0f, 0.0f };
-    auto gv = std::make_unique<mplot::GraphVisual<float, glver>> (offset);
-    gv->set_parent (v.get_id());
-    gv->setsize (3, 2);
-    gv->setdata (positions, dirns, clr, dsq);
-#if 0
-    if (!pos_orig.empty()) {
-        dsq.quiver_flagset.set (mplot::quiver_flags::colour_fixed);
-        dsq.linecolour = mplot::colour::springgreen;
-        gv->setdata (pos_orig, dirn_orig, dsq);
-    }
-#endif
-    gv->finalize();
-    v.addVisualModel (gv);
-
-    v.keepOpen();
 }

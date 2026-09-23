@@ -131,6 +131,7 @@ set(ANTPOV_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/SphereVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/ColourBarVisual.cppm
 )
 
 #
