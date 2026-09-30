@@ -77,6 +77,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
     std::cout << "We are colouring ant trail by " << (colour_by_route ? "forage/run" : "ant") << std::endl;
 
     // csv reading (comes between find_landscape and setup_landscape)
+    sm::vvec<float> ant_speed;
     if (v.sim_opts.test (craysim::options::path_from_csv)) {
         // Check if path encodes several paths
         std::vector<std::string> cpaths = mplot::tools::stringToVector (prog_opts.csv_path, ",");
@@ -137,7 +138,7 @@ std::int32_t main (std::int32_t argc, char* argv[])
         std::uint32_t block = 3;
         float max_delta_phi = 2.8f;
         sm::vvec<sm::vec<float, 2>> dirns (v.csv_positions.size(), sm::vec<float, 2>{}); // dummy, unused
-        cater::helpers::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, block, max_delta_phi);
+        cater::helpers::process_positions<false, true> (v.csv_positions, v.csv_flags, dirns, ant_speed, block, max_delta_phi);
         // for each antflag, set dirn uncertain flag
     }
     v.setup_breadcrumbs (32000); // enough to show a whole path/all paths from csv

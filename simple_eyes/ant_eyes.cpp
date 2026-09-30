@@ -309,14 +309,14 @@ int main (int argc, char** argv)
     sm::vvec<sm::vec<float, 3>> neighb_b(hg.num(), sm::vec<float, 3>{0,0,0});
     for (unsigned int i = 0; i < hg.num(); ++i) {
 
-        if (hg.d_ne[i] != -1) {
-            neighb_r[i] = sphere_coords[hg.d_ne[i]] - sphere_coords[i];
+        if (hg.d_n0[i] != -1) {
+            neighb_r[i] = sphere_coords[hg.d_n0[i]] - sphere_coords[i];
         }
-        if (hg.d_nne[i] != -1) {
-            neighb_g[i] = sphere_coords[hg.d_nne[i]] - sphere_coords[i];
+        if (hg.d_n1[i] != -1) {
+            neighb_g[i] = sphere_coords[hg.d_n1[i]] - sphere_coords[i];
         }
-        if (hg.d_nnw[i] != -1) {
-            neighb_b[i] = sphere_coords[hg.d_nnw[i]] - sphere_coords[i];
+        if (hg.d_n2[i] != -1) {
+            neighb_b[i] = sphere_coords[hg.d_n2[i]] - sphere_coords[i];
         }
     }
 
@@ -325,14 +325,14 @@ int main (int argc, char** argv)
     sm::vvec<sm::vec<float, 3>> neighb_g2(hg.num(), sm::vec<float, 3>{0,0,0});
     sm::vvec<sm::vec<float, 3>> neighb_b2(hg.num(), sm::vec<float, 3>{0,0,0});
     for (unsigned int i = 0; i < hg.num(); ++i) {
-        if (hg.d_ne[i] != -1) {
-            neighb_r2[i] = sphere_coords2[hg.d_ne[i]] - sphere_coords2[i];
+        if (hg.d_n0[i] != -1) {
+            neighb_r2[i] = sphere_coords2[hg.d_n0[i]] - sphere_coords2[i];
         }
-        if (hg.d_nne[i] != -1) {
-            neighb_g2[i] = sphere_coords2[hg.d_nne[i]] - sphere_coords2[i];
+        if (hg.d_n1[i] != -1) {
+            neighb_g2[i] = sphere_coords2[hg.d_n1[i]] - sphere_coords2[i];
         }
-        if (hg.d_nnw[i] != -1) {
-            neighb_b2[i] = sphere_coords2[hg.d_nnw[i]] - sphere_coords2[i];
+        if (hg.d_n2[i] != -1) {
+            neighb_b2[i] = sphere_coords2[hg.d_n2[i]] - sphere_coords2[i];
         }
     }
 
@@ -362,23 +362,23 @@ int main (int argc, char** argv)
             norm.renormalize();
             float acceptance_angle = 1.0f;
             auto c1 = radius * (coords[i] - eyeoffset);
-            if (hg.d_ne[i] != -1) {
-                auto c2 = radius * (coords[hg.d_ne[i]] - eyeoffset);
+            if (hg.d_n0[i] != -1) {
+                auto c2 = radius * (coords[hg.d_n0[i]] - eyeoffset);
                 acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
-            } else if (hg.d_nne[i] != -1) {
-                auto c2 = radius * (coords[hg.d_nne[i]] - eyeoffset);
+            } else if (hg.d_n1[i] != -1) {
+                auto c2 = radius * (coords[hg.d_n1[i]] - eyeoffset);
                 acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
-            } else if (hg.d_nnw[i] != -1) {
-                auto c2 = radius * (coords[hg.d_nnw[i]] - eyeoffset);
+            } else if (hg.d_n2[i] != -1) {
+                auto c2 = radius * (coords[hg.d_n2[i]] - eyeoffset);
                 acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
-            } else if (hg.d_nw[i] != -1) {
-                auto c2 = radius * (coords[hg.d_nw[i]] - eyeoffset);
+            } else if (hg.d_n3[i] != -1) {
+                auto c2 = radius * (coords[hg.d_n3[i]] - eyeoffset);
                 acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
-            } else if (hg.d_nsw[i] != -1) {
-                auto c2 = radius * (coords[hg.d_nsw[i]] - eyeoffset);
+            } else if (hg.d_n4[i] != -1) {
+                auto c2 = radius * (coords[hg.d_n4[i]] - eyeoffset);
                 acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
-            } else if (hg.d_nse[i] != -1) {
-                auto c2 = radius * (coords[hg.d_nse[i]] - eyeoffset);
+            } else if (hg.d_n5[i] != -1) {
+                auto c2 = radius * (coords[hg.d_n5[i]] - eyeoffset);
                 acceptance_angle *= c1.angle(c2) * 2.0f * acceptance_angle_multiplier;
             } // else acceptange angle will be unchanged at 1.0f
 

@@ -31,14 +31,14 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/extern/craysim/cmake" ${CMAKE_MODUL
 # Path to the NVidia OptiX SDK directory e.g. ~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
 set(OptiX_INSTALL_DIR "${PROJECT_SOURCE_DIR}/../" CACHE PATH "Path to OptiX installed location.")
 
-# Find the libraries which will be needed in addition to compound-ray (libEyeRenderer3.so)
+# Find the libraries which will be needed in addition to compoundray (libEyeRenderer3.so)
 find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(OpenMP) # (OpenMP may be used to build navmesh)
 find_package(Freetype REQUIRED)
 find_package(HDF5 REQUIRED)
 find_package(OptiX REQUIRED)
-find_package(compound-ray REQUIRED)
+find_package(compoundray REQUIRED)
 
 # Where is mathplot? (allows headers and modules to be found)
 set(MPLOT_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/extern/mathplot" CACHE PATH "The path to mathplot")
@@ -86,7 +86,7 @@ include_directories(
 )
 
 # Add the path to the OptiX headers to our include paths. This is
-# required to compile craysim.virtual, which includes compound-ray
+# required to compile craysim.virtual, which includes compoundray
 # headers, which refer to some OptiX data structures
 include_directories("${OptiX_INCLUDE}")
 
@@ -131,6 +131,7 @@ set(ANTPOV_VM_MODULES
   ${MPLOT_INCLUDE_PATH}/mplot/SphereVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/RhomboVisual.cppm
   ${MPLOT_INCLUDE_PATH}/mplot/ScatterVisual.cppm
+  ${MPLOT_INCLUDE_PATH}/mplot/ColourBarVisual.cppm
 )
 
 #
@@ -162,7 +163,7 @@ target_sources(antpov_modules
   PUBLIC FILE_SET CXX_MODULES BASE_DIRS ${PROJECT_SOURCE_DIR}
   FILES ${ANTPOV_MODULES}
 )
-target_link_libraries(antpov_modules ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compound-ray::EyeRenderer3 glad mplot_fontdata)
+target_link_libraries(antpov_modules ${MPLOT_LIBS_CORE} ${MPLOT_LIBS_GL} compoundray::compoundray glad mplot_fontdata)
 
 #
 # Executables in subdirectories
