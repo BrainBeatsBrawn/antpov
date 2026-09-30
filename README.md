@@ -91,7 +91,7 @@ sudo apt install build-essential git \
                  libxi-dev libglfw3-dev libfreetype-dev libhdf5-dev
 ```
 
-* GCC 12 and gmake (from build-essential) is used to compile compound-ray.
+* GCC 12 and gmake (from build-essential) is used to compile compound-ray if using CUDA 12 and OptiX 8.
 * Compound-ray also needs nvidia-cuda-toolkit, which installs the NVIDIA GPU compiler nvcc.
 * Clang-20 and ninja are used to compile antpov.
 * The libraries freeglut3-dev to libhdf5-dev are required by craysim/mathplot for OpenGL visualizations.
@@ -180,6 +180,12 @@ cmake .. -DOptiX_INSTALL_DIR=~/src/NVIDIA-OptiX-SDK-8.0.0-linux64-x86_64
 make
 sudo make install # Installs in /usr/local
 ```
+
+### New: You can use OptiX 9 and CUDA 13
+
+With recent updates in [compound-ray](https://github.com/BrainBeatsBrawn/compound-ray) you can now compile with OptiX 8/CUDA 12 **and** with Optix 9/CUDA 13. If you use Optix 9/CUDA 13, you are no longer constrained to use gcc 12 when compiling compound-ray!
+
+Refer to the build instructions in the [compound-ray README](https://github.com/BrainBeatsBrawn/compound-ray/blob/master/README.md).
 
 ## Build antpov
 
