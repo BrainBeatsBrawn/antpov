@@ -19,3 +19,6 @@
 [submodule "extern/cater_helpers"]
 	path = extern/cater_helpers
 	url = https://github.com/BrainBeatsBrawn/cater_helpers
+[submodule "extern/maths_config"]
+	path = extern/maths_config
+	url = https://github.com/sebsjames/maths_config
