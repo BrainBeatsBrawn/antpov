@@ -6,7 +6,7 @@ It opens a
 glTF-encoded 3D environment containing an ant-form compound eye camera and
 renders the ant's view.
 
-Figures from the associated paper (**to be linked here**) give you a flavour of what the software was designed to do.
+Figures from the associated paper ([preprint](https://www.biorxiv.org/content/10.64898/2026.10.22.760929v1)) give you a flavour of what the software was designed to do.
 In the paper, we describe how we reconstructed the views of real ants as they foraged for the first time in their lives outside their nest, which was situated on a piece of land in Seville, Spain.
 
 ## Ant foraging paths
