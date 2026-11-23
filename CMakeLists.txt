@@ -123,7 +123,7 @@ setup_module_variables_for_craysim (
 )
 # OCES
 include(${PROJECT_SOURCE_DIR}/extern/oces_viewer/cmake/module_definitions.cmake)
-setup_module_variables_for_oces_viewer (${PROJECT_SOURCE_DIR}/extern/oces_viewer ${PROJECT_SOURCE_DIR}/extern/maths)
+setup_module_variables_for_oces_viewer (${PROJECT_SOURCE_DIR}/extern/oces_viewer ${PROJECT_SOURCE_DIR}/extern/maths ${PROJECT_SOURCE_DIR}/extern/maths_hdf)
 
 include(${PROJECT_SOURCE_DIR}/extern/cater_helpers/cmake/module_definitions.cmake)
 setup_module_variables_for_cater_helpers (${PROJECT_SOURCE_DIR}/extern/cater_helpers ${PROJECT_SOURCE_DIR}/extern/maths)

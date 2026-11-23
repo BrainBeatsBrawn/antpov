@@ -22,3 +22,6 @@
 [submodule "extern/maths_config"]
 	path = extern/maths_config
 	url = https://github.com/sebsjames/maths_config
+[submodule "extern/maths_hdf"]
+	path = extern/maths_hdf
+	url = https://github.com/sebsjames/maths_hdf
